@@ -59,6 +59,14 @@ export function AuthMenu() {
             İşletme Paneli
           </Link>
         )}
+        {user.role === "admin" && (
+          <Link
+            href="/admin"
+            className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            Yönetim Paneli
+          </Link>
+        )}
 
         <NotificationBell />
 

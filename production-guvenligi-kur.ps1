@@ -1,3 +1,29 @@
+﻿$ErrorActionPreference = "Stop"
+
+$root = "C:\Users\Atilla\Desktop\neyeihtiyacvar"
+$backendRoot = Join-Path $root "backend\NeyeIhtiyacVar.Api"
+$frontendRoot = Join-Path $root "frontend"
+
+function Write-Utf8NoBom([string]$path, [string]$content) {
+    $dir = [System.IO.Path]::GetDirectoryName($path)
+    if (-not [string]::IsNullOrWhiteSpace($dir)) {
+        [System.IO.Directory]::CreateDirectory($dir) | Out-Null
+    }
+
+    [System.IO.File]::WriteAllText(
+        $path,
+        $content,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+}
+
+# -------------------------------------------------------------------
+# BACKEND: Program.cs production guvenligi
+# -------------------------------------------------------------------
+
+$programPath = Join-Path $backendRoot "Program.cs"
+
+$programContent = @'
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -189,3 +215,111 @@ else
 }
 
 app.Run();
+'@
+
+Write-Utf8NoBom $programPath $programContent
+
+# -------------------------------------------------------------------
+# BACKEND: Production config ornegi - gizli bilgi yok
+# -------------------------------------------------------------------
+
+$productionExamplePath = Join-Path $backendRoot "appsettings.Production.example.json"
+
+$productionExampleContent = @'
+{
+  "Cors": {
+    "AllowedOrigins": [
+      "https://neyeihtiyacvar.com",
+      "https://www.neyeihtiyacvar.com"
+    ]
+  },
+  "Jwt": {
+    "Issuer": "NeyeIhtiyacVar.Api",
+    "Audience": "NeyeIhtiyacVar.Frontend",
+    "ExpirationMinutes": 480
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "neyeihtiyacvar.com;www.neyeihtiyacvar.com"
+}
+'@
+
+Write-Utf8NoBom $productionExamplePath $productionExampleContent
+
+# -------------------------------------------------------------------
+# UBUNTU: Environment variable ornegi - sadece placeholder
+# -------------------------------------------------------------------
+
+$envExamplePath = Join-Path $root "deploy\ubuntu\neyeihtiyacvar-api.env.example"
+
+$envExampleContent = @'
+ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_URLS=http://127.0.0.1:5155
+
+ConnectionStrings__DefaultConnection=Host=127.0.0.1;Port=5432;Database=neyeihtiyacvar;Username=neyeihtiyacvar_app;Password=CHANGE_ME
+
+Jwt__Issuer=NeyeIhtiyacVar.Api
+Jwt__Audience=NeyeIhtiyacVar.Frontend
+Jwt__Key=CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARACTERS
+
+Cors__AllowedOrigins__0=https://neyeihtiyacvar.com
+Cors__AllowedOrigins__1=https://www.neyeihtiyacvar.com
+'@
+
+Write-Utf8NoBom $envExamplePath $envExampleContent
+
+# -------------------------------------------------------------------
+# FRONTEND: Production API URL ornegi
+# -------------------------------------------------------------------
+
+$frontendEnvExamplePath = Join-Path $frontendRoot ".env.production.example"
+
+$frontendEnvExampleContent = @'
+NEXT_PUBLIC_API_BASE_URL=https://api.neyeihtiyacvar.com
+'@
+
+Write-Utf8NoBom $frontendEnvExamplePath $frontendEnvExampleContent
+
+# -------------------------------------------------------------------
+# Gitignore: gercek production env dosyalarini koru, example'lari tut
+# -------------------------------------------------------------------
+
+$gitignorePath = Join-Path $root ".gitignore"
+$gitignore = Get-Content -Raw -Encoding UTF8 $gitignorePath
+
+$linesToAdd = @(
+    "deploy/ubuntu/neyeihtiyacvar-api.env",
+    "frontend/.env.production",
+    "!frontend/.env.production.example",
+    "!backend/NeyeIhtiyacVar.Api/appsettings.Production.example.json",
+    "!deploy/ubuntu/neyeihtiyacvar-api.env.example"
+)
+
+foreach ($line in $linesToAdd) {
+    if ($gitignore -notmatch "(?m)^" + [regex]::Escape($line) + "$") {
+        $gitignore = $gitignore.TrimEnd() + "`r`n" + $line + "`r`n"
+    }
+}
+
+Write-Utf8NoBom $gitignorePath $gitignore
+
+Write-Host ""
+Write-Host "Production guvenligi ve ortam ayrimi hazirlandi." -ForegroundColor Green
+Write-Host ""
+Write-Host "Yapilanlar:" -ForegroundColor Cyan
+Write-Host "  Production admin endpointleri aktif ve Admin rolune korumali"
+Write-Host "  Development admin bootstrap endpointi Production'da yok"
+Write-Host "  Production CORS environment variable ile zorunlu"
+Write-Host "  Connection string environment variable ile destekleniyor"
+Write-Host "  JWT anahtari environment variable ile destekleniyor"
+Write-Host "  Ubuntu production env ornegi olusturuldu"
+Write-Host "  Frontend production API URL ornegi olusturuldu"
+Write-Host "  Gercek production secret dosyalari .gitignore'a eklendi"
+Write-Host ""
+Write-Host "Kontrol:" -ForegroundColor Yellow
+Write-Host "  backend -> dotnet build"
+Write-Host "  frontend -> pnpm exec tsc --noEmit"

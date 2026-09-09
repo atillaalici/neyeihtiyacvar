@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { adminFetch } from "@/lib/admin-api";
 import { apiBaseUrl } from "@/lib/api";
 
 type PublicationStatus = "draft" | "published" | "unpublished";
@@ -56,7 +58,7 @@ export default function AdminProvidersPage() {
           ? `${apiBaseUrl}/api/admin/providers`
           : `${apiBaseUrl}/api/admin/providers?status=${encodeURIComponent(status)}`;
 
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await adminFetch(url, { cache: "no-store" });
 
       if (!response.ok) {
         throw new Error("İşletmeler alınamadı.");
@@ -88,6 +90,7 @@ export default function AdminProvidersPage() {
 
   return (
     <SiteLayout>
+      <AdminNav />
       <section className="border-b border-border bg-cream">
         <div className="section-shell py-10 sm:py-14">
           <p className="text-sm font-medium text-primary">Yönetim</p>

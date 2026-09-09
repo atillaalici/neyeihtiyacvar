@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
+import { adminFetch } from "@/lib/admin-api";
 import { apiBaseUrl } from "@/lib/api";
 
 type ApplicationStatus = "pending" | "approved" | "rejected";
@@ -54,7 +56,7 @@ export default function AdminApplicationsPage() {
     setError("");
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/admin/provider-applications`, {
+      const response = await adminFetch(`${apiBaseUrl}/api/admin/provider-applications`, {
         cache: "no-store",
       });
 
@@ -94,7 +96,7 @@ export default function AdminApplicationsPage() {
     setMessage("");
 
     try {
-      const response = await fetch(
+      const response = await adminFetch(
         `${apiBaseUrl}/api/admin/provider-applications/${application.id}/${action}`,
         {
           method: "POST",
@@ -136,6 +138,7 @@ export default function AdminApplicationsPage() {
 
   return (
     <SiteLayout>
+      <AdminNav />
       <section className="border-b border-border bg-cream">
         <div className="section-shell py-10 sm:py-14">
           <p className="text-sm font-medium text-primary">Yönetim</p>

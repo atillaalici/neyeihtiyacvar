@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
@@ -9,7 +9,7 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import type { ProviderSummary } from "@/lib/providers";
 
-export default function ExplorePage() {
+function ExplorePageContent() {
   const searchParams = useSearchParams();
 
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
@@ -176,5 +176,21 @@ export default function ExplorePage() {
         )}
       </section>
     </SiteLayout>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense
+      fallback={
+        <SiteLayout>
+          <section className="section-shell py-10 sm:py-14">
+            <div className="h-80 animate-pulse rounded-2xl border border-border bg-card" />
+          </section>
+        </SiteLayout>
+      }
+    >
+      <ExplorePageContent />
+    </Suspense>
   );
 }

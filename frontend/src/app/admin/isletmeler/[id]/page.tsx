@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { adminFetch } from "@/lib/admin-api";
 import { apiBaseUrl } from "@/lib/api";
 import type { CategoryDto } from "@/lib/categories";
 
@@ -159,9 +161,9 @@ export default function AdminProviderDetailPage() {
     try {
       const [providersResponse, categoriesResponse, locationsResponse] =
         await Promise.all([
-          fetch(`${apiBaseUrl}/api/admin/providers`, { cache: "no-store" }),
-          fetch(`${apiBaseUrl}/api/categories`, { cache: "no-store" }),
-          fetch(`${apiBaseUrl}/api/locations`, { cache: "no-store" }),
+          adminFetch(`${apiBaseUrl}/api/admin/providers`, { cache: "no-store" }),
+          adminFetch(`${apiBaseUrl}/api/categories`, { cache: "no-store" }),
+          adminFetch(`${apiBaseUrl}/api/locations`, { cache: "no-store" }),
         ]);
 
       if (
@@ -230,7 +232,7 @@ export default function AdminProviderDetailPage() {
         return;
       }
 
-      const response = await fetch(
+      const response = await adminFetch(
         `${apiBaseUrl}/api/admin/providers/${provider.id}`,
         {
           method: "PUT",
@@ -289,7 +291,7 @@ export default function AdminProviderDetailPage() {
     setMessage("");
 
     try {
-      const response = await fetch(
+      const response = await adminFetch(
         `${apiBaseUrl}/api/admin/providers/${provider.id}/${action}`,
         {
           method: "POST",
@@ -327,6 +329,7 @@ export default function AdminProviderDetailPage() {
   if (loading) {
     return (
       <SiteLayout>
+      <AdminNav />
         <section className="section-shell py-12">
           <div className="h-80 animate-pulse rounded-2xl border border-border bg-card" />
         </section>
@@ -337,6 +340,7 @@ export default function AdminProviderDetailPage() {
   if (!provider) {
     return (
       <SiteLayout>
+      <AdminNav />
         <section className="section-shell py-12">
           <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
             <h1 className="font-display text-2xl font-bold">
@@ -359,6 +363,7 @@ export default function AdminProviderDetailPage() {
 
   return (
     <SiteLayout>
+      <AdminNav />
       <section className="border-b border-border bg-cream">
         <div className="section-shell py-10 sm:py-14">
           <Link

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -86,7 +86,7 @@ function toSlug(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-export default function NeedCreatePage() {
+function NeedCreatePageContent() {
   const searchParams = useSearchParams();
   const initialNeed = searchParams.get("ihtiyac") ?? "";
 
@@ -490,5 +490,23 @@ export default function NeedCreatePage() {
         </div>
       </section>
     </SiteLayout>
+  );
+}
+
+export default function NeedCreatePage() {
+  return (
+    <Suspense
+      fallback={
+        <SiteLayout>
+          <section className="section-shell py-10 sm:py-16">
+            <div className="mx-auto max-w-2xl">
+              <div className="h-96 animate-pulse rounded-2xl border border-border bg-card" />
+            </div>
+          </section>
+        </SiteLayout>
+      }
+    >
+      <NeedCreatePageContent />
+    </Suspense>
   );
 }

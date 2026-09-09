@@ -42,3 +42,8 @@ backend/NeyeIhtiyacVar.Api/appsettings.json
 isletme-profil-duzenleme-kur.ps1
 neyeihtiyacvar.docx
 talep-durum-sistemi-kur.ps1
+deploy/ubuntu/neyeihtiyacvar-api.env
+frontend/.env.production
+!frontend/.env.production.example
+!backend/NeyeIhtiyacVar.Api/appsettings.Production.example.json
+!deploy/ubuntu/neyeihtiyacvar-api.env.example
