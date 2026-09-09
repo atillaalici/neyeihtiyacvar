@@ -1,8 +1,11 @@
 export type AuthUser = {
   id: string;
   email: string;
+  phoneNumber: string | null;
   displayName: string;
   role: "user" | "provider" | "admin";
+  emailVerified: boolean;
+  phoneVerified: boolean;
 };
 
 export type AuthResponse = {

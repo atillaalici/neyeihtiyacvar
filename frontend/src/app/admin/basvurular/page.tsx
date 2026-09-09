@@ -56,7 +56,7 @@ export default function AdminApplicationsPage() {
     setError("");
 
     try {
-      const response = await adminFetch(`${apiBaseUrl}/api/admin/provider-applications`, {
+      const response = await adminFetch(`${apiBaseUrl}/api/admin/provider-applications?status=pending`, {
         cache: "no-store",
       });
 

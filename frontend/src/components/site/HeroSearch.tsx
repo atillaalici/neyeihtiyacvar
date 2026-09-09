@@ -37,7 +37,7 @@ export function HeroSearch() {
     }
 
     router.push(
-      `/ihtiyac-olustur?ihtiyac=${encodeURIComponent(cleanQuery)}`,
+      `/kesfet?q=${encodeURIComponent(cleanQuery)}`,
     );
   }
 

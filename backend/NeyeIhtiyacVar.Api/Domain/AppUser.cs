@@ -8,6 +8,14 @@ public sealed class AppUser
 
     public string NormalizedEmail { get; set; } = string.Empty;
 
+    public string? PhoneNumber { get; set; }
+
+    public string? NormalizedPhoneNumber { get; set; }
+
+    public DateTime? EmailVerifiedAtUtc { get; set; }
+
+    public DateTime? PhoneVerifiedAtUtc { get; set; }
+
     public string PasswordHash { get; set; } = string.Empty;
 
     public string DisplayName { get; set; } = string.Empty;

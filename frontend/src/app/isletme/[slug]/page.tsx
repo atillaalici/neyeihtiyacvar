@@ -12,10 +12,11 @@ import {
   Star,
   Wrench,
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
 import {
   phoneHref,
   type ProviderDetail,
@@ -62,6 +63,7 @@ function RatingStars({ value }: { value: number }) {
 }
 
 export default function ProviderDetailPage() {
+  const router = useRouter();
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
 
@@ -71,6 +73,8 @@ export default function ProviderDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [pendingContactHref, setPendingContactHref] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) {
@@ -145,6 +149,19 @@ export default function ProviderDetailPage() {
     };
   }, [slug]);
 
+  function requestContact(href: string) {
+    if (getAccessToken()) {
+      window.location.href = href;
+      return;
+    }
+
+    setPendingContactHref(href);
+    setShowAuthPrompt(true);
+  }
+
+  function authReturnUrl() {
+    return `/isletme/${encodeURIComponent(slug)}`;
+  }
   if (loading) {
     return (
       <SiteLayout>
@@ -175,6 +192,8 @@ export default function ProviderDetailPage() {
 
   const phone = phoneHref(provider.publicPhone);
   const whatsapp = whatsappHref(provider.publicWhatsapp);
+
+  void pendingContactHref;
 
   const averageRating = reviewSummary?.averageRating ?? 0;
   const reviewCount = reviewSummary?.reviewCount ?? 0;
@@ -234,25 +253,25 @@ export default function ProviderDetailPage() {
 
             <div className="mt-7 flex flex-wrap gap-3">
               {phone && (
-                <a
-                  href={phone}
+                <button
+                  type="button"
+                  onClick={() => requestContact(phone)}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   <Phone className="size-4" aria-hidden="true" />
                   Telefon Et
-                </a>
+                </button>
               )}
 
               {whatsapp && (
-                <a
-                  href={whatsapp}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => requestContact(whatsapp)}
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-5 text-sm font-medium transition-colors hover:bg-accent"
                 >
                   <MessageCircle className="size-4" aria-hidden="true" />
                   WhatsApp
-                </a>
+                </button>
               )}
             </div>
           </div>
@@ -458,6 +477,60 @@ export default function ProviderDetailPage() {
           </aside>
         </div>
       </section>
+      {showAuthPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="font-display text-2xl font-bold">
+              İşletmeyle iletişime geçmek için giriş yap
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Telefon ve WhatsApp bilgilerine erişmek için hesabına giriş yap
+              veya ücretsiz üye ol. İşletme sayfası korunacak; girişten sonra
+              kaldığın yerden devam edebilirsin.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const returnUrl = authReturnUrl();
+                  router.push(
+                    `/giris?returnUrl=${encodeURIComponent(returnUrl)}`,
+                  );
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+              >
+                Giriş Yap
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const returnUrl = authReturnUrl();
+                  router.push(
+                    `/kayit?returnUrl=${encodeURIComponent(returnUrl)}`,
+                  );
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-semibold transition hover:bg-muted"
+              >
+                Üye Ol
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowAuthPrompt(false);
+                setPendingContactHref(null);
+              }}
+              className="mt-3 w-full text-sm text-muted-foreground hover:text-foreground"
+            >
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      )}
     </SiteLayout>
   );
 }

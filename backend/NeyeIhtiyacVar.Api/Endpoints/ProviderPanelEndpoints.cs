@@ -1,4 +1,7 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
@@ -39,7 +42,8 @@ public static class ProviderPanelEndpoints
                 .AsNoTracking()
                 .CountAsync(x =>
                     x.CategorySlug == provider.CategorySlug &&
-                    x.ServiceSlug == provider.ServiceSlug &&
+                    (x.ServiceSlug == provider.ServiceSlug ||
+                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
                     x.CitySlug == provider.CitySlug &&
                     x.DistrictSlug == provider.DistrictSlug);
 
@@ -78,6 +82,45 @@ public static class ProviderPanelEndpoints
 
             var errors = ValidateOwnUpdate(request);
 
+            var normalizedAdditionalServices = request.AdditionalServices
+                .Select(x => x?.Trim().ToLowerInvariant() ?? string.Empty)
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (normalizedAdditionalServices.Length > 1)
+            {
+                errors["additionalServices"] =
+                    ["En fazla 1 ek hizmet seçebilirsiniz."];
+            }
+
+            if (normalizedAdditionalServices.Any(x =>
+                string.Equals(
+                    x,
+                    provider.ServiceSlug,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                errors["additionalServices"] =
+                    ["Ana hizmet ek hizmetler arasında tekrar seçilemez."];
+            }
+
+            var validServiceSlugs = (await dbContext.CategoryServices
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.Category.Slug == provider.CategorySlug &&
+                        x.IsActive)
+                    .Select(x => x.Name)
+                    .ToListAsync())
+                .Select(ToSlug)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (normalizedAdditionalServices.Any(x =>
+                !validServiceSlugs.Contains(x)))
+            {
+                errors["additionalServices"] =
+                    ["Ek hizmetler işletmenin ana kategorisindeki hizmetlerden seçilmelidir."];
+            }
+
             if (errors.Count > 0)
             {
                 return Results.BadRequest(new
@@ -88,13 +131,7 @@ public static class ProviderPanelEndpoints
             }
 
             provider.Description = Optional(request.Description);
-            provider.AdditionalServices = request.AdditionalServices
-                .Select(x => x.Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Take(30)
-                .ToArray();
-
+            provider.AdditionalServices = normalizedAdditionalServices;
             provider.PublicPhone = Optional(request.PublicPhone);
             provider.PublicWhatsapp = Optional(request.PublicWhatsapp);
             provider.PublicAddress = Optional(request.PublicAddress);
@@ -111,7 +148,8 @@ public static class ProviderPanelEndpoints
                 .AsNoTracking()
                 .CountAsync(x =>
                     x.CategorySlug == provider.CategorySlug &&
-                    x.ServiceSlug == provider.ServiceSlug &&
+                    (x.ServiceSlug == provider.ServiceSlug ||
+                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
                     x.CitySlug == provider.CitySlug &&
                     x.DistrictSlug == provider.DistrictSlug);
 
@@ -143,7 +181,8 @@ public static class ProviderPanelEndpoints
                 .AsNoTracking()
                 .Where(x =>
                     x.CategorySlug == provider.CategorySlug &&
-                    x.ServiceSlug == provider.ServiceSlug &&
+                    (x.ServiceSlug == provider.ServiceSlug ||
+                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
                     x.CitySlug == provider.CitySlug &&
                     x.DistrictSlug == provider.DistrictSlug)
                 .OrderByDescending(x => x.CreatedAtUtc)
@@ -321,13 +360,14 @@ public static class ProviderPanelEndpoints
                 ["Deneyim yılı 0 ile 100 arasında olmalıdır."];
         }
 
-        if (request.AdditionalServices.Count > 30)
+        if (request.AdditionalServices.Count > 1)
         {
             errors["additionalServices"] =
-                ["En fazla 30 ek hizmet yazabilirsiniz."];
+                ["En fazla 1 ek hizmet seçebilirsiniz."];
         }
 
-        if (request.AdditionalServices.Any(x => x.Trim().Length > 150))
+        if (request.AdditionalServices.Any(x =>
+            x is not null && x.Trim().Length > 150))
         {
             errors["additionalServices"] =
                 ["Ek hizmetlerin her biri en fazla 150 karakter olabilir."];
@@ -346,8 +386,39 @@ public static class ProviderPanelEndpoints
         out Guid userId)
     {
         var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-
         return Guid.TryParse(value, out userId);
+    }
+
+    private static string ToSlug(string value)
+    {
+        var normalized = value
+            .ToLower(new CultureInfo("tr-TR"))
+            .Replace('ı', 'i')
+            .Replace('ğ', 'g')
+            .Replace('ü', 'u')
+            .Replace('ş', 's')
+            .Replace('ö', 'o')
+            .Replace('ç', 'c')
+            .Normalize(NormalizationForm.FormD);
+
+        var builder = new StringBuilder();
+
+        foreach (var character in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(character) !=
+                UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(character);
+            }
+        }
+
+        return Regex.Replace(
+                builder
+                    .ToString()
+                    .Normalize(NormalizationForm.FormC),
+                "[^a-z0-9]+",
+                "-")
+            .Trim('-');
     }
 }
 

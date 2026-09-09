@@ -65,7 +65,7 @@ type FormState = {
   description: string;
   categorySlug: string;
   serviceSlug: string;
-  additionalServices: string;
+  additionalServices: string[];
   citySlug: string;
   districtSlug: string;
   publicPhone: string;
@@ -83,7 +83,7 @@ const emptyForm: FormState = {
   description: "",
   categorySlug: "",
   serviceSlug: "",
-  additionalServices: "",
+  additionalServices: [],
   citySlug: "",
   districtSlug: "",
   publicPhone: "",
@@ -102,7 +102,7 @@ function formFromProvider(provider: AdminProvider): FormState {
     description: provider.description ?? "",
     categorySlug: provider.categorySlug,
     serviceSlug: provider.serviceSlug,
-    additionalServices: provider.additionalServices.join("\n"),
+    additionalServices: provider.additionalServices,
     citySlug: provider.citySlug,
     districtSlug: provider.districtSlug,
     publicPhone: provider.publicPhone ?? "",
@@ -186,8 +186,26 @@ export default function AdminProviderDetailPage() {
         return;
       }
 
+      const currentCategory =
+        categoryData.find((item) => item.slug === current.categorySlug) ?? null;
+
+      const validAdditionalServiceSlugs = new Set(
+        (currentCategory?.services ?? [])
+          .map(toSlug)
+          .filter((slug) => slug !== current.serviceSlug),
+      );
+
+      const sanitizedAdditionalServices = current.additionalServices
+        .filter((item) => validAdditionalServiceSlugs.has(item))
+        .slice(0, 1);
+
       setProvider(current);
-      setForm(formFromProvider(current));
+      setForm(
+        formFromProvider({
+          ...current,
+          additionalServices: sanitizedAdditionalServices,
+        }),
+      );
       setCategories(categoryData);
       setCities(locationData);
     } catch {
@@ -208,6 +226,35 @@ export default function AdminProviderDetailPage() {
     }));
   }
 
+  function toggleAdditionalService(serviceSlug: string) {
+    setForm((current) => {
+      const exists = current.additionalServices.includes(serviceSlug);
+
+      if (exists) {
+        return {
+          ...current,
+          additionalServices: current.additionalServices.filter(
+            (item) => item !== serviceSlug,
+          ),
+        };
+      }
+
+      if (current.additionalServices.length >= 1) {
+        setError("En fazla 1 ek hizmet seçebilirsiniz.");
+        return current;
+      }
+
+      setError("");
+
+      return {
+        ...current,
+        additionalServices: [
+          ...current.additionalServices,
+          serviceSlug,
+        ],
+      };
+    });
+  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -246,10 +293,7 @@ export default function AdminProviderDetailPage() {
             description: form.description.trim() || null,
             categorySlug: form.categorySlug,
             serviceSlug: form.serviceSlug,
-            additionalServices: form.additionalServices
-              .split("\n")
-              .map((item) => item.trim())
-              .filter(Boolean),
+            additionalServices: form.additionalServices,
             citySlug: form.citySlug,
             districtSlug: form.districtSlug,
             publicPhone: form.publicPhone.trim() || null,
@@ -568,19 +612,51 @@ export default function AdminProviderDetailPage() {
             </div>
 
             <div className="sm:col-span-2">
-              <label className="mb-2 block text-sm font-medium">
-                Ek hizmetler
-              </label>
-              <textarea
-                value={form.additionalServices}
-                onChange={(event) =>
-                  update("additionalServices", event.target.value)
-                }
-                disabled={!editable}
-                rows={4}
-                className="w-full rounded-md border border-input bg-background px-3 py-3 text-sm disabled:opacity-60"
-                placeholder={"Her satıra bir hizmet yaz.\nÖrn: Bilgisayar tamiri"}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-sm font-medium">
+                  Ek hizmetler
+                </label>
+                <span className="text-xs text-muted-foreground">
+                  {form.additionalServices.length}/1 seçildi
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(selectedCategory?.services ?? [])
+                  .filter((service) => toSlug(service) !== form.serviceSlug)
+                  .map((service) => {
+                    const slug = toSlug(service);
+                    const checked = form.additionalServices.includes(slug);
+                    const disabled =
+                      !editable ||
+                      (!checked && form.additionalServices.length >= 1);
+
+                    return (
+                      <label
+                        key={service}
+                        className={[
+                          "flex items-center gap-3 rounded-xl border p-3 text-sm",
+                          checked
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border bg-background",
+                          disabled ? "opacity-60" : "cursor-pointer",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={() => toggleAdditionalService(slug)}
+                        />
+                        <span>{service}</span>
+                      </label>
+                    );
+                  })}
+              </div>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                Ana hizmete ek olarak en fazla 3 hizmet seçebilirsin.
+              </p>
             </div>
 
             <div>

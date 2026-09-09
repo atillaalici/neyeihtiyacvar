@@ -11,6 +11,7 @@ import {
   MessageSquareText,
   Star,
   Store,
+  Users,
   XCircle,
 } from "lucide-react";
 
@@ -38,6 +39,8 @@ type DashboardData = {
   cancelledNeeds: number;
   pendingApplications: number;
   approvedApplications: number;
+  totalUsers: number;
+  activeUsers: number;
   totalProviders: number;
   publishedProviders: number;
   totalOffers: number;
@@ -157,6 +160,30 @@ export default function AdminDashboardPage() {
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Toplam Kullanıcı"
+                value={data.totalUsers}
+                icon={<Users className="size-5 text-violet-600" />}
+                href="/admin/kullanicilar"
+              />
+              <StatCard
+                label="Aktif Kullanıcı"
+                value={data.activeUsers}
+                icon={<Users className="size-5 text-emerald-600" />}
+                href="/admin/kullanicilar"
+              />
+              <StatCard
+                label="Toplam İşletme"
+                value={data.totalProviders}
+                icon={<Building2 className="size-5 text-sky-600" />}
+                href="/admin/isletmeler"
+              />
+              <StatCard
+                label="Yayındaki İşletme"
+                value={data.publishedProviders}
+                icon={<Store className="size-5 text-blue-600" />}
+                href="/admin/isletmeler"
+              />
               <StatCard
                 label="Toplam Talep"
                 value={data.totalNeeds}

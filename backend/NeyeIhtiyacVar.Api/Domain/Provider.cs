@@ -47,6 +47,8 @@ public sealed class Provider
     public DateTime? PublishedAtUtc { get; set; }
 
     public string? PublishedBy { get; set; }
+    public bool IsActive { get; set; } = true;
+
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 

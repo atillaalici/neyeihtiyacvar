@@ -30,6 +30,10 @@ public static class AdminDashboardEndpoints
                 await dbContext.ProviderApplications.CountAsync(
                     x => x.Status == ProviderApplicationStatus.Approved);
 
+            var totalUsers = await dbContext.Users.CountAsync();
+            var activeUsers = await dbContext.Users.CountAsync(
+                x => x.IsActive);
+
             var totalProviders = await dbContext.Providers.CountAsync();
 
             var publishedProviders =
@@ -81,6 +85,8 @@ public static class AdminDashboardEndpoints
                 cancelledNeeds,
                 pendingApplications,
                 approvedApplications,
+                totalUsers,
+                activeUsers,
                 totalProviders,
                 publishedProviders,
                 totalOffers,

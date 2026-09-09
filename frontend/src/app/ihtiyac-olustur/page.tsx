@@ -1,8 +1,15 @@
 "use client";
 
-import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BellRing, CheckCircle2 } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -87,42 +94,108 @@ function toSlug(value: string) {
 }
 
 function NeedCreatePageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const initialNeed = searchParams.get("ihtiyac") ?? "";
+
+  const initialNeed =
+    searchParams.get("ihtiyac") ??
+    searchParams.get("q") ??
+    "";
+
+  const initialCategory =
+    searchParams.get("kategori") ?? "";
+  const initialService =
+    searchParams.get("hizmet") ?? "";
+  const initialCity =
+    searchParams.get("il") ?? "";
+  const initialDistrict =
+    searchParams.get("ilce") ?? "";
+
+  const returnUrl = `/ihtiyac-olustur${
+    searchParams.toString()
+      ? `?${searchParams.toString()}`
+      : ""
+  }`;
+  const fromSearch =
+    Boolean(initialNeed) &&
+    Boolean(initialCategory) &&
+    Boolean(initialService) &&
+    Boolean(initialCity) &&
+    Boolean(initialDistrict);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
-  const [description, setDescription] = useState(initialNeed);
-  const [categorySlug, setCategorySlug] = useState("");
-  const [serviceSlug, setServiceSlug] = useState("");
-  const [citySlug, setCitySlug] = useState("");
-  const [districtSlug, setDistrictSlug] = useState("");
+  const [description, setDescription] =
+    useState(initialNeed);
+  const [categorySlug, setCategorySlug] =
+    useState(initialCategory);
+  const [serviceSlug, setServiceSlug] =
+    useState(initialService);
+  const [citySlug, setCitySlug] =
+    useState(initialCity);
+  const [districtSlug, setDistrictSlug] =
+    useState(initialDistrict);
 
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<NeedResponse | null>(null);
-  const [matches, setMatches] = useState<MatchResponse | null>(null);
+  const [success, setSuccess] =
+    useState<NeedResponse | null>(null);
+  const [matches, setMatches] =
+    useState<MatchResponse | null>(null);
   const [error, setError] = useState("");
+  useEffect(() => {
+    setAuthenticated(Boolean(getAccessToken()));
+    setAuthReady(true);
+  }, []);
+
+  useEffect(() => {
+    setDescription(initialNeed);
+    setCategorySlug(initialCategory);
+    setServiceSlug(initialService);
+    setCitySlug(initialCity);
+    setDistrictSlug(initialDistrict);
+    setSuccess(null);
+    setMatches(null);
+  }, [
+    initialNeed,
+    initialCategory,
+    initialService,
+    initialCity,
+    initialDistrict,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadCatalogs() {
       try {
-        const [categoryResponse, locationResponse] = await Promise.all([
-          fetch(`${apiBaseUrl}/api/categories`),
-          fetch(`${apiBaseUrl}/api/locations`),
-        ]);
+        const [categoryResponse, locationResponse] =
+          await Promise.all([
+            fetch(`${apiBaseUrl}/api/categories`, {
+              cache: "no-store",
+            }),
+            fetch(`${apiBaseUrl}/api/locations`, {
+              cache: "no-store",
+            }),
+          ]);
 
-        if (!categoryResponse.ok || !locationResponse.ok) {
-          throw new Error("Katalog verileri alınamadı.");
+        if (
+          !categoryResponse.ok ||
+          !locationResponse.ok
+        ) {
+          throw new Error(
+            "Katalog verileri alınamadı.",
+          );
         }
 
-        const [categoryData, locationData] = await Promise.all([
-          categoryResponse.json() as Promise<Category[]>,
-          locationResponse.json() as Promise<City[]>,
-        ]);
+        const [categoryData, locationData] =
+          await Promise.all([
+            categoryResponse.json() as Promise<Category[]>,
+            locationResponse.json() as Promise<City[]>,
+          ]);
 
         if (!cancelled) {
           setCategories(categoryData);
@@ -131,11 +204,13 @@ function NeedCreatePageContent() {
       } catch {
         if (!cancelled) {
           setError(
-            "Kategori ve konum bilgileri yüklenemedi. Backend'in çalıştığından emin olun.",
+            "Kategori ve konum bilgileri yüklenemedi.",
           );
         }
       } finally {
-        if (!cancelled) setCatalogLoading(false);
+        if (!cancelled) {
+          setCatalogLoading(false);
+        }
       }
     }
 
@@ -147,14 +222,44 @@ function NeedCreatePageContent() {
   }, []);
 
   const services = useMemo(() => {
-    return categories.find((item) => item.slug === categorySlug)?.services ?? [];
+    return (
+      categories.find(
+        (item) => item.slug === categorySlug,
+      )?.services ?? []
+    );
   }, [categories, categorySlug]);
 
   const districts = useMemo(() => {
-    return cities.find((item) => item.slug === citySlug)?.districts ?? [];
+    return (
+      cities.find(
+        (item) => item.slug === citySlug,
+      )?.districts ?? []
+    );
   }, [cities, citySlug]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const selectedCategoryName =
+    categories.find(
+      (item) => item.slug === categorySlug,
+    )?.name ?? categorySlug;
+
+  const selectedServiceName =
+    services.find(
+      (item) => toSlug(item) === serviceSlug,
+    ) ?? serviceSlug;
+
+  const selectedCityName =
+    cities.find(
+      (item) => item.slug === citySlug,
+    )?.name ?? citySlug;
+
+  const selectedDistrictName =
+    districts.find(
+      (item) => item.slug === districtSlug,
+    )?.name ?? districtSlug;
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     if (loading || success) {
@@ -198,6 +303,13 @@ function NeedCreatePageContent() {
 
     const token = getAccessToken();
 
+    if (!token) {
+      router.push(
+        `/giris?returnUrl=${encodeURIComponent(returnUrl)}`,
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -205,27 +317,31 @@ function NeedCreatePageContent() {
         "Content-Type": "application/json",
       };
 
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+      headers.Authorization = `Bearer ${token}`;
 
-      const response = await fetch(`${apiBaseUrl}/api/needs`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          title,
-          description: cleanDescription,
-          categorySlug,
-          serviceSlug,
-          citySlug,
-          districtSlug,
-        }),
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/api/needs`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            title,
+            description: cleanDescription,
+            categorySlug,
+            serviceSlug,
+            citySlug,
+            districtSlug,
+          }),
+        },
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data?.message ?? "İhtiyaç talebi oluşturulamadı.");
+        setError(
+          data?.message ??
+            "İhtiyaç talebi oluşturulamadı.",
+        );
         return;
       }
 
@@ -234,14 +350,17 @@ function NeedCreatePageContent() {
 
       const matchResponse = await fetch(
         `${apiBaseUrl}/api/needs/${created.id}/matches`,
+        { cache: "no-store" },
       );
 
       if (matchResponse.ok) {
-        setMatches((await matchResponse.json()) as MatchResponse);
+        setMatches(
+          (await matchResponse.json()) as MatchResponse,
+        );
       }
     } catch {
       setError(
-        "Sunucuya bağlanılamadı. Backend'in çalıştığından emin olun.",
+        "Sunucuya bağlanılamadı. Lütfen tekrar deneyin.",
       );
     } finally {
       setLoading(false);
@@ -254,15 +373,72 @@ function NeedCreatePageContent() {
         <div className="mx-auto max-w-2xl">
           <div className="mb-8">
             <h1 className="font-display text-3xl font-bold sm:text-4xl">
-              İhtiyaç Oluştur
+              Talep Oluştur
             </h1>
 
             <p className="mt-3 text-muted-foreground">
-              İhtiyacını, hizmeti ve konumunu seç. Sana uygun yayındaki
-              işletmeleri bulalım.
+              {fromSearch
+                ? "Arama bilgilerini senin için hazırladık. Kontrol edip talebi oluşturabilirsin."
+                : "İhtiyacını, hizmeti ve konumunu belirle. Uygun işletme platforma geldiğinde bu talep üzerinden takip edebiliriz."}
             </p>
           </div>
 
+          {fromSearch && (
+            <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <BellRing
+                    className="size-5"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div>
+                  <h2 className="font-semibold">
+                    İstersen bu ihtiyacı takip edelim
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    Şu an uygun işletme bulunamadı. Talebi
+                    oluşturursan uygun bir işletme platforma
+                    eklendiğinde ileride sana haber verebileceğiz.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!authReady ? (
+            <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
+          ) : !authenticated ? (
+            <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-soft sm:p-8">
+              <h2 className="font-display text-2xl font-bold">
+                Talep oluşturmak için hesabına giriş yap
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                Talebini 7 gün takip edebilmemiz ve uygun bir işletme
+                bulunduğunda sana haber verebilmemiz için talebin hesabına
+                bağlı olmalı. Arama bilgilerin korunacak; giriş veya kayıt
+                sonrası kaldığın yerden devam edeceksin.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Link
+                  href={`/giris?returnUrl=${encodeURIComponent(returnUrl)}`}
+                  className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Giriş Yap
+                </Link>
+
+                <Link
+                  href={`/kayit?returnUrl=${encodeURIComponent(returnUrl)}`}
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-semibold transition hover:bg-muted"
+                >
+                  Üye Ol
+                </Link>
+              </div>
+            </div>
+          ) : (
           <form
             onSubmit={handleSubmit}
             className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft sm:p-8"
@@ -283,12 +459,38 @@ function NeedCreatePageContent() {
                   setSuccess(null);
                   setMatches(null);
                 }}
-                rows={5}
+                rows={4}
                 maxLength={2000}
                 placeholder="İhtiyacını kendi cümlenle anlat..."
                 className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </div>
+
+            {fromSearch && !catalogLoading && (
+              <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
+                <div>
+                  <div className="text-xs text-muted-foreground">
+                    Hizmet
+                  </div>
+                  <div className="mt-1 font-medium">
+                    {selectedServiceName || "—"}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {selectedCategoryName}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-muted-foreground">
+                    Konum
+                  </div>
+                  <div className="mt-1 font-medium">
+                    {selectedCityName} /{" "}
+                    {selectedDistrictName}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -301,6 +503,8 @@ function NeedCreatePageContent() {
                   onValueChange={(value) => {
                     setCategorySlug(value);
                     setServiceSlug("");
+                    setSuccess(null);
+                    setMatches(null);
                   }}
                   disabled={catalogLoading}
                 >
@@ -310,7 +514,10 @@ function NeedCreatePageContent() {
 
                   <SelectContent>
                     {categories.map((item) => (
-                      <SelectItem key={item.id} value={item.slug}>
+                      <SelectItem
+                        key={item.id}
+                        value={item.slug}
+                      >
                         {item.name}
                       </SelectItem>
                     ))}
@@ -330,16 +537,19 @@ function NeedCreatePageContent() {
                     setSuccess(null);
                     setMatches(null);
                   }}
-                  disabled={!categorySlug}
+                  disabled={!categorySlug || catalogLoading}
                 >
                   <SelectTrigger className="h-11 w-full">
                     <SelectValue placeholder="Hizmet Seç" />
                   </SelectTrigger>
 
                   <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service} value={toSlug(service)}>
-                        {service}
+                    {services.map((serviceItem) => (
+                      <SelectItem
+                        key={serviceItem}
+                        value={toSlug(serviceItem)}
+                      >
+                        {serviceItem}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -349,13 +559,17 @@ function NeedCreatePageContent() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-2 block text-sm font-medium">İl</label>
+                <label className="mb-2 block text-sm font-medium">
+                  İl
+                </label>
 
                 <Select
                   value={citySlug}
                   onValueChange={(value) => {
                     setCitySlug(value);
                     setDistrictSlug("");
+                    setSuccess(null);
+                    setMatches(null);
                   }}
                   disabled={catalogLoading}
                 >
@@ -365,7 +579,10 @@ function NeedCreatePageContent() {
 
                   <SelectContent>
                     {cities.map((item) => (
-                      <SelectItem key={item.id} value={item.slug}>
+                      <SelectItem
+                        key={item.id}
+                        value={item.slug}
+                      >
                         {item.name}
                       </SelectItem>
                     ))}
@@ -385,7 +602,7 @@ function NeedCreatePageContent() {
                     setSuccess(null);
                     setMatches(null);
                   }}
-                  disabled={!citySlug}
+                  disabled={!citySlug || catalogLoading}
                 >
                   <SelectTrigger className="h-11 w-full">
                     <SelectValue placeholder="İlçe Seç" />
@@ -393,7 +610,10 @@ function NeedCreatePageContent() {
 
                   <SelectContent>
                     {districts.map((item) => (
-                      <SelectItem key={item.id} value={item.slug}>
+                      <SelectItem
+                        key={item.id}
+                        value={item.slug}
+                      >
                         {item.name}
                       </SelectItem>
                     ))}
@@ -402,17 +622,6 @@ function NeedCreatePageContent() {
               </div>
             </div>
 
-            {!getAccessToken() && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Giriş yapmadan da talep oluşturabilirsin; ancak işletmelerden
-                teklif almak ve teklifleri hesabında görmek için giriş yapman gerekir.
-                {" "}
-                <Link href="/giris" className="font-medium underline">
-                  Giriş Yap
-                </Link>
-              </div>
-            )}
-
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {error}
@@ -420,15 +629,24 @@ function NeedCreatePageContent() {
             )}
 
             {success && (
-              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                Talebin başarıyla oluşturuldu.
-                <div className="mt-1 break-all text-xs">
-                  Talep ID: {success.id}
+              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-700">
+                <div className="flex items-center gap-2 font-medium">
+                  <CheckCircle2
+                    className="size-4"
+                    aria-hidden="true"
+                  />
+                  Talebin başarıyla oluşturuldu.
                 </div>
+
+                <p className="mt-2 text-sm">
+                  Talebin açık kaldığı sürece uygun işletmelerle
+                  eşleştirilebilir.
+                </p>
+
                 {getAccessToken() && (
                   <Link
                     href="/taleplerim"
-                    className="mt-2 inline-block font-medium underline"
+                    className="mt-3 inline-block font-medium underline"
                   >
                     Taleplerime Git
                   </Link>
@@ -436,46 +654,44 @@ function NeedCreatePageContent() {
               </div>
             )}
 
-            {matches && (
+            {matches && matches.count > 0 && (
               <div className="rounded-2xl border border-border bg-background p-5">
                 <div className="mb-4">
                   <h2 className="font-semibold">
                     Uygun işletmeler ({matches.count})
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Aynı kategori, hizmet, il ve ilçedeki yayındaki işletmeler.
+                    Talebi oluştururken yeni bir eşleşme bulundu.
                   </p>
                 </div>
 
-                {matches.count === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Şu anda birebir eşleşen yayındaki işletme bulunamadı.
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {matches.providers.map((provider) => (
-                      <Link
-                        key={provider.id}
-                        href={`/isletme/${provider.slug}`}
-                        className="block rounded-xl border border-border p-4 transition hover:border-primary/40 hover:bg-muted/40"
-                      >
-                        <div className="font-semibold">
-                          {provider.businessName}
-                        </div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          {provider.shortDescription}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                <div className="space-y-3">
+                  {matches.providers.map((provider) => (
+                    <Link
+                      key={provider.id}
+                      href={`/isletme/${provider.slug}`}
+                      className="block rounded-xl border border-border p-4 transition hover:border-primary/40 hover:bg-muted/40"
+                    >
+                      <div className="font-semibold">
+                        {provider.businessName}
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {provider.shortDescription}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
 
             <Button
               type="submit"
               size="lg"
-              disabled={loading || catalogLoading || !!success}
+              disabled={
+                loading ||
+                catalogLoading ||
+                Boolean(success)
+              }
               className="w-full"
             >
               {loading
@@ -484,9 +700,10 @@ function NeedCreatePageContent() {
                   ? "Bilgiler yükleniyor..."
                   : success
                     ? "Talep Oluşturuldu"
-                    : "Talebi Gönder"}
+                    : "Talebi Oluştur ve Takip Et"}
             </Button>
           </form>
+          )}
         </div>
       </section>
     </SiteLayout>

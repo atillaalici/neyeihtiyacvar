@@ -22,6 +22,101 @@ namespace NeyeIhtiyacVar.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.AccountVerificationCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Purpose", "Channel", "CreatedAtUtc");
+
+                    b.ToTable("AccountVerificationCodes");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.AdminAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("AdminEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<Guid?>("AdminUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("EntityId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("EntityName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("EntityType");
+
+                    b.ToTable("AdminAuditLogs");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -41,6 +136,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<DateTime?>("EmailVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -49,10 +147,21 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
+                    b.Property<string>("NormalizedPhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("PhoneVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -65,6 +174,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedPhoneNumber")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -231,6 +343,11 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<Guid?>("OwnerUserId")
                         .HasColumnType("uuid");
 
@@ -248,6 +365,12 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<DateTime?>("TrackingExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("TrackingReminderSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -256,6 +379,8 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasIndex("OwnerUserId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TrackingExpiresAtUtc");
 
                     b.ToTable("NeedRequests");
                 });
@@ -346,6 +471,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
 
                     b.Property<int?>("ExperienceYears")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("OnsiteService")
                         .HasColumnType("boolean");
@@ -594,6 +722,17 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("ProviderReviews");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.AccountVerificationCode", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryService", b =>

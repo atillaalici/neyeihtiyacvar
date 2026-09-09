@@ -22,11 +22,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AppUser> Users => Set<AppUser>();
 
+    public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
+
     public DbSet<ProviderOffer> ProviderOffers => Set<ProviderOffer>();
 
     public DbSet<ProviderReview> ProviderReviews => Set<ProviderReview>();
 
     public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -171,7 +175,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         modelBuilder.Entity<ProviderApplication>(entity =>
         {
             entity.HasIndex(x => x.Status);
-            entity.HasIndex(x => x.CreatedAtUtc);
+entity.HasIndex(x => x.CreatedAtUtc);
 
             entity.Property(x => x.BusinessName)
                 .HasMaxLength(200)
@@ -222,9 +226,40 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .IsConcurrencyToken();
         });
 
+        modelBuilder.Entity<AdminAuditLog>(entity =>
+        {
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.Action);
+            entity.HasIndex(x => x.EntityType);
+            entity.HasIndex(x => x.AdminUserId);
+
+            entity.Property(x => x.AdminEmail)
+                .HasMaxLength(254)
+                .IsRequired();
+
+            entity.Property(x => x.Action)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.EntityType)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.EntityId)
+                .HasMaxLength(100);
+
+            entity.Property(x => x.EntityName)
+                .HasMaxLength(300);
+
+            entity.Property(x => x.Details)
+                .HasMaxLength(2000);
+        });
         modelBuilder.Entity<AppUser>(entity =>
         {
             entity.HasIndex(x => x.NormalizedEmail).IsUnique();
+
+            entity.HasIndex(x => x.NormalizedPhoneNumber)
+                .IsUnique();
 
             entity.Property(x => x.Email)
                 .HasMaxLength(254)
@@ -233,6 +268,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.NormalizedEmail)
                 .HasMaxLength(254)
                 .IsRequired();
+
+            entity.Property(x => x.PhoneNumber)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.NormalizedPhoneNumber)
+                .HasMaxLength(20);
 
             entity.Property(x => x.PasswordHash)
                 .HasMaxLength(1000)
@@ -247,12 +288,43 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(20);
         });
 
+
+        modelBuilder.Entity<AccountVerificationCode>(entity =>
+        {
+            entity.HasIndex(x => new
+            {
+                x.UserId,
+                x.Purpose,
+                x.Channel,
+                x.CreatedAtUtc
+            });
+
+            entity.Property(x => x.Purpose)
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            entity.Property(x => x.Channel)
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(x => x.CodeHash)
+                .HasMaxLength(128)
+                .IsRequired();
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<NeedRequest>(entity =>
         {
             entity.HasIndex(x => x.OwnerUserId);
             entity.HasIndex(x => x.Status);
+            entity.HasIndex(x => x.TrackingExpiresAtUtc);
 
-            entity.Property(x => x.Title)
+            entity.Property(x => x.IsActive)
+                .HasDefaultValue(true);
+entity.Property(x => x.Title)
                 .HasMaxLength(150)
                 .IsRequired();
 
@@ -303,8 +375,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             }).IsUnique();
 
             entity.HasIndex(x => x.Status);
-
-            entity.Property(x => x.Message)
+entity.Property(x => x.Message)
                 .HasMaxLength(2000)
                 .IsRequired();
 

@@ -34,6 +34,10 @@ public static class NeedRequestEndpoints
                     x.CitySlug,
                     x.DistrictSlug,
                     status = x.Status.ToString().ToLowerInvariant(),
+                    x.TrackingExpiresAtUtc,
+                    x.TrackingReminderSentAtUtc,
+                    trackingExpired =
+                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
                     x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
@@ -63,6 +67,10 @@ public static class NeedRequestEndpoints
                     x.CitySlug,
                     x.DistrictSlug,
                     status = x.Status.ToString().ToLowerInvariant(),
+                    x.TrackingExpiresAtUtc,
+                    x.TrackingReminderSentAtUtc,
+                    trackingExpired =
+                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
                     x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
@@ -142,6 +150,14 @@ public static class NeedRequestEndpoints
             ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
+            var userIdValue =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(userIdValue, out var ownerUserId))
+            {
+                return Results.Unauthorized();
+            }
+
             var validationErrors = Validate(request);
 
             if (validationErrors.Count > 0)
@@ -219,14 +235,6 @@ public static class NeedRequestEndpoints
                 });
             }
 
-            Guid? ownerUserId = null;
-            var userIdValue =
-                principal.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (Guid.TryParse(userIdValue, out var parsedUserId))
-            {
-                ownerUserId = parsedUserId;
-            }
 
             var now = DateTime.UtcNow;
 
@@ -243,6 +251,8 @@ public static class NeedRequestEndpoints
                 CitySlug = city.Slug,
                 DistrictSlug = district.Slug,
                 Status = NeedStatus.Open,
+                TrackingExpiresAtUtc = now.AddDays(7),
+                TrackingReminderSentAtUtc = null,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
@@ -265,10 +275,128 @@ public static class NeedRequestEndpoints
                     needRequest.CitySlug,
                     needRequest.DistrictSlug,
                     status = needRequest.Status.ToString().ToLowerInvariant(),
+                    needRequest.TrackingExpiresAtUtc,
+                    trackingExpired = false,
                     needRequest.CreatedAtUtc
                 });
         });
 
+
+        group.MapPost("/{id:guid}/tracking/renew", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var userIdValue =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(userIdValue, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var need = await dbContext.NeedRequests
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (need is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İhtiyaç talebi bulunamadı."
+                });
+            }
+
+            if (need.OwnerUserId != userId)
+            {
+                return Results.Forbid();
+            }
+
+            if (need.Status is NeedStatus.Completed or NeedStatus.Cancelled)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Sonuçlanmış veya iptal edilmiş talep yenilenemez."
+                });
+            }
+
+            var now = DateTime.UtcNow;
+            var currentExpiry =
+                need.TrackingExpiresAtUtc ??
+                need.CreatedAtUtc.AddDays(7);
+
+            var renewalBase =
+                currentExpiry > now
+                    ? currentExpiry
+                    : now;
+
+            need.TrackingExpiresAtUtc =
+                renewalBase.AddDays(7);
+            need.TrackingReminderSentAtUtc = null;
+            need.IsActive = true;
+            need.UpdatedAtUtc = now;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                need.Id,
+                need.TrackingExpiresAtUtc,
+                trackingExpired = false,
+                message = "Talebin 7 gün daha takip edilecek."
+            });
+        });
+
+        group.MapPost("/{id:guid}/tracking/stop", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var userIdValue =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(userIdValue, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var need = await dbContext.NeedRequests
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (need is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İhtiyaç talebi bulunamadı."
+                });
+            }
+
+            if (need.OwnerUserId != userId)
+            {
+                return Results.Forbid();
+            }
+
+            if (need.Status == NeedStatus.Completed)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Sonuçlanmış talep kapatılamaz."
+                });
+            }
+
+            need.Status = NeedStatus.Cancelled;
+            need.IsActive = false;
+            need.UpdatedAtUtc = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                need.Id,
+                status = need.Status.ToString().ToLowerInvariant(),
+                need.IsActive,
+                message = "Talep takibi kapatıldı."
+            });
+        });
         return app;
     }
 

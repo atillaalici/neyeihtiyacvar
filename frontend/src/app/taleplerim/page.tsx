@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, Phone, Star } from "lucide-react";
+import { Clock3, MessageCircle, Phone, RefreshCw, Star } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ type MyNeed = {
   citySlug: string | null;
   districtSlug: string | null;
   status: NeedStatus;
+  trackingExpiresAtUtc: string;
+  trackingExpired: boolean;
   createdAtUtc: string;
   updatedAtUtc: string;
   offerCount: number;
@@ -186,6 +188,7 @@ export default function MyNeedsPage() {
   const [loading, setLoading] = useState(true);
   const [workingOfferId, setWorkingOfferId] = useState<string | null>(null);
   const [workingCancelNeedId, setWorkingCancelNeedId] = useState<string | null>(null);
+  const [workingTrackingNeedId, setWorkingTrackingNeedId] = useState<string | null>(null);
   const [workingReviewNeedId, setWorkingReviewNeedId] = useState<string | null>(
     null,
   );
@@ -352,6 +355,46 @@ export default function MyNeedsPage() {
     }));
   }
 
+  async function renewTracking(needId: string) {
+    const token = getAccessToken();
+
+    if (!token) {
+      router.replace("/giris");
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setWorkingTrackingNeedId(needId);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/needs/${needId}/tracking/renew`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.message ?? "Takip süresi uzatılamadı.");
+        return;
+      }
+
+      setMessage("Talebin 7 gün daha takip edilecek.");
+      setLoading(true);
+      await loadData();
+    } catch {
+      setError("Sunucuya bağlanılamadı.");
+    } finally {
+      setWorkingTrackingNeedId(null);
+      setLoading(false);
+    }
+  }
   async function cancelNeed(needId: string) {
     const token = getAccessToken();
 
@@ -361,7 +404,7 @@ export default function MyNeedsPage() {
     }
 
     const confirmed = window.confirm(
-      "Bu ihtiyaç talebini iptal etmek istediğine emin misin?",
+      "Bu talebi kapatmak istediğine emin misin?",
     );
 
     if (!confirmed) {
@@ -390,7 +433,7 @@ export default function MyNeedsPage() {
         return;
       }
 
-      setMessage("İhtiyaç talebin iptal edildi.");
+      setMessage("Talebin kapatıldı.");
       setLoading(true);
       await loadData();
     } catch {
@@ -541,6 +584,19 @@ export default function MyNeedsPage() {
                 (offer) => offer.status === "accepted",
               );
               const reviewDraft = getReviewDraft(need.id);
+              const trackingExpiry = new Date(need.trackingExpiresAtUtc);
+              const trackingRemainingMs =
+                trackingExpiry.getTime() - Date.now();
+              const trackingDaysLeft = Math.max(
+                0,
+                Math.ceil(
+                  trackingRemainingMs / (1000 * 60 * 60 * 24),
+                ),
+              );
+              const trackingActive =
+                (need.status === "open" ||
+                  need.status === "offerreceived") &&
+                !need.trackingExpired;
 
               return (
                 <article
@@ -575,6 +631,70 @@ export default function MyNeedsPage() {
 
                   {(need.status === "open" ||
                     need.status === "offerreceived") && (
+                    <div
+                      className={`mt-4 rounded-xl border p-4 ${
+                        trackingActive
+                          ? "border-primary/20 bg-primary/5"
+                          : "border-amber-200 bg-amber-50"
+                      }`}
+                    >
+                      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
+                              trackingActive
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            <Clock3 className="size-4" aria-hidden="true" />
+                          </div>
+
+                          <div>
+                            <div className="font-medium">
+                              {trackingActive
+                                ? "Talebin takip ediliyor"
+                                : "Takip süresi doldu"}
+                            </div>
+
+                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                              {trackingActive
+                                ? `Uygun işletme bulunursa sana haber vereceğiz. Takip süresinin bitmesine ${trackingDaysLeft} gün kaldı.`
+                                : "İhtiyacın devam ediyorsa talebini 7 gün daha takip edebiliriz."}
+                            </p>
+
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Takip bitişi:{" "}
+                              {trackingExpiry.toLocaleString("tr-TR")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {!trackingActive && (
+                          <Button
+                            type="button"
+                            disabled={
+                              workingTrackingNeedId === need.id
+                            }
+                            onClick={() =>
+                              void renewTracking(need.id)
+                            }
+                            className="w-full shrink-0 sm:w-auto"
+                          >
+                            <RefreshCw
+                              className="size-4"
+                              aria-hidden="true"
+                            />
+                            {workingTrackingNeedId === need.id
+                              ? "Uzatılıyor..."
+                              : "7 Gün Daha Takip Et"}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {(need.status === "open" ||
+                    need.status === "offerreceived") && (
                     <div className="mt-4">
                       <Button
                         type="button"
@@ -584,8 +704,8 @@ export default function MyNeedsPage() {
                         className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                       >
                         {workingCancelNeedId === need.id
-                          ? "İptal Ediliyor..."
-                          : "Talebi İptal Et"}
+                          ? "Kapatılıyor..."
+                          : "Talebi Kapat"}
                       </Button>
                     </div>
                   )}

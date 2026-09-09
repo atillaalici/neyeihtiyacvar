@@ -10,6 +10,8 @@ using NeyeIhtiyacVar.Api.Infrastructure.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpClient();
+
 builder.Services.AddOpenApi();
 
 var configuredOrigins = builder.Configuration
@@ -166,12 +168,15 @@ app.MapNeedRequestEndpoints();
 app.MapCatalogEndpoints();
 app.MapLocationEndpoints();
 app.MapProviderEndpoints();
+app.MapRecommendationEndpoints();
 app.MapProviderApplicationEndpoints();
 app.MapAuthEndpoints();
 app.MapProviderPanelEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
 app.MapNotificationEndpoints();
+app.MapAdminAuditLogEndpoints();
+app.MapAdminDirectoryEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
@@ -179,6 +184,7 @@ if (app.Environment.IsDevelopment())
     app.MapDevelopmentProviderOwnerEndpoints();
     app.MapAdminNeedEndpoints();
     app.MapAdminDashboardEndpoints();
+    app.MapAdminUserEndpoints();
     app.MapDevelopmentAdminEndpoints();
 }
 else
@@ -186,6 +192,7 @@ else
     app.MapAdminProviderWorkflowEndpoints();
     app.MapAdminNeedEndpoints();
     app.MapAdminDashboardEndpoints();
+    app.MapAdminUserEndpoints();
 }
 
 app.Run();

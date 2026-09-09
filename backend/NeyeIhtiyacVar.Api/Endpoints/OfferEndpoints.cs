@@ -302,7 +302,7 @@ public static class OfferEndpoints
                     x.Message,
                     x.Price,
                     status = x.Status.ToString().ToLowerInvariant(),
-                    x.CreatedAtUtc,
+x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
                 .ToListAsync();
@@ -340,7 +340,11 @@ public static class OfferEndpoints
                     x.CitySlug,
                     x.DistrictSlug,
                     status = x.Status.ToString().ToLowerInvariant(),
-                    x.CreatedAtUtc,
+                    trackingExpiresAtUtc =
+                        x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7),
+                    trackingExpired =
+                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
+x.CreatedAtUtc,
                     x.UpdatedAtUtc,
                     offerCount = x.Offers.Count
                 })
@@ -483,7 +487,7 @@ public static class OfferEndpoints
                     x.Message,
                     x.Price,
                     status = x.Status.ToString().ToLowerInvariant(),
-                    x.CreatedAtUtc
+x.CreatedAtUtc
                 })
                 .ToListAsync();
 

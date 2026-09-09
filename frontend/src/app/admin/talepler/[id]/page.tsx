@@ -18,6 +18,7 @@ import {
 
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { Button } from "@/components/ui/button";
 import { adminFetch } from "@/lib/admin-api";
 import { apiBaseUrl } from "@/lib/api";
 
@@ -70,6 +71,7 @@ type AdminNeedDetail = {
   citySlug: string | null;
   districtSlug: string | null;
   status: NeedStatus;
+  isActive: boolean;
   ownerUserId: string | null;
   ownerDisplayName: string | null;
   ownerEmail: string | null;
@@ -119,6 +121,8 @@ export default function AdminNeedDetailPage() {
   const [need, setNeed] = useState<AdminNeedDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -168,6 +172,50 @@ export default function AdminNeedDetailPage() {
     };
   }, [id]);
 
+  async function changeActiveStatus(isActive: boolean) {
+    if (!need) return;
+
+    const action = isActive ? "aktif etmek" : "pasife almak";
+    if (!window.confirm(`Bu ihtiyaç talebini ${action} istiyor musunuz?`)) {
+      return;
+    }
+
+    setStatusBusy(true);
+    setError("");
+    setActionMessage("");
+
+    try {
+      const response = await adminFetch(
+        `${apiBaseUrl}/api/admin/needs/${encodeURIComponent(need.id)}/status`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isActive }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.message ?? "Talep durumu değiştirilemedi.");
+        return;
+      }
+
+      setNeed((current) =>
+        current ? { ...current, isActive: data.isActive } : current,
+      );
+
+      setActionMessage(
+        isActive
+          ? "İhtiyaç talebi tekrar aktif edildi."
+          : "İhtiyaç talebi pasife alındı.",
+      );
+    } catch {
+      setError("Sunucuya bağlanılamadı.");
+    } finally {
+      setStatusBusy(false);
+    }
+  }
   const acceptedOffer = useMemo(
     () => need?.offers.find((offer) => offer.status === "accepted") ?? null,
     [need],
@@ -233,6 +281,17 @@ export default function AdminNeedDetailPage() {
                   className={`rounded-full border px-3 py-1 text-xs font-medium ${needStatusClasses[need.status]}`}
                 >
                   {needStatusLabels[need.status]}
+                </span>
+
+                <span
+                  className={[
+                    "rounded-full border px-3 py-1 text-xs font-medium",
+                    need.isActive
+                      ? "border-green-200 bg-green-50 text-green-700"
+                      : "border-red-200 bg-red-50 text-red-700",
+                  ].join(" ")}
+                >
+                  {need.isActive ? "Aktif" : "Pasif"}
                 </span>
               </div>
 
@@ -376,6 +435,36 @@ export default function AdminNeedDetailPage() {
           </div>
 
           <aside className="space-y-5">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+              <h2 className="font-display text-lg font-semibold">
+                Talep Yönetimi
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Talebin iş akışına müdahale etmeden görünürlüğünü yönet.
+                Aktif/pasif işlemleri İşlem Geçmişi'ne kaydedilir.
+              </p>
+
+              {actionMessage && (
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {actionMessage}
+                </div>
+              )}
+
+              <Button
+                type="button"
+                disabled={statusBusy}
+                variant={need.isActive ? "destructive" : "default"}
+                onClick={() => void changeActiveStatus(!need.isActive)}
+                className="mt-4 w-full"
+              >
+                {statusBusy
+                  ? "İşleniyor..."
+                  : need.isActive
+                    ? "Talebi Pasife Al"
+                    : "Talebi Aktif Et"}
+              </Button>
+            </div>
             <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
               <h2 className="font-display text-lg font-semibold">
                 Talep Sahibi

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+using System.Globalization;
+using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
@@ -71,11 +72,15 @@ public static class ProviderApplicationEndpoints
         {
             var query = dbContext.ProviderApplications.AsNoTracking();
 
-            if (!string.IsNullOrWhiteSpace(status) &&
-                Enum.TryParse<ProviderApplicationStatus>(
-                    status,
-                    true,
-                    out var parsedStatus))
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                query = query.Where(x =>
+                    x.Status == ProviderApplicationStatus.Pending);
+            }
+            else if (Enum.TryParse<ProviderApplicationStatus>(
+                status,
+                true,
+                out var parsedStatus))
             {
                 query = query.Where(x => x.Status == parsedStatus);
             }
@@ -243,9 +248,13 @@ public static class ProviderApplicationEndpoints
 
         group.MapGet("/providers", async (
             string? status,
+            bool? isActive,
             AppDbContext dbContext) =>
         {
             var query = dbContext.Providers.AsNoTracking();
+
+            var activeFilter = isActive ?? true;
+            query = query.Where(x => x.IsActive == activeFilter);
 
             if (!string.IsNullOrWhiteSpace(status) &&
                 Enum.TryParse<PublicationStatus>(
@@ -282,6 +291,7 @@ public static class ProviderApplicationEndpoints
                     x.PublishedAtUtc,
                     x.CreatedAtUtc,
                     x.UpdatedAtUtc,
+                    x.IsActive,
                     x.Version
                 })
                 .ToListAsync();
@@ -321,16 +331,38 @@ public static class ProviderApplicationEndpoints
                 });
             }
 
+            var normalizedAdditionalServices = (request.AdditionalServices ?? Array.Empty<string>())
+                .Select(x => x?.Trim() ?? string.Empty)
+                .Where(x => x.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (normalizedAdditionalServices.Length > 1)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "En fazla 1 ek hizmet seçebilirsiniz."
+                });
+            }
+
+            if (normalizedAdditionalServices.Any(x =>
+                string.Equals(
+                    x,
+                    request.ServiceSlug.Trim(),
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Ana hizmet ek hizmet olarak tekrar seçilemez."
+                });
+            }
+
             provider.BusinessName = request.BusinessName.Trim();
             provider.ShortDescription = request.ShortDescription.Trim();
             provider.Description = Optional(request.Description);
             provider.CategorySlug = request.CategorySlug.Trim();
             provider.ServiceSlug = request.ServiceSlug.Trim();
-            provider.AdditionalServices = request.AdditionalServices
-                .Select(x => x.Trim())
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            provider.AdditionalServices = normalizedAdditionalServices;
             provider.CitySlug = request.CitySlug.Trim();
             provider.DistrictSlug = request.DistrictSlug.Trim();
             provider.PublicPhone = Optional(request.PublicPhone);
@@ -348,6 +380,124 @@ public static class ProviderApplicationEndpoints
             return Results.Ok(ToAdminProvider(provider));
         });
 
+        group.MapDelete("/providers/{id:guid}", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İşletme profili bulunamadı."
+                });
+            }
+
+            var hasOffers = await dbContext.ProviderOffers
+                .AsNoTracking()
+                .AnyAsync(x => x.ProviderId == id);
+
+            var hasReviews = await dbContext.ProviderReviews
+                .AsNoTracking()
+                .AnyAsync(x => x.ProviderId == id);
+
+            if (hasOffers || hasReviews)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Bu işletmeye bağlı teklif veya değerlendirme geçmişi bulunduğu için işletme doğrudan silinemez. İşletmeyi pasif hale getirin."
+                });
+            }
+
+            dbContext.Providers.Remove(provider);
+
+            try
+            {
+                await dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Bu işletmeye bağlı başka kayıtlar bulunduğu için işletme silinemedi. İşletmeyi pasif hale getirin."
+                });
+            }
+
+            var deleteAdminUserIdValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid? deleteAdminUserId = Guid.TryParse(deleteAdminUserIdValue, out var parsedDeleteAdminId)
+                ? parsedDeleteAdminId
+                : null;
+
+            dbContext.AdminAuditLogs.Add(new AdminAuditLog
+            {
+                AdminUserId = deleteAdminUserId,
+                AdminEmail = principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity?.Name ?? "unknown",
+                Action = "provider.delete",
+                EntityType = "provider",
+                EntityId = provider.Id.ToString(),
+                EntityName = provider.BusinessName,
+                Details = $"Isletme silindi: {provider.BusinessName}",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+            return Results.Ok(new
+            {
+                provider.Id,
+                message = "İşletme silindi."
+            });
+        });
+        group.MapPost("/providers/{id:guid}/status", async (
+            Guid id,
+            ProviderActiveStatusRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İşletme profili bulunamadı."
+                });
+            }
+
+            if (provider.IsActive == request.IsActive)
+            {
+                return Results.Ok(ToAdminProvider(provider));
+            }
+
+            provider.IsActive = request.IsActive;
+            provider.UpdatedAtUtc = DateTime.UtcNow;
+            provider.Version++;
+
+            var statusAdminUserIdValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid? statusAdminUserId = Guid.TryParse(statusAdminUserIdValue, out var parsedStatusAdminId)
+                ? parsedStatusAdminId
+                : null;
+
+            dbContext.AdminAuditLogs.Add(new AdminAuditLog
+            {
+                AdminUserId = statusAdminUserId,
+                AdminEmail = principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity?.Name ?? "unknown",
+                Action = request.IsActive ? "provider.activate" : "provider.deactivate",
+                EntityType = "provider",
+                EntityId = provider.Id.ToString(),
+                EntityName = provider.BusinessName,
+                Details = request.IsActive
+                    ? $"Isletme aktif edildi: {provider.BusinessName}"
+                    : $"Isletme pasife alindi: {provider.BusinessName}",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(ToAdminProvider(provider));
+        });
         group.MapPost("/providers/{id:guid}/publish", async (
             Guid id,
             VersionRequest request,
@@ -377,12 +527,94 @@ public static class ProviderApplicationEndpoints
                 return Results.Ok(ToAdminProvider(provider));
             }
 
+            var publishedAtUtc = DateTime.UtcNow;
+
             provider.PublicationStatus = PublicationStatus.Published;
-            provider.PublishedAtUtc = DateTime.UtcNow;
-            provider.UpdatedAtUtc = DateTime.UtcNow;
+            provider.PublishedAtUtc = publishedAtUtc;
+            provider.UpdatedAtUtc = publishedAtUtc;
             provider.Version++;
 
             await dbContext.SaveChangesAsync();
+
+            var matchingNeeds = await dbContext.NeedRequests
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.OwnerUserId != null &&
+                    x.Status == NeedStatus.Open &&
+                    (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) > publishedAtUtc &&
+                    x.CategorySlug == provider.CategorySlug &&
+                    x.CitySlug == provider.CitySlug &&
+                    x.DistrictSlug == provider.DistrictSlug &&
+                    (
+                        x.ServiceSlug == provider.ServiceSlug ||
+                        (
+                            x.ServiceSlug != null &&
+                            provider.AdditionalServices.Contains(x.ServiceSlug)
+                        )
+                    ))
+                .Select(x => new
+                {
+                    x.Id,
+                    UserId = x.OwnerUserId!.Value,
+                    x.Title
+                })
+                .ToListAsync();
+
+            if (matchingNeeds.Count > 0)
+            {
+                const string eventType = "need.provider-match";
+
+                var matchingNeedIds = matchingNeeds
+                    .Select(x => x.Id.ToString())
+                    .ToArray();
+
+                var existingLinks = await dbContext.Notifications
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.EventType == eventType &&
+                        matchingNeeds.Select(n => n.UserId).Contains(x.UserId) &&
+                        x.Link != null)
+                    .Select(x => new
+                    {
+                        x.UserId,
+                        x.Link
+                    })
+                    .ToListAsync();
+
+                var existingKeys = existingLinks
+                    .Select(x => $"{x.UserId:N}|{x.Link}")
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var need in matchingNeeds)
+                {
+                    var link =
+                        $"/isletme/{provider.Slug}?talep={need.Id}";
+
+                    var key = $"{need.UserId:N}|{link}";
+
+                    if (existingKeys.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    dbContext.Notifications.Add(new Notification
+                    {
+                        UserId = need.UserId,
+                        EventType = eventType,
+                        Title = "Talebine uygun işletme bulundu",
+                        Message =
+                            $"\"{need.Title}\" talebine uygun {provider.BusinessName} artık hizmet veriyor. İşletmeyi incelemek için dokun.",
+                        Link = link,
+                        IsRead = false,
+                        CreatedAtUtc = publishedAtUtc
+                    });
+
+                    existingKeys.Add(key);
+                }
+
+                await dbContext.SaveChangesAsync();
+            }
 
             return Results.Ok(ToAdminProvider(provider));
         });
@@ -433,7 +665,7 @@ public static class ProviderApplicationEndpoints
         Required(errors, "shortDescription", request.ShortDescription, 300, "Kısa açıklama");
         Required(errors, "categorySlug", request.CategorySlug, 100, "Kategori");
         Required(errors, "serviceSlug", request.ServiceSlug, 150, "Hizmet");
-        Required(errors, "citySlug", request.CitySlug, 100, "İl");
+Required(errors, "citySlug", request.CitySlug, 100, "İl");
         Required(errors, "districtSlug", request.DistrictSlug, 100, "İlçe");
         Required(errors, "applicantName", request.ApplicantName, 150, "Başvuran adı");
         Required(errors, "phone", request.Phone, 30, "Telefon");
@@ -577,6 +809,7 @@ public static class ProviderApplicationEndpoints
             provider.PublishedAtUtc,
             provider.CreatedAtUtc,
             provider.UpdatedAtUtc,
+            provider.IsActive,
             provider.Version
         };
 }
@@ -616,3 +849,6 @@ public sealed record UpdateProvider(
     int? ExperienceYears,
     bool EmergencyService,
     bool OnsiteService);
+
+public sealed record ProviderActiveStatusRequest(
+    bool IsActive);
