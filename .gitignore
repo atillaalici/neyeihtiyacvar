@@ -39,3 +39,6 @@ Thumbs.db
 *.log
 veritabani-yapisi.sql
 backend/NeyeIhtiyacVar.Api/appsettings.json
+isletme-profil-duzenleme-kur.ps1
+neyeihtiyacvar.docx
+talep-durum-sistemi-kur.ps1
