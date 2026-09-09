@@ -1,0 +1,41 @@
+# Neye Ihtiyac Var Git Ignore
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/dist/
+frontend/.turbo/
+frontend/.vercel/
+frontend/coverage/
+frontend/*.log
+
+# Backend
+backend/**/bin/
+backend/**/obj/
+backend/**/.vs/
+backend/**/TestResults/
+backend/**/coverage/
+backend/**/*.user
+backend/**/*.suo
+
+# OS / Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local generated files
+*.tmp
+*.temp
+*.log
+veritabani-yapisi.sql
+backend/NeyeIhtiyacVar.Api/appsettings.json

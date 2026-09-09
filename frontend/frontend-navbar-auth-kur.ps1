@@ -1,0 +1,68 @@
+﻿$ErrorActionPreference = "Stop"
+
+$root = "C:\Users\Atilla\Desktop\neyeihtiyacvar\frontend"
+$navbarPath = Join-Path $root "src\components\site\Navbar.tsx"
+
+$content = @'
+import Link from "next/link";
+import { Menu } from "lucide-react";
+
+import { AuthMenu } from "@/components/site/AuthMenu";
+
+export function Navbar() {
+  return (
+    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+      <div className="section-shell flex h-16 items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-lg bg-primary font-display text-lg font-bold text-primary-foreground">
+            N
+          </span>
+
+          <span className="font-display text-lg font-bold">
+            Neye İhtiyaç Var?
+          </span>
+        </Link>
+
+        <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
+          <Link href="/">Ana Sayfa</Link>
+          <Link href="/kesfet">Keşfet</Link>
+          <Link href="/kategoriler">Kategoriler</Link>
+          <Link href="/nasil-calisir">Nasıl Çalışır</Link>
+        </nav>
+
+        <div className="hidden items-center gap-2 md:flex">
+          <AuthMenu />
+
+          <Link
+            href="/ihtiyac-olustur"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            İhtiyaç Oluştur
+          </Link>
+        </div>
+
+        <button
+          type="button"
+          className="grid size-10 place-items-center rounded-lg border border-border md:hidden"
+          aria-label="Menü"
+        >
+          <Menu className="size-5" />
+        </button>
+      </div>
+    </header>
+  );
+}
+'@
+
+[System.IO.File]::WriteAllText(
+    $navbarPath,
+    $content,
+    (New-Object System.Text.UTF8Encoding($false))
+)
+
+Write-Host ""
+Write-Host "Navbar AuthMenu ile guncellendi ve Turkce karakterler duzeltildi." -ForegroundColor Green
+Write-Host "Degistirilen dosya:" -ForegroundColor Cyan
+Write-Host "  src\components\site\Navbar.tsx"
+Write-Host ""
+Write-Host "Simdi: pnpm exec tsc --noEmit" -ForegroundColor Yellow
