@@ -168,7 +168,7 @@
 
 @layer utilities {
   .home-page > section {
-    padding-block: clamp(2.5rem, 4vw, 3.5rem);
+    padding-block: clamp(1.35rem, 2.4vw, 2.25rem);
   }
 
   .home-page > section:first-child {
@@ -176,7 +176,7 @@
   }
 
   .home-page > section:first-child > .section-shell {
-    padding-block: clamp(2.5rem, 4.5vw, 4rem);
+    padding-block: clamp(1.75rem, 3vw, 2.75rem);
   }
 
   .home-page h2 {
@@ -263,3 +263,172 @@
     }
   }
 }
+
+/* NIYV SHRINK RESPONSIVE START */
+
+/*
+  Masaustunde pencere yarim ekrana alindiginda:
+  - Navbar ayni masaustu tasariminda kalir.
+  - Elemanlar birbirine girmek yerine orantili kuculur.
+  - Nasil Calisir 5 esit sutun olarak kalir ve kart icleri kuculur.
+*/
+
+/* NASIL CALISIR */
+.how-responsive-five {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: clamp(0.4rem, 1vw, 0.9rem) !important;
+  width: 100% !important;
+}
+
+.how-responsive-five > * {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.how-responsive-five img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+@media (max-width: 1180px) and (min-width: 701px) {
+  .how-responsive-five {
+    gap: clamp(0.3rem, 0.7vw, 0.65rem) !important;
+  }
+
+  .how-responsive-five > * {
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .how-responsive-five h2,
+  .how-responsive-five h3,
+  .how-responsive-five h4 {
+    font-size: clamp(0.68rem, 1.15vw, 0.95rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .how-responsive-five p,
+  .how-responsive-five span {
+    font-size: clamp(0.56rem, 0.92vw, 0.78rem) !important;
+    line-height: 1.35 !important;
+  }
+
+  .how-responsive-five [class*="p-6"] {
+    padding: clamp(0.45rem, 1vw, 0.9rem) !important;
+  }
+
+  .how-responsive-five [class*="p-5"] {
+    padding: clamp(0.4rem, 0.9vw, 0.8rem) !important;
+  }
+
+  .how-responsive-five [class*="p-4"] {
+    padding: clamp(0.35rem, 0.8vw, 0.7rem) !important;
+  }
+
+  .how-responsive-five [class*="gap-"] {
+    column-gap: clamp(0.2rem, 0.5vw, 0.45rem) !important;
+  }
+}
+
+/* Gercek telefon/tablet darliginda okunabilirlik icin sutun azalir. */
+@media (max-width: 700px) {
+  .how-responsive-five {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .how-responsive-five {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+/* NAVBAR - eski masaustu gorunumu korunur, sadece oranlar kuculur */
+@media (max-width: 1180px) and (min-width: 701px) {
+  .responsive-site-navbar .section-shell {
+    padding-left: clamp(0.35rem, 1vw, 0.8rem) !important;
+    padding-right: clamp(0.35rem, 1vw, 0.8rem) !important;
+  }
+
+  .responsive-site-navbar nav {
+    gap: clamp(0.15rem, 0.45vw, 0.45rem) !important;
+  }
+
+  .responsive-site-navbar a,
+  .responsive-site-navbar button {
+    font-size: clamp(0.62rem, 1.05vw, 0.82rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  .responsive-site-navbar a {
+    padding-left: clamp(0.25rem, 0.65vw, 0.7rem) !important;
+    padding-right: clamp(0.25rem, 0.65vw, 0.7rem) !important;
+  }
+
+  .responsive-site-navbar button {
+    padding-left: clamp(0.3rem, 0.7vw, 0.8rem) !important;
+    padding-right: clamp(0.3rem, 0.7vw, 0.8rem) !important;
+  }
+
+  .responsive-site-navbar img {
+    max-width: clamp(8.5rem, 20vw, 13rem) !important;
+    height: auto !important;
+  }
+
+  .responsive-site-navbar [class*="gap-"] {
+    column-gap: clamp(0.2rem, 0.55vw, 0.65rem) !important;
+  }
+
+  .responsive-site-navbar [class*="h-"] {
+    min-height: 0 !important;
+  }
+}
+
+/* NIYV SHRINK RESPONSIVE END */
+
+/* HOME_STATS_RESPONSIVE_START */
+.home-stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.home-stats-grid > * {
+  min-width: 0 !important;
+  padding: 1rem 0.8rem !important;
+}
+
+.home-stats-grid > * > * {
+  min-width: 0;
+}
+
+.home-stats-grid .font-bold,
+.home-stats-grid .font-semibold,
+.home-stats-grid strong {
+  font-size: clamp(0.95rem, 1.2vw, 1.25rem) !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+}
+
+.home-stats-grid .text-xs,
+.home-stats-grid .text-sm,
+.home-stats-grid p:not(.font-bold):not(.font-semibold) {
+  font-size: clamp(0.72rem, 0.85vw, 0.9rem) !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+}
+
+.home-stats-grid svg {
+  width: clamp(1rem, 1.25vw, 1.35rem) !important;
+  height: clamp(1rem, 1.25vw, 1.35rem) !important;
+}
+
+@media (min-width: 640px) {
+  .home-stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .home-stats-grid > * {
+    padding: clamp(1rem, 1.45vw, 1.5rem) clamp(0.7rem, 1.25vw, 1.4rem) !important;
+  }
+}
+/* HOME_STATS_RESPONSIVE_END */

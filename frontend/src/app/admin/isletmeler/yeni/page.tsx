@@ -114,7 +114,7 @@ export default function NewAdminProviderPage() {
         return current.filter((item) => item !== slug);
       }
 
-      if (current.length >= 3) {
+      if (current.length >= 1) {
         setError("En fazla 1 ek hizmet seçebilirsiniz.");
         return current;
       }

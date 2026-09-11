@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 
@@ -67,6 +67,11 @@ public static class ProviderEndpoints
                     x.DistrictSlug,
                     x.PublicPhone,
                     x.PublicWhatsapp,
+                    isVerifiedBusiness =
+                        x.OwnerUserId != null &&
+                        x.OwnerUser != null &&
+                        x.OwnerUser.EmailVerifiedAtUtc != null &&
+                        x.OwnerUser.PhoneVerifiedAtUtc != null,
                     publicationStatus = x.PublicationStatus.ToString().ToLowerInvariant()
                 })
                 .ToListAsync();
@@ -102,6 +107,11 @@ public static class ProviderEndpoints
                     x.ExperienceYears,
                     x.EmergencyService,
                     x.OnsiteService,
+                    isVerifiedBusiness =
+                        x.OwnerUserId != null &&
+                        x.OwnerUser != null &&
+                        x.OwnerUser.EmailVerifiedAtUtc != null &&
+                        x.OwnerUser.PhoneVerifiedAtUtc != null,
                     publicationStatus = x.PublicationStatus.ToString().ToLowerInvariant()
                 })
                 .FirstOrDefaultAsync();

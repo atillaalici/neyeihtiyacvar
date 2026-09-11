@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 
@@ -65,7 +65,7 @@ export function CategoryGrid({
   return (
     <section
       id="kategoriler"
-      className="section-shell py-12 sm:py-16"
+      className="section-shell py-6 sm:py-8 lg:py-10"
     >
       {withHeading && (
         <header className="max-w-2xl">

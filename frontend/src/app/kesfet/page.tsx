@@ -14,19 +14,18 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  FormEvent,
+import {FormEvent,
   Suspense,
   useEffect,
   useMemo,
-  useState,
-} from "react";
+  useState, useRef} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ProviderCard } from "@/components/site/ProviderCard";
 import { LocationSearch } from "@/components/site/LocationSearch";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
+import { getStoredUser } from "@/lib/auth";
 import { getAccessToken } from "@/lib/auth";
 import type { ProviderSummary } from "@/lib/providers";
 
@@ -145,6 +144,8 @@ function ExplorePageContent() {
 
   const [providers, setProviders] =
     useState<ProviderSummary[]>([]);
+  const [visibleProviderCount, setVisibleProviderCount] =
+    useState(16);
   const [recommendationData, setRecommendationData] =
     useState<RecommendationResponse | null>(null);
   const [queryInput, setQueryInput] = useState(
@@ -169,9 +170,6 @@ function ExplorePageContent() {
 
   const smartMode = q.length > 0;
 
-  useEffect(() => {
-    setQueryInput(q);
-  }, [q]);
 
   const providerQueryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -262,6 +260,7 @@ function ExplorePageContent() {
           }
 
           setProviders(data);
+          setVisibleProviderCount(16);
           setRecommendationData(null);
         }
       } catch {
@@ -290,6 +289,31 @@ function ExplorePageContent() {
     smartMode,
   ]);
 
+  function buildSearchParamsWithPreferredLocation(value: string) {
+    const params = new URLSearchParams();
+    params.set("q", value);
+
+    // Kesfet sayfasinda kullanicinin secmis oldugu konum varsa
+    // yeni ihtiyac aramasinda ayni il/ilce korunur.
+    if (city && district) {
+      params.set("il", city);
+      params.set("ilce", district);
+      return params;
+    }
+
+    const storedUser = getStoredUser();
+
+    if (storedUser?.citySlug && storedUser?.districtSlug) {
+      params.set("il", storedUser.citySlug);
+      params.set("ilce", storedUser.districtSlug);
+      return params;
+    }
+
+    // Kayitli konum yoksa mevcut cihaz-konumu akisini kullan.
+    params.set("yakinda", "1");
+
+    return params;
+  }
   function submitSearch(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -302,17 +326,15 @@ function ExplorePageContent() {
       return;
     }
 
-    const params = new URLSearchParams();
-    params.set("q", value);
+    const params = buildSearchParamsWithPreferredLocation(value);
 
     router.push(`/kesfet?${params.toString()}`);
   }
 
-  function usePopularSearch(value: string) {
+  function selectPopularSearch(value: string) {
     setQueryInput(value);
 
-    const params = new URLSearchParams();
-    params.set("q", value);
+    const params = buildSearchParamsWithPreferredLocation(value);
 
     router.push(`/kesfet?${params.toString()}`);
   }
@@ -322,7 +344,32 @@ function ExplorePageContent() {
     router.push("/kesfet");
   }
 
-  function useDeviceLocation() {
+  const nearbyAutoTriggeredRef = useRef(false);
+  function applyLocation(value: {
+    city: string;
+    district: string;
+  }) {
+    const params = new URLSearchParams();
+
+    if (q) {
+      params.set("q", q);
+    }
+
+    if (category) {
+      params.set("kategori", category);
+    }
+
+    if (service) {
+      params.set("hizmet", service);
+    }
+
+    params.set("il", value.city);
+    params.set("ilce", value.district);
+
+    router.push(`/kesfet?${params.toString()}`);
+  }
+
+  function requestDeviceLocation() {
     setLocationMessage("");
 
     if (!("geolocation" in navigator)) {
@@ -411,30 +458,24 @@ function ExplorePageContent() {
       },
     );
   }
-  function applyLocation(value: {
-    city: string;
-    district: string;
-  }) {
-    const params = new URLSearchParams();
-
-    if (q) {
-      params.set("q", q);
+  useEffect(() => {
+    if (nearbyAutoTriggeredRef.current) {
+      return;
     }
 
-    if (category) {
-      params.set("kategori", category);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("yakinda") !== "1") {
+      return;
     }
 
-    if (service) {
-      params.set("hizmet", service);
-    }
+    nearbyAutoTriggeredRef.current = true;
 
-    params.set("il", value.city);
-    params.set("ilce", value.district);
+    const timer = window.setTimeout(() => {
+      requestDeviceLocation();
+    }, 0);
 
-    router.push(`/kesfet?${params.toString()}`);
-  }
-
+    return () => window.clearTimeout(timer);
+  }, []);
   const recommendations =
     recommendationData?.recommendations ?? [];
 
@@ -547,7 +588,7 @@ function ExplorePageContent() {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => usePopularSearch(item)}
+                  onClick={() => selectPopularSearch(item)}
                   className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-primary"
                 >
                   {item}
@@ -560,8 +601,8 @@ function ExplorePageContent() {
 
       <section className="section-shell py-8 sm:py-10">
         {loading && (
-          <div className="grid gap-4 md:grid-cols-3">
-            {Array.from({ length: 3 }).map(
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map(
               (_, index) => (
                 <div
                   key={index}
@@ -718,7 +759,7 @@ function ExplorePageContent() {
 
                     <button
                       type="button"
-                      onClick={useDeviceLocation}
+                      onClick={requestDeviceLocation}
                       disabled={locating}
                       className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
@@ -891,14 +932,24 @@ function ExplorePageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 md:gap-2 lg:gap-3">
                       {sortedRecommendations.map(
                         (provider, index) => (
                           <article
                             key={provider.id}
                             className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lift"
                           >
-                            <div className="relative flex h-28 items-center justify-center border-b border-border bg-gradient-to-br from-primary/10 via-cream to-background">
+                            {/* smart-provider-image-v1 */}
+                            <div className="relative h-32 overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-cream to-background">
+                              <img
+                                src={`${apiBaseUrl}/api/providers/${provider.id}/image`}
+                                alt={`${provider.businessName} işletme görseli`}
+                                className="h-full w-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+
                               {index === 0 && (
                                 <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground">
                                   <BadgeCheck
@@ -909,12 +960,6 @@ function ExplorePageContent() {
                                 </span>
                               )}
 
-                              <div className="flex size-16 items-center justify-center rounded-2xl border border-primary/15 bg-background shadow-soft">
-                                <Store
-                                  className="size-7 text-primary"
-                                  aria-hidden="true"
-                                />
-                              </div>
 
                               {provider.reviewCount >
                                 0 && (
@@ -1032,10 +1077,10 @@ function ExplorePageContent() {
                                 </div>
                               )}
 
-                              <div className="mt-4 grid grid-cols-2 gap-2">
+                              <div className="mt-3 grid grid-cols-2 gap-1.5">
                                 <Link
                                   href={`/isletme/${provider.slug}`}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted"
+                                  className="inline-flex min-w-0 h-9 items-center justify-center rounded-lg border border-border bg-background px-2 text-xs font-medium transition hover:bg-muted"
                                 >
                                   Detayları Gör
                                 </Link>
@@ -1043,8 +1088,32 @@ function ExplorePageContent() {
                                 <button
                                   type="button"
                                   onClick={() => {
+                                    const contactParams =
+                                      new URLSearchParams({
+                                        contact: "1",
+                                      });
+
+                                    const trackedNeedId =
+                                      searchParams.get("needId");
+                                    const searchText =
+                                      searchParams.get("q");
+
+                                    if (trackedNeedId) {
+                                      contactParams.set(
+                                        "needId",
+                                        trackedNeedId,
+                                      );
+                                    }
+
+                                    if (searchText) {
+                                      contactParams.set(
+                                        "q",
+                                        searchText,
+                                      );
+                                    }
+
                                     const providerUrl =
-                                      `/isletme/${provider.slug}`;
+                                      `/isletme/${provider.slug}?${contactParams.toString()}`;
 
                                     if (getAccessToken()) {
                                       router.push(providerUrl);
@@ -1057,7 +1126,7 @@ function ExplorePageContent() {
                                       )}`,
                                     );
                                   }}
-                                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+                                  className="inline-flex min-w-0 h-9 items-center justify-center gap-1 rounded-lg bg-primary px-2 text-xs font-semibold text-primary-foreground transition hover:bg-primary/90"
                                 >
                                   İletişime Geç
                                   <ArrowRight
@@ -1081,21 +1150,42 @@ function ExplorePageContent() {
           !error &&
           !smartMode &&
           providers.length === 0 && (
-            <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
-              <Search
-                className="mx-auto size-8 text-primary"
-                aria-hidden="true"
-              />
+            <div className="space-y-4">
+              {(city || district) && (
+                <div className="rounded-2xl border border-primary/20 bg-card p-5 shadow-soft sm:p-6">
+                  <div className="mb-4">
+                    <h2 className="font-display text-2xl font-bold">
+                      Yakınımda kim var?
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+                      İl ve ilçeni seç, bölgedeki hizmet verenleri listeleyelim.
+                    </p>
+                  </div>
 
-              <h2 className="mt-4 font-display text-xl font-semibold">
-                Bir ihtiyacını yaz
-              </h2>
+                  <LocationSearch
+                    initialCity={city}
+                    initialDistrict={district}
+                    onSearch={applyLocation}
+                  />
+                </div>
+              )}
 
-              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-                Yukarıdaki arama alanına ihtiyacını kendi
-                cümlelerinle yaz. Sana uygun hizmeti ve
-                işletmeleri bulalım.
-              </p>
+              <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-soft">
+                <Search
+                  className="mx-auto size-8 text-primary"
+                  aria-hidden="true"
+                />
+
+                <h2 className="mt-4 font-display text-xl font-semibold">
+                  Bir ihtiyacını yaz
+                </h2>
+
+                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+                  Yukarıdaki arama alanına ihtiyacını kendi
+                  cümlelerinle yaz. Sana uygun hizmeti ve
+                  işletmeleri bulalım.
+                </p>
+              </div>
             </div>
           )}
 
@@ -1114,13 +1204,37 @@ function ExplorePageContent() {
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                {providers.map((provider) => (
-                  <ProviderCard
-                    key={provider.id}
-                    provider={provider}
-                  />
-                ))}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 md:gap-2 lg:gap-3">
+                {providers
+                  .slice(0, visibleProviderCount)
+                  .map((provider) => (
+                    <ProviderCard
+                      key={provider.id}
+                      provider={provider}
+                    />
+                  ))}
+              </div>
+
+              <div className="mt-7 flex justify-center">
+                {providers.length > visibleProviderCount ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVisibleProviderCount((count) => count + 16)
+                    }
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 bg-white px-6 py-2.5 text-sm font-bold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50"
+                  >
+                    Diğer İşletmeler
+                  </button>
+                ) : providers.length > 16 ? (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleProviderCount(16)}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-background px-6 py-2.5 text-sm font-semibold text-muted-foreground transition hover:bg-muted"
+                  >
+                    İlk 16 İşletmeye Dön
+                  </button>
+                ) : null}
               </div>
             </>
           )}

@@ -14,6 +14,12 @@ public sealed class NeedRequest
     public string? ServiceSlug { get; set; }
     public string? CitySlug { get; set; }
     public string? DistrictSlug { get; set; }
+    public Guid? TargetProviderId { get; set; }
+    public Provider? TargetProvider { get; set; }
+    public bool ContactByPhone { get; set; } = true;
+    public bool ContactByWhatsapp { get; set; }
+    public bool ContactByEmail { get; set; }
+    public bool ContactByPush { get; set; }
     public NeedStatus Status { get; set; } = NeedStatus.Open;
     public bool IsActive { get; set; } = true;
 

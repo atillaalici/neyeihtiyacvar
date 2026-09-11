@@ -100,6 +100,34 @@ public static class ProviderApplicationEndpoints
                     x.Phone,
                     x.Whatsapp,
                     x.Note,
+                    Email = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id && p.OwnerUserId != null)
+                        .Join(
+                            dbContext.Users,
+                            p => p.OwnerUserId,
+                            u => (Guid?)u.Id,
+                            (p, u) => u.Email)
+                        .FirstOrDefault(),
+                    AdditionalServices = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id)
+                        .Select(p => p.AdditionalServices)
+                        .FirstOrDefault() ?? Array.Empty<string>(),
+                    EmailVerified = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id && p.OwnerUserId != null)
+                        .Join(
+                            dbContext.Users,
+                            p => p.OwnerUserId,
+                            u => (Guid?)u.Id,
+                            (p, u) => u.EmailVerifiedAtUtc)
+                        .FirstOrDefault() != null,
+                    PhoneVerified = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id && p.OwnerUserId != null)
+                        .Join(
+                            dbContext.Users,
+                            p => p.OwnerUserId,
+                            u => (Guid?)u.Id,
+                            (p, u) => u.PhoneVerifiedAtUtc)
+                        .FirstOrDefault() != null,
                     status = x.Status.ToString().ToLowerInvariant(),
                     x.ReviewNote,
                     x.ReviewedAtUtc,
@@ -527,6 +555,32 @@ public static class ProviderApplicationEndpoints
                 return Results.Ok(ToAdminProvider(provider));
             }
 
+            if (provider.OwnerUserId is not null)
+            {
+                var ownerVerification = await dbContext.Users
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.Id == provider.OwnerUserId.Value &&
+                        x.IsActive)
+                    .Select(x => new
+                    {
+                        x.EmailVerifiedAtUtc,
+                        x.PhoneVerifiedAtUtc
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (ownerVerification is null ||
+                    ownerVerification.EmailVerifiedAtUtc is null ||
+                    ownerVerification.PhoneVerifiedAtUtc is null)
+                {
+                    return Results.BadRequest(new
+                    {
+                        code = "business_verification_required",
+                        message = "İşletme yayına alınmadan önce hesap sahibinin e-posta ve telefon doğrulamasını tamamlaması gerekir."
+                    });
+                }
+            }
+
             var publishedAtUtc = DateTime.UtcNow;
 
             provider.PublicationStatus = PublicationStatus.Published;
@@ -543,7 +597,6 @@ public static class ProviderApplicationEndpoints
                     x.OwnerUserId != null &&
                     x.Status == NeedStatus.Open &&
                     (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) > publishedAtUtc &&
-                    x.CategorySlug == provider.CategorySlug &&
                     x.CitySlug == provider.CitySlug &&
                     x.DistrictSlug == provider.DistrictSlug &&
                     (
@@ -589,7 +642,9 @@ public static class ProviderApplicationEndpoints
                 foreach (var need in matchingNeeds)
                 {
                     var link =
-                        $"/isletme/{provider.Slug}?talep={need.Id}";
+                        $"/kesfet?q={Uri.EscapeDataString(need.Title)}" +
+                        $"&needId={need.Id}" +
+                        $"&provider={Uri.EscapeDataString(provider.Slug)}";
 
                     var key = $"{need.UserId:N}|{link}";
 
@@ -604,7 +659,7 @@ public static class ProviderApplicationEndpoints
                         EventType = eventType,
                         Title = "Talebine uygun işletme bulundu",
                         Message =
-                            $"\"{need.Title}\" talebine uygun {provider.BusinessName} artık hizmet veriyor. İşletmeyi incelemek için dokun.",
+                            $"{provider.BusinessName} \"{need.Title}\" talebinizi karşılayabilir. Uygun işletmeleri görmek için dokunun.",
                         Link = link,
                         IsRead = false,
                         CreatedAtUtc = publishedAtUtc

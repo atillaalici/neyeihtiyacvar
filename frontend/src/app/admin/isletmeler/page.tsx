@@ -81,7 +81,11 @@ export default function AdminProvidersPage() {
   }, [status]);
 
   useEffect(() => {
-    void loadProviders();
+    const timer = window.setTimeout(() => {
+      void loadProviders();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadProviders]);
 
   const filtered = useMemo(() => {
@@ -117,8 +121,49 @@ export default function AdminProvidersPage() {
   );
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => {
+      setPage(1);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [query, sort, status]);
+
+  async function publishProvider(provider: AdminProvider) {
+    if (
+      !window.confirm(
+        `${provider.businessName} işletmesini yayına almak istiyor musunuz?`,
+      )
+    ) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      const response = await adminFetch(
+        `${apiBaseUrl}/api/admin/providers/${provider.id}/publish`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expectedVersion: provider.version }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data?.message ??
+            "İşletme yayına alınamadı. E-posta ve telefon doğrulamalarını kontrol edin.",
+        );
+        return;
+      }
+
+      await loadProviders();
+    } catch {
+      setError("Sunucuya bağlanılamadı.");
+    }
+  }
 
   async function passivateProvider(provider: AdminProvider) {
     if (!window.confirm(
@@ -329,6 +374,15 @@ export default function AdminProvidersPage() {
                     >
                       Düzenle
                     </Link>
+
+                    {provider.publicationStatus !== "published" && (
+                      <Button
+                        type="button"
+                        onClick={() => void publishProvider(provider)}
+                      >
+                        Yayına Al
+                      </Button>
+                    )}
 
                     {provider.publicationStatus === "published" && (
                       <Link

@@ -42,6 +42,14 @@ public sealed class Provider
 
     public bool OnsiteService { get; set; }
 
+    public bool NotifyByEmail { get; set; } = true;
+
+    public bool NotifyBySms { get; set; }
+
+    public bool NotifyByWhatsapp { get; set; }
+
+    public bool NotifyByPush { get; set; } = true;
+
     public PublicationStatus PublicationStatus { get; set; } = PublicationStatus.Draft;
 
     public DateTime? PublishedAtUtc { get; set; }

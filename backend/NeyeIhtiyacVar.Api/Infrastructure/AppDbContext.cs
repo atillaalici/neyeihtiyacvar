@@ -166,6 +166,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(x => x.Version)
                 .IsConcurrencyToken();
 
+            entity.Property(x => x.NotifyByEmail)
+                .HasDefaultValue(true);
+
+            entity.Property(x => x.NotifyByPush)
+                .HasDefaultValue(true);
+
             entity.HasOne(x => x.OwnerUser)
                 .WithOne()
                 .HasForeignKey<Provider>(x => x.OwnerUserId)
@@ -321,6 +327,7 @@ entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => x.OwnerUserId);
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => x.TrackingExpiresAtUtc);
+            entity.HasIndex(x => x.TargetProviderId);
 
             entity.Property(x => x.IsActive)
                 .HasDefaultValue(true);
@@ -363,6 +370,11 @@ entity.Property(x => x.Title)
             entity.HasOne(x => x.OwnerUser)
                 .WithMany()
                 .HasForeignKey(x => x.OwnerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.TargetProvider)
+                .WithMany()
+                .HasForeignKey(x => x.TargetProviderId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 

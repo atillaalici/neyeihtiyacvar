@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NeyeIhtiyacVar.Api.Application;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 
@@ -20,8 +21,11 @@ public static class RecommendationEndpoints
             ],
             ["su-tesisatcisi"] =
             [
-                K("su kacagi", 8), K("musluk", 5), K("lavabo", 5), K("tikaniklik", 7),
-                K("boru patladi", 8), K("sifon", 5), K("tesisatci", 6)
+                K("su kacagi", 8), K("musluk", 5), K("muslugum", 8),
+                K("muslugum su akitiyor", 12), K("su akitiyor", 9),
+                K("su sizdiriyor", 9), K("damlatiyor", 7), K("lavabo", 5),
+                K("tikaniklik", 7), K("boru patladi", 8), K("sifon", 5),
+                K("tesisatci", 6)
             ],
             ["boyaci"] =
             [
@@ -467,7 +471,7 @@ public static class RecommendationEndpoints
                         .Select(service =>
                         {
                             var serviceCandidateSlug = ToSlug(service.Name);
-                            var score = CalculateServiceMatchScore(
+                            var score = NeedUnderstandingEngine.Score(
                                 searchText,
                                 category.Name,
                                 service.Name,
@@ -554,7 +558,14 @@ public static class RecommendationEndpoints
                 baseQuery = baseQuery.Where(x => x.CitySlug == citySlug);
             }
 
-            if (categorySlug is not null)
+            if (searchText is not null && serviceSlug is null)
+            {
+                // Serbest metinden bir hizmet anlayamadıysak tüm işletmeleri
+                // "yakın alternatif" olarak göstermek yanlış yönlendirir.
+                baseQuery = baseQuery.Where(_ => false);
+            }
+
+            if (categorySlug is not null && serviceSlug is null)
             {
                 baseQuery = baseQuery.Where(
                     x => x.CategorySlug == categorySlug);

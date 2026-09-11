@@ -47,3 +47,72 @@ frontend/.env.production
 !frontend/.env.production.example
 !backend/NeyeIhtiyacVar.Api/appsettings.Production.example.json
 !deploy/ubuntu/neyeihtiyacvar-api.env.example
+
+# --- Local development / assistant-generated backups ---
+_backup_*/
+_broken_*/
+_business-registration-core/
+backup-*/
+.build-check-*/
+.*-backup-*/
+.utf8-backup-*/
+.verification-flow-backup-*/
+.account-profile-backup-*/
+.auth-professional-backup-*/
+
+# Backup copies created beside source files
+*.bak-*
+*.bak
+*.backup
+
+# Local helper / diagnostic scripts and reports in repository root
+/*.ps1
+/*.txt
+/*.zip
+
+# Accidental command/output files in repository root
+/cd
+/cls
+/dotnet
+/powershell
+/findstr
+/Results.Ok(new
+/{
+/05-degerlendir.png
+/neyeihtiyacvar-logo.png
+/ihtiyac-olustur-page.tsx
+
+# Accidental command files inside app folders
+/backend/NeyeIhtiyacVar.Api/cd
+/backend/NeyeIhtiyacVar.Api/cls
+/backend/NeyeIhtiyacVar.Api/dotnet
+/backend/NeyeIhtiyacVar.Api/powershell
+/frontend/cd
+/frontend/cls
+/frontend/dotnet
+/frontend/pnpm
+/frontend/powershell
+/frontend/Pasif
+/frontend/Pasifler
+/frontend/duzenlenebilir
+/frontend/sadece
+/frontend/sil
+
+# Runtime/local data
+/backend/NeyeIhtiyacVar.Api/App_Data/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+!.env.example.*
+**/appsettings.Production.json
+**/appsettings.Local.json
+
+# Build outputs
+**/bin/
+**/obj/
+**/.next/
+**/node_modules/
+**/dist/
+**/coverage/

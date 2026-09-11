@@ -8,6 +8,7 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Send,
   ShieldCheck,
   Star,
   Wrench,
@@ -16,7 +17,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getStoredUser } from "@/lib/auth";
 import {
   phoneHref,
   type ProviderDetail,
@@ -73,8 +74,19 @@ export default function ProviderDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [showVerificationPrompt, setShowVerificationPrompt] = useState(false);
+  const [showNeedModal, setShowNeedModal] = useState(false);
   const [pendingContactHref, setPendingContactHref] = useState<string | null>(null);
+  const [needText, setNeedText] = useState("");
+  const [contactByWhatsapp, setContactByWhatsapp] = useState(false);
+  const [contactByEmail, setContactByEmail] = useState(false);
+  const [contactByPush, setContactByPush] = useState(false);
+  const [contactAutoOpened, setContactAutoOpened] = useState(false);
+  const [sendingNeed, setSendingNeed] = useState(false);
+  const [needError, setNeedError] = useState("");
+  const [needSuccess, setNeedSuccess] = useState("");
 
   useEffect(() => {
     if (!slug) {
@@ -129,6 +141,7 @@ export default function ProviderDetailPage() {
 
         if (active) {
           setProvider(providerData);
+          setImageFailed(false);
           setReviewSummary(reviewData);
         }
       } catch {
@@ -150,13 +163,180 @@ export default function ProviderDetailPage() {
   }, [slug]);
 
   function requestContact(href: string) {
-    if (getAccessToken()) {
-      window.location.href = href;
+    const token = getAccessToken();
+    const user = getStoredUser();
+
+    if (!token || !user) {
+      setPendingContactHref(href);
+      setShowAuthPrompt(true);
       return;
     }
 
-    setPendingContactHref(href);
-    setShowAuthPrompt(true);
+    if (!user.emailVerified) {
+      setPendingContactHref(href);
+      setShowVerificationPrompt(true);
+      return;
+    }
+
+    window.location.href = href;
+  }
+
+  useEffect(() => {
+    if (!provider || contactAutoOpened) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("contact") !== "1") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setContactAutoOpened(true);
+
+      const searchText = params.get("q")?.trim();
+
+      if (searchText) {
+        setNeedText(searchText);
+      }
+
+      setContactByWhatsapp(false);
+      setContactByEmail(false);
+      setContactByPush(false);
+
+      if (!getAccessToken()) {
+        setShowAuthPrompt(true);
+        return;
+      }
+
+      setNeedError("");
+      setShowNeedModal(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [provider, contactAutoOpened]);
+  function openNeedModal() {
+    const token = getAccessToken();
+    const user = getStoredUser();
+
+    if (!token || !user) {
+      setPendingContactHref(null);
+      setShowAuthPrompt(true);
+      return;
+    }
+
+    if (!user.emailVerified) {
+      setPendingContactHref(null);
+      setShowVerificationPrompt(true);
+      return;
+    }
+
+    setNeedError("");
+    setNeedSuccess("");
+    setShowNeedModal(true);
+  }
+
+  async function submitNeed() {
+    const token = getAccessToken();
+    const user = getStoredUser();
+    const cleanText = needText.trim();
+
+    if (!token || !user) {
+      setShowNeedModal(false);
+      setShowAuthPrompt(true);
+      return;
+    }
+
+    if (!user.emailVerified) {
+      setShowNeedModal(false);
+      setShowVerificationPrompt(true);
+      return;
+    }
+
+    if (cleanText.length < 5) {
+      setNeedError("İhtiyacını en az 5 karakterle açıklamalısın.");
+      return;
+    }
+
+    setSendingNeed(true);
+    setNeedError("");
+
+    try {
+      const currentUser = getStoredUser();
+
+      if (!currentUser?.phoneNumber) {
+        setNeedError(
+          "İhtiyacını işletmeye iletmek için hesabında cep telefonu numarası bulunmalıdır.",
+        );
+        return;
+      }
+
+      const urlParams = new URLSearchParams(
+        window.location.search,
+      );
+      const trackedNeedId = urlParams.get("needId");
+
+      const response = trackedNeedId
+        ? await fetch(
+            `${apiBaseUrl}/api/needs/${trackedNeedId}/target-provider`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                targetProviderId: provider!.id,
+                description: needText.trim(),
+                contactByWhatsapp,
+                contactByEmail,
+                contactByPush,
+              }),
+            },
+          )
+        : await fetch(`${apiBaseUrl}/api/needs`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              title: `${provider!.businessName} ile iletişim talebi`,
+              description: needText.trim(),
+              categorySlug: provider!.categorySlug,
+              serviceSlug: provider!.serviceSlug,
+              citySlug: provider!.citySlug,
+              districtSlug: provider!.districtSlug,
+              targetProviderId: provider!.id,
+              contactByWhatsapp,
+              contactByEmail,
+              contactByPush,
+            }),
+          });
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data?.code === "verification_required") {
+          setShowNeedModal(false);
+          setShowVerificationPrompt(true);
+          return;
+        }
+
+        setNeedError(data?.message ?? "İhtiyaç işletmeye iletilemedi.");
+        return;
+      }
+
+      setShowNeedModal(false);
+      setNeedText("");
+      setNeedSuccess(
+        `İhtiyacınız ${provider!.businessName} işletmesine iletildi. İşletme sizinle en kısa sürede iletişime geçecektir.`,
+      );
+    } catch {
+      setNeedError("Sunucuya bağlanılamadı.");
+    } finally {
+      setSendingNeed(false);
+    }
   }
 
   function authReturnUrl() {
@@ -193,8 +373,6 @@ export default function ProviderDetailPage() {
   const phone = phoneHref(provider.publicPhone);
   const whatsapp = whatsappHref(provider.publicWhatsapp);
 
-  void pendingContactHref;
-
   const averageRating = reviewSummary?.averageRating ?? 0;
   const reviewCount = reviewSummary?.reviewCount ?? 0;
   const reviews = reviewSummary?.reviews ?? [];
@@ -209,12 +387,31 @@ export default function ProviderDetailPage() {
               Yayındaki İşletme
             </span>
 
+            {!imageFailed && (
+              <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+                <img
+                  src={`${apiBaseUrl}/api/providers/${provider.id}/image`}
+                  alt={`${provider.businessName} işletme görseli`}
+                  className="aspect-[16/7] w-full object-cover sm:aspect-[16/6]"
+                  onError={() => setImageFailed(true)}
+                />
+              </div>
+            )}
             <h1 className="mt-4 font-display text-3xl font-bold sm:text-5xl">
-              {provider.businessName}
+              {provider!.businessName}
             </h1>
 
+            {provider.isVerifiedBusiness && (
+              <div className="mt-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                  <BadgeCheck className="size-3.5" aria-hidden="true" />
+                  Doğrulanmış İşletme
+                </span>
+              </div>
+            )}
+
             {reviewCount > 0 && (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-4 inline-flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
                 <RatingStars value={averageRating} />
 
                 <span className="font-semibold">
@@ -237,7 +434,7 @@ export default function ProviderDetailPage() {
             <div className="mt-5 flex flex-wrap gap-3 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="size-4 text-primary" aria-hidden="true" />
-                {provider.citySlug} / {provider.districtSlug}
+                {provider!.citySlug} / {provider!.districtSlug}
               </span>
 
               {provider.experienceYears !== null && (
@@ -250,6 +447,12 @@ export default function ProviderDetailPage() {
                 </span>
               )}
             </div>
+
+            {needSuccess && (
+              <div className="mt-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+                {needSuccess}
+              </div>
+            )}
 
             <div className="mt-7 flex flex-wrap gap-3">
               {phone && (
@@ -273,6 +476,15 @@ export default function ProviderDetailPage() {
                   WhatsApp
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={openNeedModal}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-5 text-sm font-semibold text-background transition-opacity hover:opacity-90"
+              >
+                <Send className="size-4" aria-hidden="true" />
+                İhtiyacımı İlet
+              </button>
             </div>
           </div>
         </div>
@@ -301,7 +513,7 @@ export default function ProviderDetailPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm text-accent-foreground">
                   <Wrench className="size-3.5" aria-hidden="true" />
-                  {provider.serviceSlug}
+                  {provider!.serviceSlug}
                 </span>
 
                 {provider.additionalServices.map((service) => (
@@ -477,6 +689,294 @@ export default function ProviderDetailPage() {
           </aside>
         </div>
       </section>
+      {showVerificationPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="font-display text-2xl font-bold">
+              Önce e-posta adresini doğrula
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              İşletmeyle doğrudan iletişim kurmak veya ihtiyacını iletmek için
+              e-posta adresini doğrulaman gerekiyor.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const returnUrl = authReturnUrl();
+                  router.push(
+                    `/dogrula?returnUrl=${encodeURIComponent(returnUrl)}`,
+                  );
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
+              >
+                Şimdi Doğrula
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowVerificationPrompt(false);
+                  setPendingContactHref(null);
+                }}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-semibold transition hover:bg-muted"
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNeedModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 p-4 backdrop-blur-[1px]">
+          <div className="mx-auto my-6 w-full max-w-5xl rounded-3xl border border-border bg-card shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5 sm:px-8">
+              <div>
+                <h2 className="font-display text-2xl font-bold sm:text-3xl">
+                  {provider!.businessName}&apos;e İhtiyacını İlet
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  İhtiyacını bu işletmeye ilet. İşletme talebini aldıktan sonra
+                  seçtiğin iletişim kanalları üzerinden seninle iletişime geçebilir.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowNeedModal(false)}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-border text-lg hover:bg-accent"
+                aria-label="Pencereyi kapat"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4">
+                  <div className="font-semibold">
+                    {new URLSearchParams(window.location.search).get("needId")
+                      ? "Mevcut talebin hazır"
+                      : "İhtiyacını işletmeye ilet"}
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {new URLSearchParams(window.location.search).get("needId")
+                      ? "Daha önce oluşturduğun takip talebi bu işletmeye yönlendirilecek. Yeni bir genel talep oluşturulmayacak."
+                      : "Açıklaman doğrudan bu işletmeye gönderilecek."}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-border p-5">
+                  <h3 className="font-semibold">Talep bilgileri</h3>
+
+                  <label className="mt-4 block">
+                    <span className="mb-2 block text-sm font-medium">
+                      İhtiyacın
+                    </span>
+                    <textarea
+                      value={needText}
+                      onChange={(event) =>
+                        setNeedText(event.target.value)
+                      }
+                      rows={5}
+                      maxLength={2000}
+                      placeholder="İhtiyacını ve işletmenin bilmesi gereken detayları yaz..."
+                      className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <div className="mt-1 text-right text-xs text-muted-foreground">
+                      {needText.length}/2000
+                    </div>
+                  </label>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-muted/30 p-4">
+                      <div className="text-xs text-muted-foreground">
+                        Konum
+                      </div>
+                      <div className="mt-1 font-semibold">
+                        {provider!.citySlug} / {provider!.districtSlug}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-muted/30 p-4">
+                      <div className="text-xs text-muted-foreground">
+                        Hizmet
+                      </div>
+                      <div className="mt-1 font-semibold">
+                        {new URLSearchParams(window.location.search).get("q")
+                          ? "Mevcut ihtiyacın"
+                          : provider!.serviceSlug}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border p-5">
+                  <h3 className="font-semibold">
+                    İşletme seninle nasıl iletişime geçsin?
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Telefon zorunlu ve varsayılan iletişim kanalıdır.
+                    İstersen başka kanallar da ekleyebilirsin.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-xl border border-primary/40 bg-primary/5 p-4">
+                      <div>
+                        <div className="font-semibold">Telefon</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Arama yoluyla
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked
+                        readOnly
+                        className="size-5 accent-primary"
+                        aria-label="Telefon seçili"
+                      />
+                    </div>
+
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
+                      <div>
+                        <div className="font-semibold">WhatsApp</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Mesaj yoluyla
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={contactByWhatsapp}
+                        onChange={(event) =>
+                          setContactByWhatsapp(event.target.checked)
+                        }
+                        className="size-5 accent-primary"
+                      />
+                    </label>
+
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
+                      <div>
+                        <div className="font-semibold">E-posta</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          E-posta yoluyla
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={contactByEmail}
+                        onChange={(event) =>
+                          setContactByEmail(event.target.checked)
+                        }
+                        className="size-5 accent-primary"
+                      />
+                    </label>
+
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
+                      <div>
+                        <div className="font-semibold">
+                          Uygulama içi bildirim
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Platform üzerinden
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={contactByPush}
+                        onChange={(event) =>
+                          setContactByPush(event.target.checked)
+                        }
+                        className="size-5 accent-primary"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
+                    İletişim bilgilerin yalnızca seçtiğin kanallar üzerinden
+                    bu işletmeyle paylaşılır.
+                  </div>
+                </div>
+
+                {needError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {needError}
+                  </div>
+                )}
+              </div>
+
+              <aside className="h-fit rounded-2xl border border-border bg-muted/20 p-5">
+                <div className="text-xl font-bold">
+                  {provider!.businessName}
+                </div>
+
+                {provider!.isVerifiedBusiness && (
+                  <div className="mt-2 inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                    Doğrulanmış İşletme
+                  </div>
+                )}
+
+                <div className="mt-5 space-y-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Konum:</span>{" "}
+                    <strong>
+                      {provider!.citySlug} / {provider!.districtSlug}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground">Ana hizmet:</span>{" "}
+                    <strong>{provider!.serviceSlug}</strong>
+                  </div>
+
+                  {provider!.publicPhone && (
+                    <div>
+                      <span className="text-muted-foreground">Telefon:</span>{" "}
+                      {provider!.publicPhone}
+                    </div>
+                  )}
+
+                  {provider!.publicWhatsapp && (
+                    <div>
+                      <span className="text-muted-foreground">WhatsApp:</span>{" "}
+                      {provider!.publicWhatsapp}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-800">
+                  <strong>Güvenle iletişim kur</strong>
+                  <div className="mt-1">
+                    Talebin yalnızca bu işletmeye iletilir. Seçmediğin ek
+                    iletişim kanalları paylaşılmaz.
+                  </div>
+                </div>
+              </aside>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-border px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+              <button
+                type="button"
+                onClick={() => setShowNeedModal(false)}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-input bg-background px-6 text-sm font-semibold hover:bg-accent"
+              >
+                İptal
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void submitNeed()}
+                disabled={sendingNeed || needText.trim().length < 3}
+                className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {sendingNeed ? "İletiliyor..." : "İhtiyacımı İlet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showAuthPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">

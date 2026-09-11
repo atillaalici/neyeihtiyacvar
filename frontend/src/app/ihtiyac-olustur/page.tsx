@@ -1,18 +1,28 @@
 "use client";
 
 import {
+  ArrowRight,
+  BadgeCheck,
+  BellRing,
+  BriefcaseBusiness,
+  Check,
+  MapPin,
+  Phone,
+  Search,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
+import Link from "next/link";
+import {
   FormEvent,
   Suspense,
   useEffect,
   useMemo,
   useState,
 } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BellRing, CheckCircle2 } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -21,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiBaseUrl } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getStoredUser } from "@/lib/auth";
 
 type Category = {
   id: string;
@@ -43,667 +53,644 @@ type City = {
   districts: District[];
 };
 
-type NeedResponse = {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  city: string;
-  district: string;
-  categorySlug: string | null;
-  serviceSlug: string | null;
-  citySlug: string | null;
-  districtSlug: string | null;
-  createdAtUtc: string;
-};
-
-type MatchProvider = {
+type Recommendation = {
   id: string;
   slug: string;
   businessName: string;
   shortDescription: string;
   categorySlug: string;
   serviceSlug: string;
+  additionalServices: string[];
   citySlug: string;
   districtSlug: string;
-  publicPhone: string | null;
-  publicWhatsapp: string | null;
+  publicPhone?: string | null;
+  publicWhatsapp?: string | null;
+  matchLevel: "main-service" | "additional-service" | "category-fallback";
+  averageRating: number;
+  reviewCount: number;
+  experienceYears: number | null;
+  emergencyService: boolean;
+  onsiteService: boolean;
+  score: number;
+  reasons: string[];
 };
 
-type MatchResponse = {
-  requestId: string;
-  matchType: string;
-  count: number;
-  providers: MatchProvider[];
-  message?: string;
+type RecommendationResponse = {
+  understanding: {
+    originalText: string | null;
+    source: "explicit" | "inferred" | "unmatched";
+    confidence: number;
+    categorySlug: string | null;
+    categoryName: string | null;
+    serviceSlug: string | null;
+    serviceName: string | null;
+    alternatives: {
+      categorySlug: string;
+      categoryName: string;
+      serviceSlug: string;
+      serviceName: string;
+      score: number;
+    }[];
+  };
+  location: {
+    citySlug: string | null;
+    districtSlug: string | null;
+  };
+  matching: {
+    exactServiceMatchFound: boolean;
+    usedCategoryFallback: boolean;
+    exactCandidateCount: number;
+    categoryCandidateCount: number;
+  };
+  totalCandidates: number;
+  recommendations: Recommendation[];
 };
 
-function toSlug(value: string) {
+function formatSlug(value: string | null | undefined) {
+  if (!value) return "";
   return value
-    .toLocaleLowerCase("tr-TR")
-    .replaceAll("ı", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ş", "s")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toLocaleUpperCase("tr-TR") + part.slice(1))
+    .join(" ");
+}
+
+function phoneHref(value: string | null | undefined) {
+  if (!value) return null;
+  const cleaned = value.replace(/[^\d+]/g, "");
+  return cleaned ? `tel:${cleaned}` : null;
 }
 
 function NeedCreatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const storedUser = getStoredUser();
 
-  const initialNeed =
-    searchParams.get("ihtiyac") ??
-    searchParams.get("q") ??
-    "";
-
-  const initialCategory =
-    searchParams.get("kategori") ?? "";
-  const initialService =
-    searchParams.get("hizmet") ?? "";
-  const initialCity =
-    searchParams.get("il") ?? "";
-  const initialDistrict =
-    searchParams.get("ilce") ?? "";
-
-  const returnUrl = `/ihtiyac-olustur${
-    searchParams.toString()
-      ? `?${searchParams.toString()}`
-      : ""
-  }`;
-  const fromSearch =
-    Boolean(initialNeed) &&
-    Boolean(initialCategory) &&
-    Boolean(initialService) &&
-    Boolean(initialCity) &&
-    Boolean(initialDistrict);
+  const [query, setQuery] = useState(
+    searchParams.get("q")?.trim() ??
+      searchParams.get("ihtiyac")?.trim() ??
+      "",
+  );
+  const [detail, setDetail] = useState("");
+  const [citySlug, setCitySlug] = useState(
+    searchParams.get("il")?.trim() ?? storedUser?.citySlug ?? "",
+  );
+  const [districtSlug, setDistrictSlug] = useState(
+    searchParams.get("ilce")?.trim() ?? storedUser?.districtSlug ?? "",
+  );
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
-  const [authenticated, setAuthenticated] = useState(false);
-
-  const [description, setDescription] =
-    useState(initialNeed);
-  const [categorySlug, setCategorySlug] =
-    useState(initialCategory);
-  const [serviceSlug, setServiceSlug] =
-    useState(initialService);
-  const [citySlug, setCitySlug] =
-    useState(initialCity);
-  const [districtSlug, setDistrictSlug] =
-    useState(initialDistrict);
-
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] =
-    useState<NeedResponse | null>(null);
-  const [matches, setMatches] =
-    useState<MatchResponse | null>(null);
+  const [recommendationData, setRecommendationData] =
+    useState<RecommendationResponse | null>(null);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [searching, setSearching] = useState(false);
+  const [tracking, setTracking] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => {
-    setAuthenticated(Boolean(getAccessToken()));
-    setAuthReady(true);
-  }, []);
+  const [trackingSuccess, setTrackingSuccess] = useState("");
+
+  const selectedCity = useMemo(
+    () => cities.find((item) => item.slug === citySlug) ?? null,
+    [cities, citySlug],
+  );
+  const districts = selectedCity?.districts ?? [];
+
+  const understoodCategory =
+    recommendationData?.understanding.categorySlug ?? "";
+  const understoodService =
+    recommendationData?.understanding.serviceSlug ?? "";
+
+  const selectedCategoryName =
+    recommendationData?.understanding.categoryName ??
+    categories.find((item) => item.slug === understoodCategory)?.name ??
+    formatSlug(understoodCategory);
+
+  const selectedServiceName =
+    recommendationData?.understanding.serviceName ??
+    formatSlug(understoodService);
+
+  const recommendations = useMemo(() => {
+    return [...(recommendationData?.recommendations ?? [])]
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.averageRating !== a.averageRating) {
+          return b.averageRating - a.averageRating;
+        }
+        return b.reviewCount - a.reviewCount;
+      })
+      .slice(0, 5);
+  }, [recommendationData]);
 
   useEffect(() => {
-    setDescription(initialNeed);
-    setCategorySlug(initialCategory);
-    setServiceSlug(initialService);
-    setCitySlug(initialCity);
-    setDistrictSlug(initialDistrict);
-    setSuccess(null);
-    setMatches(null);
-  }, [
-    initialNeed,
-    initialCategory,
-    initialService,
-    initialCity,
-    initialDistrict,
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
+    let active = true;
 
     async function loadCatalogs() {
       try {
-        const [categoryResponse, locationResponse] =
-          await Promise.all([
-            fetch(`${apiBaseUrl}/api/categories`, {
-              cache: "no-store",
-            }),
-            fetch(`${apiBaseUrl}/api/locations`, {
-              cache: "no-store",
-            }),
-          ]);
+        const [categoryResponse, locationResponse] = await Promise.all([
+          fetch(`${apiBaseUrl}/api/categories`, { cache: "no-store" }),
+          fetch(`${apiBaseUrl}/api/locations`, { cache: "no-store" }),
+        ]);
 
-        if (
-          !categoryResponse.ok ||
-          !locationResponse.ok
-        ) {
-          throw new Error(
-            "Katalog verileri alınamadı.",
-          );
+        if (!categoryResponse.ok || !locationResponse.ok) {
+          throw new Error();
         }
 
-        const [categoryData, locationData] =
-          await Promise.all([
-            categoryResponse.json() as Promise<Category[]>,
-            locationResponse.json() as Promise<City[]>,
-          ]);
+        const [categoryData, locationData] = await Promise.all([
+          categoryResponse.json() as Promise<Category[]>,
+          locationResponse.json() as Promise<City[]>,
+        ]);
 
-        if (!cancelled) {
-          setCategories(categoryData);
-          setCities(locationData);
-        }
+        if (!active) return;
+        setCategories(categoryData);
+        setCities(locationData);
       } catch {
-        if (!cancelled) {
-          setError(
-            "Kategori ve konum bilgileri yüklenemedi.",
-          );
-        }
+        if (active) setError("Kategori ve konum bilgileri yüklenemedi.");
       } finally {
-        if (!cancelled) {
-          setCatalogLoading(false);
-        }
+        if (active) setLoadingCatalog(false);
       }
     }
 
     void loadCatalogs();
 
     return () => {
-      cancelled = true;
+      active = false;
     };
   }, []);
 
-  const services = useMemo(() => {
-    return (
-      categories.find(
-        (item) => item.slug === categorySlug,
-      )?.services ?? []
-    );
-  }, [categories, categorySlug]);
+  async function runSearch(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const cleanQuery = query.trim();
 
-  const districts = useMemo(() => {
-    return (
-      cities.find(
-        (item) => item.slug === citySlug,
-      )?.districts ?? []
-    );
-  }, [cities, citySlug]);
-
-  const selectedCategoryName =
-    categories.find(
-      (item) => item.slug === categorySlug,
-    )?.name ?? categorySlug;
-
-  const selectedServiceName =
-    services.find(
-      (item) => toSlug(item) === serviceSlug,
-    ) ?? serviceSlug;
-
-  const selectedCityName =
-    cities.find(
-      (item) => item.slug === citySlug,
-    )?.name ?? citySlug;
-
-  const selectedDistrictName =
-    districts.find(
-      (item) => item.slug === districtSlug,
-    )?.name ?? districtSlug;
-
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
-    event.preventDefault();
-
-    if (loading || success) {
+    if (cleanQuery.length < 3) {
+      setError("İhtiyacını en az 3 karakterle yaz.");
       return;
     }
 
+    if (!citySlug || !districtSlug) {
+      setError("İl ve ilçe bilgisi gerekli.");
+      return;
+    }
+
+    setSearching(true);
     setError("");
-    setMatches(null);
+    setTrackingSuccess("");
 
-    const cleanDescription = description.trim();
+    try {
+      const params = new URLSearchParams({
+        q: cleanQuery,
+        il: citySlug,
+        ilce: districtSlug,
+        limit: "5",
+      });
 
-    if (!cleanDescription) {
-      setError("Lütfen ihtiyacını yaz.");
+      const response = await fetch(
+        `${apiBaseUrl}/api/recommendations?${params.toString()}`,
+        { cache: "no-store" },
+      );
+
+      if (!response.ok) throw new Error();
+
+      setRecommendationData(
+        (await response.json()) as RecommendationResponse,
+      );
+    } catch {
+      setError("İhtiyaca uygun işletmeler alınamadı. Lütfen tekrar deneyin.");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function createTrackingNeed() {
+    const cleanQuery = query.trim();
+
+    if (
+      !cleanQuery ||
+      !understoodCategory ||
+      !understoodService ||
+      !citySlug ||
+      !districtSlug
+    ) {
+      setError("Talep oluşturmak için önce ihtiyacını arat ve konumunu seç.");
       return;
     }
-
-    if (!categorySlug) {
-      setError("Lütfen kategori seç.");
-      return;
-    }
-
-    if (!serviceSlug) {
-      setError("Lütfen hizmet seç.");
-      return;
-    }
-
-    if (!citySlug) {
-      setError("Lütfen il seç.");
-      return;
-    }
-
-    if (!districtSlug) {
-      setError("Lütfen ilçe seç.");
-      return;
-    }
-
-    const title =
-      cleanDescription.length > 150
-        ? `${cleanDescription.slice(0, 147)}...`
-        : cleanDescription;
 
     const token = getAccessToken();
 
     if (!token) {
+      const params = new URLSearchParams({
+        q: cleanQuery,
+        il: citySlug,
+        ilce: districtSlug,
+        kategori: understoodCategory,
+        hizmet: understoodService,
+      });
+
       router.push(
-        `/giris?returnUrl=${encodeURIComponent(returnUrl)}`,
+        `/giris?returnUrl=${encodeURIComponent(
+          `/ihtiyac-olustur?${params.toString()}`,
+        )}`,
       );
       return;
     }
 
-    setLoading(true);
+    setTracking(true);
+    setError("");
 
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
+      const description = detail.trim()
+        ? `${cleanQuery}\n\n${detail.trim()}`
+        : cleanQuery;
 
-      headers.Authorization = `Bearer ${token}`;
-
-      const response = await fetch(
-        `${apiBaseUrl}/api/needs`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            title,
-            description: cleanDescription,
-            categorySlug,
-            serviceSlug,
-            citySlug,
-            districtSlug,
-          }),
+      const response = await fetch(`${apiBaseUrl}/api/needs`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          title: cleanQuery,
+          description,
+          categorySlug: understoodCategory,
+          serviceSlug: understoodService,
+          citySlug,
+          districtSlug,
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setError(
-          data?.message ??
-            "İhtiyaç talebi oluşturulamadı.",
-        );
+        setError(data?.message ?? "Talep oluşturulamadı.");
         return;
       }
 
-      const created = data as NeedResponse;
-      setSuccess(created);
-
-      const matchResponse = await fetch(
-        `${apiBaseUrl}/api/needs/${created.id}/matches`,
-        { cache: "no-store" },
+      setTrackingSuccess(
+        "Talebin oluşturuldu. Uygun yeni bir işletme eklendiğinde sana bildirim göndereceğiz.",
       );
-
-      if (matchResponse.ok) {
-        setMatches(
-          (await matchResponse.json()) as MatchResponse,
-        );
-      }
     } catch {
-      setError(
-        "Sunucuya bağlanılamadı. Lütfen tekrar deneyin.",
-      );
+      setError("Talep oluşturulamadı.");
     } finally {
-      setLoading(false);
+      setTracking(false);
     }
   }
 
+  function providerContactHref(provider: Recommendation) {
+    const params = new URLSearchParams({
+      contact: "1",
+      q: query.trim(),
+    });
+    return `/isletme/${provider.slug}?${params.toString()}`;
+  }
+
+  const showResults =
+    Boolean(recommendationData) && query.trim().length > 0;
+
   return (
     <SiteLayout>
-      <section className="section-shell py-10 sm:py-16">
-        <div className="mx-auto max-w-2xl">
-          <div className="mb-8">
-            <h1 className="font-display text-3xl font-bold sm:text-4xl">
-              Talep Oluştur
-            </h1>
-
-            <p className="mt-3 text-muted-foreground">
-              {fromSearch
-                ? "Arama bilgilerini senin için hazırladık. Kontrol edip talebi oluşturabilirsin."
-                : "İhtiyacını, hizmeti ve konumunu belirle. Uygun işletme platforma geldiğinde bu talep üzerinden takip edebiliriz."}
-            </p>
-          </div>
-
-          {fromSearch && (
-            <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                  <BellRing
-                    className="size-5"
-                    aria-hidden="true"
-                  />
-                </div>
-
-                <div>
-                  <h2 className="font-semibold">
-                    İstersen bu ihtiyacı takip edelim
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Şu an uygun işletme bulunamadı. Talebi
-                    oluşturursan uygun bir işletme platforma
-                    eklendiğinde ileride sana haber verebileceğiz.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {!authReady ? (
-            <div className="h-64 animate-pulse rounded-2xl border border-border bg-card" />
-          ) : !authenticated ? (
-            <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-soft sm:p-8">
-              <h2 className="font-display text-2xl font-bold">
-                Talep oluşturmak için hesabına giriş yap
-              </h2>
-
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                Talebini 7 gün takip edebilmemiz ve uygun bir işletme
-                bulunduğunda sana haber verebilmemiz için talebin hesabına
-                bağlı olmalı. Arama bilgilerin korunacak; giriş veya kayıt
-                sonrası kaldığın yerden devam edeceksin.
-              </p>
-
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <Link
-                  href={`/giris?returnUrl=${encodeURIComponent(returnUrl)}`}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-                >
-                  Giriş Yap
-                </Link>
-
-                <Link
-                  href={`/kayit?returnUrl=${encodeURIComponent(returnUrl)}`}
-                  className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-5 text-sm font-semibold transition hover:bg-muted"
-                >
-                  Üye Ol
-                </Link>
-              </div>
-            </div>
-          ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5 rounded-2xl border border-border bg-card p-6 shadow-soft sm:p-8"
-          >
+      <section className="border-b border-border bg-cream">
+        <div className="section-shell py-8 sm:py-10">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div>
-              <label
-                htmlFor="description"
-                className="mb-2 block text-sm font-medium"
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+                <h1 className="font-display text-3xl font-bold sm:text-4xl">
+                  Neye İhtiyaç <span className="text-primary">Var?</span>
+                </h1>
+
+                <div className="hidden text-right text-sm italic text-muted-foreground md:block">
+                  İhtiyaçlar birleşir,
+                  <br />
+                  çözümler burada buluşur.
+                </div>
+              </div>
+
+              <form
+                onSubmit={runSearch}
+                className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5"
               >
-                Neye ihtiyacın var?
-              </label>
-
-              <textarea
-                id="description"
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  setSuccess(null);
-                  setMatches(null);
-                }}
-                rows={4}
-                maxLength={2000}
-                placeholder="İhtiyacını kendi cümlenle anlat..."
-                className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-              />
-            </div>
-
-            {fromSearch && !catalogLoading && (
-              <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2">
-                <div>
-                  <div className="text-xs text-muted-foreground">
-                    Hizmet
-                  </div>
-                  <div className="mt-1 font-medium">
-                    {selectedServiceName || "—"}
-                  </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">
-                    {selectedCategoryName}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-muted-foreground">
-                    Konum
-                  </div>
-                  <div className="mt-1 font-medium">
-                    {selectedCityName} /{" "}
-                    {selectedDistrictName}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Kategori
-                </label>
-
-                <Select
-                  value={categorySlug}
-                  onValueChange={(value) => {
-                    setCategorySlug(value);
-                    setServiceSlug("");
-                    setSuccess(null);
-                    setMatches(null);
-                  }}
-                  disabled={catalogLoading}
-                >
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="Kategori Seç" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {categories.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.slug}
-                      >
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Hizmet
-                </label>
-
-                <Select
-                  value={serviceSlug}
-                  onValueChange={(value) => {
-                    setServiceSlug(value);
-                    setSuccess(null);
-                    setMatches(null);
-                  }}
-                  disabled={!categorySlug || catalogLoading}
-                >
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="Hizmet Seç" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {services.map((serviceItem) => (
-                      <SelectItem
-                        key={serviceItem}
-                        value={toSlug(serviceItem)}
-                      >
-                        {serviceItem}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  İl
-                </label>
-
-                <Select
-                  value={citySlug}
-                  onValueChange={(value) => {
-                    setCitySlug(value);
-                    setDistrictSlug("");
-                    setSuccess(null);
-                    setMatches(null);
-                  }}
-                  disabled={catalogLoading}
-                >
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="İl Seç" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {cities.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.slug}
-                      >
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  İlçe
-                </label>
-
-                <Select
-                  value={districtSlug}
-                  onValueChange={(value) => {
-                    setDistrictSlug(value);
-                    setSuccess(null);
-                    setMatches(null);
-                  }}
-                  disabled={!citySlug || catalogLoading}
-                >
-                  <SelectTrigger className="h-11 w-full">
-                    <SelectValue placeholder="İlçe Seç" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    {districts.map((item) => (
-                      <SelectItem
-                        key={item.id}
-                        value={item.slug}
-                      >
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-sm text-green-700">
-                <div className="flex items-center gap-2 font-medium">
-                  <CheckCircle2
-                    className="size-4"
-                    aria-hidden="true"
+                <div className="flex items-center gap-2 rounded-xl border border-input bg-background p-1.5">
+                  <Search className="ml-3 size-5 shrink-0 text-primary" />
+                  <input
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setRecommendationData(null);
+                      setTrackingSuccess("");
+                    }}
+                    placeholder="Örneğin: musluk su akıtıyor"
+                    className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
                   />
-                  Talebin başarıyla oluşturuldu.
-                </div>
-
-                <p className="mt-2 text-sm">
-                  Talebin açık kaldığı sürece uygun işletmelerle
-                  eşleştirilebilir.
-                </p>
-
-                {getAccessToken() && (
-                  <Link
-                    href="/taleplerim"
-                    className="mt-3 inline-block font-medium underline"
+                  <button
+                    type="submit"
+                    disabled={searching}
+                    className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                   >
-                    Taleplerime Git
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {matches && matches.count > 0 && (
-              <div className="rounded-2xl border border-border bg-background p-5">
-                <div className="mb-4">
-                  <h2 className="font-semibold">
-                    Uygun işletmeler ({matches.count})
-                  </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Talebi oluştururken yeni bir eşleşme bulundu.
-                  </p>
+                    {searching ? "Aranıyor..." : "İhtiyacı Bul"}
+                  </button>
                 </div>
 
-                <div className="space-y-3">
-                  {matches.providers.map((provider) => (
-                    <Link
-                      key={provider.id}
-                      href={`/isletme/${provider.slug}`}
-                      className="block rounded-xl border border-border p-4 transition hover:border-primary/40 hover:bg-muted/40"
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <label>
+                    <span className="mb-2 block text-sm font-medium">İl</span>
+                    <Select
+                      value={citySlug}
+                      onValueChange={(value) => {
+                        setCitySlug(value);
+                        setDistrictSlug("");
+                        setRecommendationData(null);
+                      }}
+                      disabled={loadingCatalog}
                     >
-                      <div className="font-semibold">
-                        {provider.businessName}
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder="İl seç" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cities.map((item) => (
+                          <SelectItem key={item.id} value={item.slug}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+
+                  <label>
+                    <span className="mb-2 block text-sm font-medium">İlçe</span>
+                    <Select
+                      value={districtSlug}
+                      onValueChange={(value) => {
+                        setDistrictSlug(value);
+                        setRecommendationData(null);
+                      }}
+                      disabled={!citySlug || loadingCatalog}
+                    >
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder="İlçe seç" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((item) => (
+                          <SelectItem key={item.id} value={item.slug}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+
+                  <div>
+                    <span className="mb-2 block text-sm font-medium">
+                      Kategori
+                    </span>
+                    <div className="flex h-11 items-center rounded-xl border border-input bg-muted/30 px-3 text-sm">
+                      {selectedCategoryName || "Otomatik belirlenecek"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="mb-2 block text-sm font-medium">
+                      Hizmet
+                    </span>
+                    <div className="flex h-11 items-center rounded-xl border border-input bg-muted/30 px-3 text-sm">
+                      {selectedServiceName || "Otomatik belirlenecek"}
+                    </div>
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium">
+                    Detaylı Açıklama{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (Opsiyonel)
+                    </span>
+                  </span>
+                  <textarea
+                    value={detail}
+                    onChange={(event) => setDetail(event.target.value)}
+                    rows={4}
+                    maxLength={2000}
+                    placeholder="İşin detayını, uygun zamanı, beklentini veya işletmenin bilmesi gereken bilgileri yazabilirsin..."
+                    className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <div className="mt-1 text-right text-xs text-muted-foreground">
+                    {detail.length}/2000
+                  </div>
+                </label>
+
+                {error && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+              </form>
+
+              {showResults && (
+                <div className="mt-6 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="font-display text-2xl font-bold">
+                        Sana En Uygun İşletmeler
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        “{query.trim()}” ihtiyacın için {formatSlug(citySlug)} /{" "}
+                        {formatSlug(districtSlug)} bölgesindeki en uygun
+                        işletmeleri sıraladık.
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+                      İlk {recommendations.length} sonuç
+                    </div>
+                  </div>
+
+                  {recommendations.length > 0 ? (
+                    <>
+                      <div className="mt-5 space-y-3">
+                        {recommendations.map((provider, index) => {
+                          const phone = phoneHref(provider.publicPhone);
+
+                          return (
+                            <article
+                              key={provider.id}
+                              className="rounded-2xl border border-border p-4"
+                            >
+                              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                      {index + 1}
+                                    </span>
+                                    <h3 className="font-display text-lg font-bold">
+                                      {provider.businessName}
+                                    </h3>
+                                    <BadgeCheck className="size-4 text-primary" />
+                                  </div>
+
+                                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Star className="size-4 fill-amber-400 text-amber-400" />
+                                      {provider.averageRating.toLocaleString(
+                                        "tr-TR",
+                                        {
+                                          minimumFractionDigits: 1,
+                                          maximumFractionDigits: 1,
+                                        },
+                                      )}{" "}
+                                      ({provider.reviewCount} değerlendirme)
+                                    </span>
+
+                                    <span className="inline-flex items-center gap-1">
+                                      <MapPin className="size-4 text-primary" />
+                                      {formatSlug(provider.citySlug)} /{" "}
+                                      {formatSlug(provider.districtSlug)}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-2 text-sm text-muted-foreground">
+                                    {formatSlug(provider.serviceSlug)}
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Link
+                                    href={`/isletme/${provider.slug}`}
+                                    className="inline-flex h-10 items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-semibold hover:bg-accent"
+                                  >
+                                    İşletmeyi İncele
+                                  </Link>
+
+                                  {phone ? (
+                                    <a
+                                      href={phone}
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary hover:bg-primary/5"
+                                    >
+                                      <Phone className="size-4" />
+                                      Ara
+                                    </a>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled
+                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold opacity-50"
+                                    >
+                                      <Phone className="size-4" />
+                                      Ara
+                                    </button>
+                                  )}
+
+                                  <Link
+                                    href={providerContactHref(provider)}
+                                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                  >
+                                    Teklif İste
+                                  </Link>
+                                </div>
+                              </div>
+                            </article>
+                          );
+                        })}
                       </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {provider.shortDescription}
-                      </div>
-                    </Link>
+
+                      <Link
+                        href={`/kesfet?${new URLSearchParams({
+                          q: query.trim(),
+                          il: citySlug,
+                          ilce: districtSlug,
+                        }).toString()}`}
+                        className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary text-sm font-semibold text-primary hover:bg-primary/5"
+                      >
+                        <BriefcaseBusiness className="size-4" />
+                        Diğer İşletmeleri Gör
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </>
+                  ) : (
+                    <div className="mt-5 rounded-2xl border border-dashed border-border p-7 text-center">
+                      <BellRing className="mx-auto size-8 text-primary" />
+                      <h3 className="mt-3 font-display text-xl font-bold">
+                        Şimdilik uygun işletme bulamadık
+                      </h3>
+                      <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+                        Talebini takibe alabiliriz. Uygun bir işletme
+                        eklendiğinde sana bildirim göndeririz.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => void createTrackingNeed()}
+                        disabled={tracking}
+                        className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                      >
+                        {tracking
+                          ? "Talep oluşturuluyor..."
+                          : "Talep Oluştur ve Takip Et"}
+                      </button>
+                    </div>
+                  )}
+
+                  {trackingSuccess && (
+                    <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                      {trackingSuccess}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <aside className="space-y-4">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                <h2 className="font-display text-lg font-bold">
+                  Araman nasıl çalışır?
+                </h2>
+                <div className="mt-4 space-y-3 text-sm">
+                  {[
+                    "İhtiyacını yaz ve konumunu seç.",
+                    "Kategori ve hizmet otomatik belirlenir.",
+                    "En uygun işletmeler puanlanarak sıralanır.",
+                    "Uygun işletme yoksa talebini takibe alırız.",
+                  ].map((item, index) => (
+                    <div key={item} className="flex items-start gap-3">
+                      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                        {index + 1}
+                      </span>
+                      <span className="pt-1 text-muted-foreground">{item}</span>
+                    </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={
-                loading ||
-                catalogLoading ||
-                Boolean(success)
-              }
-              className="w-full"
-            >
-              {loading
-                ? "Talep oluşturuluyor..."
-                : catalogLoading
-                  ? "Bilgiler yükleniyor..."
-                  : success
-                    ? "Talep Oluşturuldu"
-                    : "Talebi Oluştur ve Takip Et"}
-            </Button>
-          </form>
-          )}
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-5">
+                <div className="flex gap-3">
+                  <ShieldCheck className="size-6 shrink-0 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-green-950">
+                      Güvenli ve Ücretsiz
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-green-800">
+                      Arama yapmak ücretsizdir. Kişisel bilgilerin yalnızca
+                      sen onayladığında seçtiğin işletmeyle paylaşılır.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+                <h3 className="font-display text-lg font-bold">
+                  Daha iyi sonuçlar için
+                </h3>
+                <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  {[
+                    "İhtiyacını kısa ve net yaz.",
+                    "İl ve ilçenin doğru olduğundan emin ol.",
+                    "Gerekirse detaylı açıklama ekle.",
+                    "Acil durum varsa açıklamada belirt.",
+                  ].map((item) => (
+                    <div key={item} className="flex items-start gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-green-600" />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          </div>
         </div>
       </section>
     </SiteLayout>
@@ -715,10 +702,8 @@ export default function NeedCreatePage() {
     <Suspense
       fallback={
         <SiteLayout>
-          <section className="section-shell py-10 sm:py-16">
-            <div className="mx-auto max-w-2xl">
-              <div className="h-96 animate-pulse rounded-2xl border border-border bg-card" />
-            </div>
+          <section className="section-shell py-10">
+            <div className="h-96 animate-pulse rounded-2xl border border-border bg-card" />
           </section>
         </SiteLayout>
       }

@@ -12,15 +12,15 @@ public static class AdminDashboardEndpoints
         app.MapGet("/api/admin/dashboard", async (
             AppDbContext dbContext) =>
         {
-            var totalNeeds = await dbContext.NeedRequests.CountAsync();
+            var totalNeeds = await dbContext.NeedRequests.CountAsync(x => x.IsActive);
             var openNeeds = await dbContext.NeedRequests.CountAsync(
-                x => x.Status == NeedStatus.Open);
+                x => x.IsActive && x.Status == NeedStatus.Open);
             var offerReceivedNeeds = await dbContext.NeedRequests.CountAsync(
-                x => x.Status == NeedStatus.OfferReceived);
+                x => x.IsActive && x.Status == NeedStatus.OfferReceived);
             var completedNeeds = await dbContext.NeedRequests.CountAsync(
-                x => x.Status == NeedStatus.Completed);
+                x => x.IsActive && x.Status == NeedStatus.Completed);
             var cancelledNeeds = await dbContext.NeedRequests.CountAsync(
-                x => x.Status == NeedStatus.Cancelled);
+                x => x.IsActive && x.Status == NeedStatus.Cancelled);
 
             var pendingApplications =
                 await dbContext.ProviderApplications.CountAsync(
@@ -47,6 +47,7 @@ public static class AdminDashboardEndpoints
             var totalReviews = await dbContext.ProviderReviews.CountAsync();
 
             var recentNeeds = await dbContext.NeedRequests
+            .Where(x => x.IsActive)
                 .AsNoTracking()
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Take(6)

@@ -1,4 +1,4 @@
-﻿export type ProviderSummary = {
+export type ProviderSummary = {
   id: string;
   slug: string;
   businessName: string;
@@ -9,6 +9,7 @@
   districtSlug: string;
   publicPhone: string | null;
   publicWhatsapp: string | null;
+  isVerifiedBusiness: boolean;
   publicationStatus: "published";
 };
 

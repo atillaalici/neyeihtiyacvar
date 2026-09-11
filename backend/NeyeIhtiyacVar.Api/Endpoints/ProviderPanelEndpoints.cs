@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
+using NeyeIhtiyacVar.Api.Infrastructure.Notifications;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
@@ -41,11 +42,9 @@ public static class ProviderPanelEndpoints
             var matchedNeedCount = await dbContext.NeedRequests
                 .AsNoTracking()
                 .CountAsync(x =>
-                    x.CategorySlug == provider.CategorySlug &&
-                    (x.ServiceSlug == provider.ServiceSlug ||
-                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
-                    x.CitySlug == provider.CitySlug &&
-                    x.DistrictSlug == provider.DistrictSlug);
+                    x.IsActive &&
+                    x.Status != NeedStatus.Cancelled &&
+                    x.TargetProviderId == provider.Id);
 
             return Results.Ok(ToPanelProfile(provider, matchedNeedCount));
         });
@@ -106,9 +105,7 @@ public static class ProviderPanelEndpoints
 
             var validServiceSlugs = (await dbContext.CategoryServices
                     .AsNoTracking()
-                    .Where(x =>
-                        x.Category.Slug == provider.CategorySlug &&
-                        x.IsActive)
+                    .Where(x => x.IsActive)
                     .Select(x => x.Name)
                     .ToListAsync())
                 .Select(ToSlug)
@@ -118,7 +115,7 @@ public static class ProviderPanelEndpoints
                 !validServiceSlugs.Contains(x)))
             {
                 errors["additionalServices"] =
-                    ["Ek hizmetler işletmenin ana kategorisindeki hizmetlerden seçilmelidir."];
+                    ["Ek hizmet aktif hizmet kataloğunda bulunmalıdır."];
             }
 
             if (errors.Count > 0)
@@ -130,6 +127,9 @@ public static class ProviderPanelEndpoints
                 });
             }
 
+            var previousAdditionalServices =
+                provider.AdditionalServices
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
             provider.Description = Optional(request.Description);
             provider.AdditionalServices = normalizedAdditionalServices;
             provider.PublicPhone = Optional(request.PublicPhone);
@@ -142,16 +142,26 @@ public static class ProviderPanelEndpoints
             provider.UpdatedAtUtc = DateTime.UtcNow;
             provider.Version++;
 
+            var newlyAddedServices =
+                provider.AdditionalServices
+                    .Where(x => !previousAdditionalServices.Contains(x))
+                    .ToArray();
+
+            if (newlyAddedServices.Length > 0)
+            {
+                await TrackedNeedMatchNotifier.NotifyForProviderAsync(
+                    dbContext,
+                    provider,
+                    newlyAddedServices);
+            }
             await dbContext.SaveChangesAsync();
 
             var matchedNeedCount = await dbContext.NeedRequests
                 .AsNoTracking()
                 .CountAsync(x =>
-                    x.CategorySlug == provider.CategorySlug &&
-                    (x.ServiceSlug == provider.ServiceSlug ||
-                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
-                    x.CitySlug == provider.CitySlug &&
-                    x.DistrictSlug == provider.DistrictSlug);
+                    x.IsActive &&
+                    x.Status != NeedStatus.Cancelled &&
+                    x.TargetProviderId == provider.Id);
 
             return Results.Ok(ToPanelProfile(provider, matchedNeedCount));
         });
@@ -180,11 +190,9 @@ public static class ProviderPanelEndpoints
             var needs = await dbContext.NeedRequests
                 .AsNoTracking()
                 .Where(x =>
-                    x.CategorySlug == provider.CategorySlug &&
-                    (x.ServiceSlug == provider.ServiceSlug ||
-                     provider.AdditionalServices.Contains(x.ServiceSlug!)) &&
-                    x.CitySlug == provider.CitySlug &&
-                    x.DistrictSlug == provider.DistrictSlug)
+                    x.IsActive &&
+                    x.Status != NeedStatus.Cancelled &&
+                    x.TargetProviderId == provider.Id)
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => new
                 {
@@ -198,11 +206,69 @@ public static class ProviderPanelEndpoints
                     x.ServiceSlug,
                     x.CitySlug,
                     x.DistrictSlug,
+                    x.TargetProviderId,
+                    isDirectRequest = x.TargetProviderId == provider.Id,
+                    contactByPhone = x.ContactByPhone,
+                    contactByWhatsapp = x.ContactByWhatsapp,
+                    contactByEmail = x.ContactByEmail,
+                    contactByPush = x.ContactByPush,
+                    requesterEmail =
+                        x.TargetProviderId == provider.Id && x.OwnerUser != null
+                            ? x.OwnerUser.Email
+                            : null,
+                    requesterName =
+                        x.TargetProviderId == provider.Id && x.OwnerUser != null
+                            ? x.OwnerUser.DisplayName
+                            : null,
+                    requesterPhone =
+                        x.TargetProviderId == provider.Id && x.OwnerUser != null
+                            ? x.OwnerUser.PhoneNumber
+                            : null,
                     x.CreatedAtUtc
                 })
                 .ToListAsync();
 
             return Results.Ok(needs);
+        });
+
+        group.MapPut("/notification-preferences", async (
+            UpdateProviderNotificationPreferences request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (provider is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "Bu hesaba bağlı işletme bulunamadı."
+                });
+            }
+
+            provider.NotifyByEmail = request.Email;
+            provider.NotifyBySms = request.Sms;
+            provider.NotifyByWhatsapp = request.Whatsapp;
+            provider.NotifyByPush = request.Push;
+            provider.UpdatedAtUtc = DateTime.UtcNow;
+            provider.Version++;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                email = provider.NotifyByEmail,
+                sms = provider.NotifyBySms,
+                whatsapp = provider.NotifyByWhatsapp,
+                push = provider.NotifyByPush,
+                provider.Version
+            });
         });
 
         return app;
@@ -312,6 +378,13 @@ public static class ProviderPanelEndpoints
             provider.ExperienceYears,
             provider.EmergencyService,
             provider.OnsiteService,
+            notificationPreferences = new
+            {
+                email = provider.NotifyByEmail,
+                sms = provider.NotifyBySms,
+                whatsapp = provider.NotifyByWhatsapp,
+                push = provider.NotifyByPush
+            },
             publicationStatus =
                 provider.PublicationStatus.ToString().ToLowerInvariant(),
             provider.PublishedAtUtc,
@@ -436,3 +509,9 @@ public sealed record UpdateOwnProviderRequest(
     int? ExperienceYears,
     bool EmergencyService,
     bool OnsiteService);
+
+public sealed record UpdateProviderNotificationPreferences(
+    bool Email,
+    bool Sms,
+    bool Whatsapp,
+    bool Push);

@@ -215,12 +215,6 @@ export default function AdminDashboardPage() {
                 href="/admin/basvurular"
               />
               <StatCard
-                label="Yayındaki İşletme"
-                value={data.publishedProviders}
-                icon={<Store className="size-5 text-blue-600" />}
-                href="/admin/isletmeler"
-              />
-              <StatCard
                 label="Toplam Teklif"
                 value={data.totalOffers}
                 icon={<CircleDollarSign className="size-5 text-primary" />}

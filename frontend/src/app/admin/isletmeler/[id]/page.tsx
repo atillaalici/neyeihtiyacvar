@@ -216,7 +216,11 @@ export default function AdminProviderDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadData]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -317,6 +321,8 @@ export default function AdminProviderDetailPage() {
       const updated = data as AdminProvider;
       setProvider(updated);
       setForm(formFromProvider(updated));
+      router.push("/admin/isletmeler");
+      router.refresh();
       setMessage("İşletme profili kaydedildi.");
     } catch {
       setError("Sunucuya bağlanılamadı.");
@@ -532,6 +538,7 @@ export default function AdminProviderDetailPage() {
                 onValueChange={(value: string) => {
                   update("categorySlug", value);
                   update("serviceSlug", "");
+                  update("additionalServices", []);
                 }}
                 disabled={!editable}
               >
@@ -552,7 +559,13 @@ export default function AdminProviderDetailPage() {
               <label className="mb-2 block text-sm font-medium">Ana hizmet</label>
               <Select
                 value={form.serviceSlug}
-                onValueChange={(value: string) => update("serviceSlug", value)}
+                onValueChange={(value: string) => {
+                  update("serviceSlug", value);
+                  update(
+                    "additionalServices",
+                    form.additionalServices.filter((item) => item !== value),
+                  );
+                }}
                 disabled={!editable || !selectedCategory}
               >
                 <SelectTrigger className="h-11 w-full">
@@ -655,7 +668,7 @@ export default function AdminProviderDetailPage() {
               </div>
 
               <p className="mt-2 text-xs text-muted-foreground">
-                Ana hizmete ek olarak en fazla 3 hizmet seçebilirsin.
+                Ana hizmete ek olarak en fazla 1 hizmet seçebilirsin.
               </p>
             </div>
 

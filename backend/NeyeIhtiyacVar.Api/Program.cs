@@ -7,10 +7,12 @@ using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Endpoints;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Auth;
+using NeyeIhtiyacVar.Api.Infrastructure.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
 
 builder.Services.AddOpenApi();
 
@@ -168,10 +170,13 @@ app.MapNeedRequestEndpoints();
 app.MapCatalogEndpoints();
 app.MapLocationEndpoints();
 app.MapProviderEndpoints();
+app.MapFeaturedProviderEndpoints();
 app.MapRecommendationEndpoints();
 app.MapProviderApplicationEndpoints();
+app.MapBusinessRegistrationEndpoints();
 app.MapAuthEndpoints();
 app.MapProviderPanelEndpoints();
+app.MapProviderImageEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
 app.MapNotificationEndpoints();

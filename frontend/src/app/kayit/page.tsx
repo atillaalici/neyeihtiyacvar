@@ -22,14 +22,16 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { BusinessRegistrationForm } from "@/components/auth/BusinessRegistrationForm";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { apiBaseUrl } from "@/lib/api";
+import { saveAuth, type AuthResponse } from "@/lib/auth";
 
 type AccountType = "user" | "business";
 type EmailAvailability = "idle" | "checking" | "available" | "taken";
 
-type RegisterResponse = {
+type RegisterResponse = AuthResponse & {
   verificationRequired: boolean;
   userId: string;
   email: string;
@@ -85,6 +87,8 @@ function RegisterPageContent() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [socialMessage, setSocialMessage] = useState("");
+  const [showVerifyChoice, setShowVerifyChoice] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState<RegisterResponse | null>(null);
 
   const passwordRules = useMemo(
     () => ({
@@ -114,10 +118,7 @@ function RegisterPageContent() {
     return { label: "Normal", level: 1 };
   }, [password, passwordRules]);
 
-  const returnUrl =
-    accountType === "business"
-      ? "/isletme-ekle"
-      : incomingReturnUrl;
+  const returnUrl = incomingReturnUrl;
 
   function clearFieldError(field: keyof FieldErrors) {
     setFieldErrors((current) => {
@@ -220,8 +221,7 @@ function RegisterPageContent() {
     }
 
     if (!termsAccepted) {
-      errors.agreements =
-        "Devam etmek için kullanım koşulları ve gizlilik politikasını kabul etmelisin.";
+      errors.agreements = "Devam etmek için Kullanım ve Üyelik Koşullarını kabul etmelisin."
     }
 
     setFieldErrors(errors);
@@ -318,6 +318,8 @@ function RegisterPageContent() {
 
       const registerData = data as RegisterResponse;
 
+      saveAuth(registerData);
+
       if (registerData.developmentCodes) {
         sessionStorage.setItem(
           "neyeihtiyacvar.devVerificationCodes",
@@ -325,14 +327,8 @@ function RegisterPageContent() {
         );
       }
 
-      const params = new URLSearchParams({
-        userId: registerData.userId,
-        email: registerData.email,
-        phone: registerData.phoneNumber,
-        returnUrl,
-      });
-
-      router.push(`/dogrula?${params.toString()}`);
+      setRegisteredUser(registerData);
+      setShowVerifyChoice(true);
     } catch {
       setError(
         "Sunucuya bağlanılamadı. İnternet bağlantısını ve backend servisinin çalıştığını kontrol et.",
@@ -349,8 +345,144 @@ function RegisterPageContent() {
     );
   }
 
+  if (accountType === "business") {
+    return (
+      <SiteLayout>
+        <section className="section-shell py-10 sm:py-14">
+          <div className="mx-auto max-w-2xl">
+            <div className="mb-7 text-center">
+              <p className="text-sm font-semibold text-primary">
+                Ücretsiz üyelik
+              </p>
+
+              <h1 className="mt-2 font-display text-3xl font-bold sm:text-4xl">
+                Hesap oluştur
+              </h1>
+
+              <p className="mt-3 text-muted-foreground">
+                Kullanıcı veya işletme hesabı türünü seçerek devam et.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AccountTypeButton
+                active={false}
+                icon={<UsersRound className="size-5" />}
+                title="Kullanıcı olarak kayıt ol"
+                subtitle="İhtiyaç oluştur, teklif al"
+                onClick={() => setAccountType("user")}
+              />
+
+              <AccountTypeButton
+                active
+                icon={<Building2 className="size-5" />}
+                title="İşletme olarak kayıt ol"
+                subtitle="Müşterilere ulaş, işini büyüt"
+                onClick={() => setAccountType("business")}
+              />
+            </div>
+
+            <BusinessRegistrationForm />
+          </div>
+        </section>
+      </SiteLayout>
+    );
+  }
+
   return (
     <SiteLayout>
+      {showVerifyChoice && registeredUser && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
+            <p className="text-sm font-semibold text-primary">
+              Hesabın oluşturuldu
+            </p>
+
+            <h2 className="mt-2 font-display text-2xl font-bold">
+              Hesabını doğrulamak ister misin?
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Kullanıcı hesabında ihtiyaç talebi oluşturmak için e-posta
+              doğrulaması gerekir. İşletme hesabında ise yayına alınmadan önce
+              e-posta ve telefon doğrulamasının ikisi de tamamlanmalıdır.
+            </p>
+
+            <div className="mt-6 grid gap-2">
+              <Button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  setError("");
+
+                  try {
+                    const response = await fetch(
+                      `${apiBaseUrl}/api/auth/verification/resend`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          userId: registeredUser.userId,
+                          channel: "email",
+                        }),
+                      },
+                    );
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                      setError(
+                        data?.message ??
+                          "E-posta doğrulama kodu gönderilemedi.",
+                      );
+                      return;
+                    }
+
+                    if (data?.developmentCode) {
+                      sessionStorage.setItem(
+                        "neyeihtiyacvar.devVerificationCodes",
+                        JSON.stringify({
+                          email: String(data.developmentCode),
+                        }),
+                      );
+                    }
+
+                    const params = new URLSearchParams({
+                      userId: registeredUser.userId,
+                      email: registeredUser.email,
+                      phone: registeredUser.phoneNumber,
+                      channel: "email",
+                      returnUrl,
+                    });
+
+                    router.push(`/dogrula?${params.toString()}`);
+                  } catch {
+                    setError("Doğrulama kodu gönderilemedi.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                Şimdi Doğrula
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowVerifyChoice(false);
+                  router.push(returnUrl);
+                  router.refresh();
+                }}
+              >
+                Doğrulamadan Devam Et
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="section-shell py-10 sm:py-14">
         <div className="mx-auto max-w-2xl">
           <div className="mb-7 text-center">
@@ -383,7 +515,7 @@ function RegisterPageContent() {
               />
 
               <AccountTypeButton
-                active={accountType === "business"}
+                active={false}
                 icon={<Building2 className="size-5" />}
                 title="İşletme olarak kayıt ol"
                 subtitle="Müşterilere ulaş, işini büyüt"
@@ -721,21 +853,43 @@ function RegisterPageContent() {
 
                 <span>
                   <Link
-                    href="/kullanim-kosullari"
+                    href="/sozlesmeler/kullanim-kosullari"
+                    target="_blank"
                     className="font-medium text-primary hover:underline"
                   >
-                    Kullanım Koşulları
-                  </Link>
-                  {" ve "}
-                  <Link
-                    href="/gizlilik-politikasi"
-                    className="font-medium text-primary hover:underline"
-                  >
-                    Gizlilik Politikası
-                  </Link>
-                  &apos;nı okudum ve kabul ediyorum.
+                    Kullanım ve Üyelik Koşulları
+                  </Link>{" "}
+                  metnini okudum ve kabul ediyorum.
                 </span>
               </label>
+
+              <p className="pl-7 text-xs leading-5 text-muted-foreground">
+                <Link
+                  href="/sozlesmeler/kvkk-aydinlatma"
+                  target="_blank"
+                  className="font-medium text-foreground underline underline-offset-4"
+                >
+                  KVKK Aydınlatma Metni
+                </Link>{" "}
+                kayıt öncesinde erişiminize sunulmuştur.
+                {" "}
+                <Link
+                  href="/sozlesmeler/gizlilik"
+                  target="_blank"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  Gizlilik Politikası
+                </Link>
+                {" ve "}
+                <Link
+                  href="/sozlesmeler/cerez-politikasi"
+                  target="_blank"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  Çerez Politikası
+                </Link>
+                {" bağlantıları da inceleyebilirsiniz."}
+              </p>
 
               <label className="flex items-start gap-3 text-sm leading-6 text-muted-foreground">
                 <input
@@ -783,7 +937,7 @@ function RegisterPageContent() {
             >
               {loading
                 ? "Hesap oluşturuluyor..."
-                : accountType === "business"
+                : false
                   ? "İşletme hesabı aç"
                   : "E-posta ile hesap aç"}
             </Button>
@@ -797,7 +951,7 @@ function RegisterPageContent() {
                 Giriş yap
               </Link>
             </div>
-          </form>
+</form>
         </div>
       </section>
     </SiteLayout>

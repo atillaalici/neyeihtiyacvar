@@ -123,6 +123,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CitySlug")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -130,6 +133,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("DistrictSlug")
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -326,6 +332,18 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<bool>("ContactByEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ContactByPhone")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ContactByPush")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ContactByWhatsapp")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -360,6 +378,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("TargetProviderId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -379,6 +400,8 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasIndex("OwnerUserId");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("TargetProviderId");
 
                     b.HasIndex("TrackingExpiresAtUtc");
 
@@ -473,6 +496,22 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyByEmail")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("NotifyByPush")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("NotifyBySms")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotifyByWhatsapp")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("OnsiteService")
@@ -764,7 +803,14 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasForeignKey("OwnerUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", "TargetProvider")
+                        .WithMany()
+                        .HasForeignKey("TargetProviderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("OwnerUser");
+
+                    b.Navigation("TargetProvider");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.Notification", b =>

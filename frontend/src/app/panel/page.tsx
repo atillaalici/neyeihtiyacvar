@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
   Clock3,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { EditableProviderImage } from "@/components/site/EditableProviderImage";
 import { Button } from "@/components/ui/button";
 import { apiBaseUrl } from "@/lib/api";
 import {
@@ -43,6 +44,12 @@ type ProviderPanelProfile = {
   experienceYears: number | null;
   emergencyService: boolean;
   onsiteService: boolean;
+  notificationPreferences: {
+    email: boolean;
+    sms: boolean;
+    whatsapp: boolean;
+    push: boolean;
+  };
   publicationStatus: "draft" | "published" | "unpublished";
   publishedAtUtc: string | null;
   version: number;
@@ -60,6 +67,10 @@ type ProviderNeed = {
   serviceSlug: string | null;
   citySlug: string | null;
   districtSlug: string | null;
+  targetProviderId?: string | null;
+  isDirectRequest?: boolean;
+  requesterName?: string | null;
+  requesterPhone?: string | null;
   status?: "open" | "offerreceived" | "completed";
   createdAtUtc: string;
 };
@@ -140,6 +151,8 @@ function RatingStars({ value }: { value: number }) {
 
 export default function ProviderPanelPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const notificationNeedId = searchParams.get("talep");
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<ProviderPanelProfile | null>(null);
@@ -151,6 +164,7 @@ export default function ProviderPanelPage() {
   const [drafts, setDrafts] = useState<Record<string, OfferDraft>>({});
   const [sendingNeedId, setSendingNeedId] = useState<string | null>(null);
   const [withdrawingOfferId, setWithdrawingOfferId] = useState<string | null>(null);
+  const [savingNotifications, setSavingNotifications] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -166,6 +180,30 @@ export default function ProviderPanelPage() {
     [needs, offeredNeedIds],
   );
 
+  useEffect(() => {
+    if (!notificationNeedId || loading) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(
+        `talep-${notificationNeedId}`,
+      );
+
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+
+      target.focus({ preventScroll: true });
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [notificationNeedId, loading, needs]);
   useEffect(() => {
     let active = true;
 
@@ -364,6 +402,63 @@ export default function ProviderPanelPage() {
     }
   }
 
+  async function saveNotificationPreferences(
+    next: ProviderPanelProfile["notificationPreferences"],
+  ) {
+    const token = getAccessToken();
+
+    if (!token || !profile) {
+      router.replace("/giris");
+      return;
+    }
+
+    setSavingNotifications(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/notification-preferences`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(next),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data?.message ?? "Bildirim tercihleri kaydedilemedi.");
+        return;
+      }
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              notificationPreferences: {
+                email: data.email,
+                sms: data.sms,
+                whatsapp: data.whatsapp,
+                push: data.push,
+              },
+              version: data.version,
+            }
+          : current,
+      );
+
+      setMessage("Bildirim tercihleri kaydedildi.");
+    } catch {
+      setError("Sunucuya bağlanılamadı.");
+    } finally {
+      setSavingNotifications(false);
+    }
+  }
+
   async function withdrawOffer(offerId: string) {
     const token = getAccessToken();
 
@@ -456,8 +551,11 @@ export default function ProviderPanelPage() {
 
   return (
     <SiteLayout>
-      <section className="border-b border-border bg-cream">
-        <div className="section-shell py-10 sm:py-14">
+      <section className="relative border-b border-border bg-cream">
+        <div className="pointer-events-auto absolute right-4 top-8 z-10 hidden xl:block 2xl:right-8">
+          <EditableProviderImage compact />
+        </div>
+        <div className="section-shell py-10 sm:py-14 xl:pr-[340px]">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div>
               <p className="text-sm font-medium text-primary">
@@ -467,6 +565,23 @@ export default function ProviderPanelPage() {
               <h1 className="mt-2 font-display text-3xl font-bold sm:text-4xl">
                 {profile.businessName}
               </h1>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full border border-border bg-background px-3 py-1.5">
+                  Kategori: {profile.categorySlug}
+                </span>
+                <span className="rounded-full border border-border bg-background px-3 py-1.5">
+                  Ana hizmet: {profile.serviceSlug}
+                </span>
+                {profile.additionalServices.map((service) => (
+                  <span
+                    key={service}
+                    className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-primary"
+                  >
+                    Ek hizmet: {service}
+                  </span>
+                ))}
+              </div>
 
               <p className="mt-3 max-w-2xl text-muted-foreground">
                 İşletme profilini, eşleşen talepleri, verdiğin teklifleri ve
@@ -618,7 +733,7 @@ export default function ProviderPanelPage() {
                     const draft = getDraft(need.id);
 
                     return (
-                      <article
+                      <article id={`talep-${need.id}`} tabIndex={-1}
                         key={need.id}
                         className="rounded-xl border border-border p-4"
                       >
@@ -629,6 +744,39 @@ export default function ProviderPanelPage() {
                             <p className="mt-2 text-sm leading-6 text-muted-foreground">
                               {need.description}
                             </p>
+
+                            {need.isDirectRequest && (
+                              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                                <div className="text-xs font-semibold text-primary">
+                                  Doğrudan işletmenize iletildi
+                                </div>
+
+                                <div className="mt-2 text-sm text-muted-foreground">
+                                  Talep sahibi: {need.requesterName ?? "Kullanıcı"}
+                                </div>
+
+                                {need.requesterPhone && (
+                                  <div className="mt-3 flex flex-wrap gap-3">
+                                    <a
+                                      href={`tel:${need.requesterPhone}`}
+                                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                                    >
+                                      <Phone className="size-4" aria-hidden="true" />
+                                      Kullanıcıyı Ara
+                                    </a>
+
+                                    <a
+                                      href={`https://wa.me/${need.requesterPhone.replace(/\D/g, "")}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                                    >
+                                      WhatsApp
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <span className="shrink-0 text-xs text-muted-foreground">
@@ -869,11 +1017,30 @@ export default function ProviderPanelPage() {
                   />
 
                   <div>
-                    <div className="font-medium">{profile.serviceSlug}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Ana hizmet
+                    </div>
+                    <div className="mt-1 font-medium">
+                      {profile.serviceSlug}
+                    </div>
 
-                    <div className="mt-1 text-muted-foreground">
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      Kategori
+                    </div>
+                    <div className="mt-1 font-medium">
                       {profile.categorySlug}
                     </div>
+
+                    {profile.additionalServices.length > 0 && (
+                      <>
+                        <div className="mt-3 text-xs text-muted-foreground">
+                          Ek hizmet
+                        </div>
+                        <div className="mt-1 font-medium">
+                          {profile.additionalServices.join(", ")}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -927,6 +1094,66 @@ export default function ProviderPanelPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+              <h2 className="font-display text-lg font-semibold">
+                Bildirim Tercihleri
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Yeni ihtiyaç taleplerini hangi kanallardan almak istediğini seç.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                {[
+                  ["email", "E-posta"],
+                  ["sms", "SMS"],
+                  ["whatsapp", "WhatsApp"],
+                  ["push", "Mobil bildirim"],
+                ].map(([key, label]) => {
+                  const typedKey =
+                    key as keyof ProviderPanelProfile["notificationPreferences"];
+
+                  return (
+                    <label
+                      key={key}
+                      className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-border px-3 py-3"
+                    >
+                      <span className="text-sm font-medium">{label}</span>
+                      <input
+                        type="checkbox"
+                        checked={profile.notificationPreferences[typedKey]}
+                        disabled={savingNotifications}
+                        onChange={(event) => {
+                          const next = {
+                            ...profile.notificationPreferences,
+                            [typedKey]: event.target.checked,
+                          };
+
+                          setProfile((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  notificationPreferences: next,
+                                }
+                              : current,
+                          );
+
+                          void saveNotificationPreferences(next);
+                        }}
+                        className="size-4 accent-primary"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                Tercihlerin kaydedilir. Uygulama içi bildirim şu anda aktiftir.
+                E-posta, SMS ve WhatsApp dış gönderimleri ilgili servis
+                entegrasyonları tamamlandığında bu tercihlere göre çalışacaktır.
+              </p>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">

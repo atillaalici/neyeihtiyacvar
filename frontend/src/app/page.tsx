@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { CategoryGrid } from "@/components/site/CategoryGrid";
+import { ShowcaseSection } from "@/components/site/ShowcaseSection";
 import { HeroSearch } from "@/components/site/HeroSearch";
 import { HowItWorks } from "@/components/site/HowItWorks";
 import { LocationSearch } from "@/components/site/LocationSearch";
@@ -18,13 +18,13 @@ export default function HomePage() {
       <div className="home-page">
         <HeroSearch />
 
-        <CategoryGrid />
+        <ShowcaseSection />
 
         <HowItWorks />
 
         <TrustSection />
 
-        <section className="home-location section-shell py-16 sm:py-20">
+        <section className="home-location section-shell py-6 sm:py-8 lg:py-10">
           <h2 className="max-w-2xl font-display text-3xl font-bold text-balance sm:text-4xl">
             Yakınında kim var?
           </h2>

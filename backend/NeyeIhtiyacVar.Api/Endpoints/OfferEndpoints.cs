@@ -72,11 +72,21 @@ public static class OfferEndpoints
                 });
             }
 
+            if (need.TargetProviderId != provider.Id)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Bu talep henüz işletmenize iletilmedi. Kullanıcı işletmenizi seçtikten sonra teklif verebilirsiniz."
+                });
+            }
             var exactMatch =
-                need.CategorySlug == provider.CategorySlug &&
-                need.ServiceSlug == provider.ServiceSlug &&
                 need.CitySlug == provider.CitySlug &&
-                need.DistrictSlug == provider.DistrictSlug;
+                need.DistrictSlug == provider.DistrictSlug &&
+                (
+                    (need.CategorySlug == provider.CategorySlug &&
+                     need.ServiceSlug == provider.ServiceSlug) ||
+                    provider.AdditionalServices.Contains(need.ServiceSlug)
+                );
 
             if (!exactMatch)
             {

@@ -1,18 +1,21 @@
-﻿"use client";
+"use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { getStoredUser } from "@/lib/auth";
 import { Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PopularSearches } from "./PopularSearches";
 
 const examples = [
-  "Örneğin: Evime güvenilir bir elektrikçi lazım...",
-  "Örneğin: Bilgisayarım açılmıyor...",
-  "Örneğin: Yarın ev taşıyacağım...",
-  "Örneğin: Klima bakımına ihtiyacım var...",
-  "Örneğin: Düğün için fotoğrafçı arıyorum...",
+  "Ã–rneÄŸin: Evime gÃ¼venilir bir elektrikÃ§i lazÄ±m...",
+  "Ã–rneÄŸin: BilgisayarÄ±m aÃ§Ä±lmÄ±yor...",
+  "Ã–rneÄŸin: YarÄ±n ev taÅŸÄ±yacaÄŸÄ±m...",
+  "Ã–rneÄŸin: Klima bakÄ±mÄ±na ihtiyacÄ±m var...",
+  "Ã–rneÄŸin: DÃ¼ÄŸÃ¼n iÃ§in fotoÄŸrafÃ§Ä± arÄ±yorum...",
 ];
 
 const maxNeedSearchLength = 200;
@@ -36,9 +39,19 @@ export function HeroSearch() {
       return;
     }
 
-    router.push(
-      `/kesfet?q=${encodeURIComponent(cleanQuery)}`,
-    );
+    const params = new URLSearchParams();
+    params.set("q", cleanQuery);
+
+    const storedUser = getStoredUser();
+
+    if (storedUser?.citySlug && storedUser?.districtSlug) {
+      params.set("il", storedUser.citySlug);
+      params.set("ilce", storedUser.districtSlug);
+    } else {
+      params.set("yakinda", "1");
+    }
+
+    router.push(`/kesfet?${params.toString()}`);
   }
 
   useEffect(() => {
@@ -71,17 +84,30 @@ export function HeroSearch() {
         }}
       />
 
-      <div className="section-shell relative py-10 text-center sm:py-16">
+      <div className="section-shell relative py-6 sm:py-8 lg:py-10 text-center sm:py-16">
         <p className="rise inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium tracking-wide text-primary uppercase">
-          Türkiye&apos;nin yerel ihtiyaç platformu
+          TÃ¼rkiye&apos;nin yerel ihtiyaÃ§ platformu
         </p>
 
-        <h1 className="rise mx-auto mt-5 max-w-[16ch] font-display text-4xl leading-[1.1] font-bold text-balance sm:text-6xl">
-          Neye ihtiyac <span className="text-primary">var?</span>
-        </h1>
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+
+          <div className="mx-auto inline-flex max-w-full items-center justify-center gap-[clamp(0.9rem,1.6vw,1.5rem)]">
+            <Image
+              src="/brand/neyeihtiyacvar-logo.png"
+              alt=""
+              width={112}
+              height={112}
+              priority
+              className="block size-[clamp(5rem,7.5vw,7.25rem)] shrink-0 object-contain"
+            />
+            <h1 className="m-0 whitespace-nowrap font-display text-[clamp(2.8rem,6vw,5rem)] font-bold leading-none tracking-tight">
+              Neye <span className="text-primary">ihtiyaÃ§</span> var?
+            </h1>
+          </div>
+        </div>
 
         <p className="rise mx-auto mt-4 max-w-[60ch] text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg">
-          İhtiyacını anlat, sana en uygun kişi, işletme veya hizmeti bulalım.
+          Ä°htiyacÄ±nÄ± anlat, sana en uygun kiÅŸi, iÅŸletme veya hizmeti bulalÄ±m.
         </p>
 
         <form
@@ -96,7 +122,7 @@ export function HeroSearch() {
             htmlFor="ihtiyac-arama"
             className="sr-only"
           >
-            İhtiyacını yaz
+            Ä°htiyacÄ±nÄ± yaz
           </label>
 
           <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-2 shadow-soft transition-all duration-200 focus-within:border-primary sm:flex-row sm:items-center">
@@ -123,7 +149,7 @@ export function HeroSearch() {
                 }}
                 placeholder={
                   focused
-                    ? "İhtiyacını kendi cümlenle yaz..."
+                    ? "Ä°htiyacÄ±nÄ± kendi cÃ¼mlenle yaz..."
                     : ""
                 }
                 className="w-full bg-transparent py-3 text-base outline-none placeholder:text-muted-foreground"
@@ -146,7 +172,7 @@ export function HeroSearch() {
               size="lg"
               className="h-12 w-full shrink-0 sm:w-auto"
             >
-              İhtiyacımı Bul
+              Ä°htiyacÄ±mÄ± Bul
             </Button>
           </div>
         </form>
@@ -156,7 +182,7 @@ export function HeroSearch() {
             className="size-3.5 text-primary"
             aria-hidden="true"
           />
-          Nasıl anlatacağını düşünme, ihtiyacını kendi cümlenle yaz.
+          NasÄ±l anlatacaÄŸÄ±nÄ± dÃ¼ÅŸÃ¼nme, ihtiyacÄ±nÄ± kendi cÃ¼mlenle yaz.
         </p>
 
         <PopularSearches

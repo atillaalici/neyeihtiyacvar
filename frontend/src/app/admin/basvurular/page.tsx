@@ -22,7 +22,10 @@ type ProviderApplication = {
   phone: string;
   whatsapp: string | null;
   note: string | null;
-  status: ApplicationStatus;
+    email: string | null;
+  additionalServices: string[];
+  emailVerified: boolean;
+  phoneVerified: boolean;status: ApplicationStatus;
   reviewNote: string | null;
   reviewedAtUtc: string | null;
   createdAtUtc: string;
@@ -68,7 +71,7 @@ export default function AdminApplicationsPage() {
       setApplications(data);
     } catch {
       setError(
-        "Admin başvuruları yüklenemedi. Backend Development ortamında çalışıyor olmalı.",
+        "Admin başvuruları yüklenemedi. Backend bağlantısını ve yönetici oturumunu kontrol edin.",
       );
     } finally {
       setLoading(false);
@@ -76,7 +79,11 @@ export default function AdminApplicationsPage() {
   }, []);
 
   useEffect(() => {
-    void loadApplications();
+    const timer = window.setTimeout(() => {
+      void loadApplications();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadApplications]);
 
   async function review(
@@ -148,9 +155,7 @@ export default function AdminApplicationsPage() {
           <p className="mt-3 max-w-2xl text-muted-foreground">
             Yeni işletme başvurularını incele, onayla veya reddet.
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Bu ekran şu aşamada yalnızca Development backend ile kullanılmalıdır.
-          </p>
+
         </div>
       </section>
 
@@ -228,6 +233,21 @@ export default function AdminApplicationsPage() {
                       <div>
                         <strong className="text-foreground">Telefon:</strong>{" "}
                         {application.phone}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">E-posta:</strong>{" "}
+                        {application.email ?? "-"}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Ek hizmet:</strong>{" "}
+                        {application.additionalServices?.length
+                          ? application.additionalServices.join(", ")
+                          : "-"}
+                      </div>
+                      <div>
+                        <strong className="text-foreground">Doğrulama:</strong>{" "}
+                        E-posta {application.emailVerified ? "✓" : "—"} / Telefon{" "}
+                        {application.phoneVerified ? "✓" : "—"}
                       </div>
                       <div>
                         <strong className="text-foreground">Tarih:</strong>{" "}

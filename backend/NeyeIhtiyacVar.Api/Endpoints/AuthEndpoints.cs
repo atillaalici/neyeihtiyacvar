@@ -7,12 +7,13 @@ using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Auth;
+using NeyeIhtiyacVar.Api.Infrastructure.Email;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
 public static class AuthEndpoints
 {
-    private static readonly TimeSpan VerificationLifetime = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan VerificationLifetime = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ResendCooldown = TimeSpan.FromSeconds(60);
     private const int MaxVerificationAttempts = 5;
 
@@ -26,7 +27,9 @@ public static class AuthEndpoints
             AppDbContext dbContext,
             IPasswordHasher<AppUser> passwordHasher,
             IConfiguration configuration,
-            IWebHostEnvironment environment) =>
+            IWebHostEnvironment environment,
+            JwtTokenService tokenService,
+            IEmailSender emailSender) =>
         {
             var validationErrors = ValidateRegister(request);
 
@@ -88,47 +91,27 @@ public static class AuthEndpoints
 
             dbContext.Users.Add(user);
 
-            var emailCode = CreateCode();
-            var phoneCode = CreateCode();
-
-            dbContext.AccountVerificationCodes.AddRange(
-                NewVerificationCode(
-                    user,
-                    VerificationPurpose.AccountVerification,
-                    VerificationChannel.Email,
-                    emailCode,
-                    now,
-                    configuration),
-                NewVerificationCode(
-                    user,
-                    VerificationPurpose.AccountVerification,
-                    VerificationChannel.Phone,
-                    phoneCode,
-                    now,
-                    configuration));
-
             await dbContext.SaveChangesAsync();
+
+            var token = tokenService.CreateToken(user);
 
             return Results.Created(
                 $"/api/auth/users/{user.Id}",
                 new
                 {
-                    verificationRequired = true,
+                    accessToken = token.AccessToken,
+                    token.ExpiresAtUtc,
+                    user = ToUserResponse(user),
+                    verificationRequired = false,
                     userId = user.Id,
                     user.Email,
                     user.PhoneNumber,
                     emailVerified = false,
                     phoneVerified = false,
-                    message = "Hesabın oluşturuldu. E-posta ve telefon doğrulamasını tamamla.",
-                    developmentCodes = environment.IsDevelopment()
-                        ? new
-                        {
-                            email = emailCode,
-                            phone = phoneCode
-                        }
-                        : null
+                    message = "Hesabın oluşturuldu. Doğrulamayı şimdi veya daha sonra Hesabım ekranından yapabilirsin."
                 });
         });
+
 
         group.MapPost("/verification/verify", async (
             VerifyCodeRequest request,
@@ -169,18 +152,8 @@ public static class AuthEndpoints
 
             if (IsChannelVerified(user, channel))
             {
-                if (IsFullyVerified(user))
-                {
-                    var existingToken = tokenService.CreateToken(user);
-                    return Results.Ok(ToAuthResponse(user, existingToken));
-                }
-
-                return Results.Ok(new
-                {
-                    verified = true,
-                    emailVerified = user.EmailVerifiedAtUtc != null,
-                    phoneVerified = user.PhoneVerifiedAtUtc != null
-                });
+                var existingToken = tokenService.CreateToken(user);
+                return Results.Ok(ToAuthResponse(user, existingToken));
             }
 
             var now = DateTime.UtcNow;
@@ -240,26 +213,17 @@ public static class AuthEndpoints
 
             await dbContext.SaveChangesAsync();
 
-            if (IsFullyVerified(user))
-            {
-                var token = tokenService.CreateToken(user);
-
-                return Results.Ok(ToAuthResponse(user, token));
-            }
-
-            return Results.Ok(new
-            {
-                verified = true,
-                emailVerified = user.EmailVerifiedAtUtc != null,
-                phoneVerified = user.PhoneVerifiedAtUtc != null
-            });
+            var token = tokenService.CreateToken(user);
+            return Results.Ok(ToAuthResponse(user, token));
         });
 
         group.MapPost("/verification/resend", async (
             ResendVerificationRequest request,
             AppDbContext dbContext,
             IConfiguration configuration,
-            IWebHostEnvironment environment) =>
+            IWebHostEnvironment environment,
+            JwtTokenService tokenService,
+            IEmailSender emailSender) =>
         {
             if (!TryParseChannel(request.Channel, out var channel))
             {
@@ -329,6 +293,27 @@ public static class AuthEndpoints
 
             await dbContext.SaveChangesAsync();
 
+            EmailSendResult? emailDelivery = null;
+
+            if (channel == VerificationChannel.Email)
+            {
+                emailDelivery = await emailSender.SendAccountVerificationCodeAsync(
+                    user.Email,
+                    user.DisplayName,
+                    code);
+
+                if (!emailDelivery.Success)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            message = "Doğrulama kodu oluşturuldu ancak e-posta gönderilemedi. Lütfen biraz sonra yeniden dene.",
+                            developmentCode = environment.IsDevelopment() ? code : null
+                        },
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+            }
+
             return Results.Ok(new
             {
                 message = channel == VerificationChannel.Email
@@ -387,21 +372,6 @@ public static class AuthEndpoints
                 await dbContext.SaveChangesAsync();
             }
 
-            if (!IsFullyVerified(user))
-            {
-                return Results.Json(
-                    new
-                    {
-                        code = "verification_required",
-                        message = "Giriş yapmadan önce e-posta ve telefon doğrulamasını tamamla.",
-                        userId = user.Id,
-                        user.Email,
-                        user.PhoneNumber,
-                        emailVerified = user.EmailVerifiedAtUtc != null,
-                        phoneVerified = user.PhoneVerifiedAtUtc != null
-                    },
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
 
             var token = tokenService.CreateToken(user);
             return Results.Ok(ToAuthResponse(user, token));
@@ -411,7 +381,10 @@ public static class AuthEndpoints
             ForgotPasswordRequest request,
             AppDbContext dbContext,
             IConfiguration configuration,
-            IWebHostEnvironment environment) =>
+            IWebHostEnvironment environment,
+            JwtTokenService tokenService,
+            IEmailSender emailSender,
+            ILoggerFactory loggerFactory) =>
         {
             const string genericMessage =
                 "E-posta adresi kayıtlıysa şifre yenileme kodu oluşturuldu.";
@@ -472,6 +445,20 @@ public static class AuthEndpoints
                     configuration));
 
             await dbContext.SaveChangesAsync();
+
+            var emailDelivery = await emailSender.SendPasswordResetCodeAsync(
+                user.Email,
+                user.DisplayName,
+                code);
+
+            if (!emailDelivery.Success)
+            {
+                var logger = loggerFactory.CreateLogger("AuthEndpoints");
+                logger.LogError(
+                    "Şifre yenileme e-postası gönderilemedi. UserId: {UserId}. Error: {Error}",
+                    user.Id,
+                    emailDelivery.ErrorMessage);
+            }
 
             return Results.Ok(new
             {
@@ -602,6 +589,158 @@ public static class AuthEndpoints
         })
         .RequireAuthorization();
 
+        group.MapPut("/me", async (
+            UpdateProfileRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var idValue = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (!Guid.TryParse(idValue, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var user = await dbContext.Users
+                .FirstOrDefaultAsync(x =>
+                    x.Id == userId &&
+                    x.IsActive);
+
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var errors = new Dictionary<string, string[]>();
+
+            var displayName = request.DisplayName?.Trim() ?? string.Empty;
+
+            if (displayName.Length < 2)
+            {
+                errors["displayName"] = ["Ad soyad en az 2 karakter olmalıdır."];
+            }
+            else if (displayName.Length > 150)
+            {
+                errors["displayName"] = ["Ad soyad en fazla 150 karakter olabilir."];
+            }
+
+            var rawPhone = request.PhoneNumber?.Trim() ?? string.Empty;
+            var normalizedPhone = string.IsNullOrWhiteSpace(rawPhone)
+                ? string.Empty
+                : NormalizePhone(rawPhone);
+
+            // Telefon bilgisi zorunlu degildir. Girildiyse gecerli ve benzersiz olmali.
+            if (!string.IsNullOrWhiteSpace(normalizedPhone))
+            {
+                if (normalizedPhone.Length != 13 || !normalizedPhone.StartsWith("+905"))
+                {
+                    errors["phoneNumber"] = ["Geçerli bir cep telefonu numarası girin."];
+                }
+                else
+                {
+                    var phoneExists = await dbContext.Users
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.Id != userId &&
+                            x.NormalizedPhoneNumber == normalizedPhone);
+
+                    if (phoneExists)
+                    {
+                        errors["phoneNumber"] = ["Bu telefon numarası başka bir hesapta kullanılıyor."];
+                    }
+                }
+            }
+
+            var citySlug = request.CitySlug?.Trim() ?? string.Empty;
+            var districtSlug = request.DistrictSlug?.Trim() ?? string.Empty;
+
+            // Konum da zorunlu degildir. Ancak il veya ilceden biri secildiyse ikisi birlikte secilmelidir.
+            var hasCity = !string.IsNullOrWhiteSpace(citySlug);
+            var hasDistrict = !string.IsNullOrWhiteSpace(districtSlug);
+
+            if (hasCity != hasDistrict)
+            {
+                if (!hasCity)
+                {
+                    errors["citySlug"] = ["İl seçin."];
+                }
+
+                if (!hasDistrict)
+                {
+                    errors["districtSlug"] = ["İlçe seçin."];
+                }
+            }
+
+            if (errors.Count == 0 && hasCity && hasDistrict)
+            {
+                var city = await dbContext.Cities
+                    .AsNoTracking()
+                    .Include(x => x.Districts)
+                    .FirstOrDefaultAsync(x =>
+                        x.IsActive &&
+                        x.Slug == citySlug);
+
+                if (city is null)
+                {
+                    errors["citySlug"] = ["Geçerli bir il seçin."];
+                }
+                else
+                {
+                    var districtIsValid = city.Districts.Any(x =>
+                        x.IsActive &&
+                        x.Slug == districtSlug);
+
+                    if (!districtIsValid)
+                    {
+                        errors["districtSlug"] = ["Seçilen ilçenin ile ait olduğunu kontrol edin."];
+                    }
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Profil bilgileri geçerli değil.",
+                    errors
+                });
+            }
+
+            var phoneChanged =
+                !string.Equals(
+                    user.NormalizedPhoneNumber ?? string.Empty,
+                    normalizedPhone,
+                    StringComparison.Ordinal);
+
+            user.DisplayName = displayName;
+            user.PhoneNumber = string.IsNullOrWhiteSpace(normalizedPhone)
+                ? null
+                : FormatPhoneForDisplay(normalizedPhone);
+            user.NormalizedPhoneNumber = string.IsNullOrWhiteSpace(normalizedPhone)
+                ? null
+                : normalizedPhone;
+            user.CitySlug = string.IsNullOrWhiteSpace(citySlug) ? null : citySlug;
+            user.DistrictSlug = string.IsNullOrWhiteSpace(districtSlug) ? null : districtSlug;
+            user.UpdatedAtUtc = DateTime.UtcNow;
+
+            if (phoneChanged)
+            {
+                user.PhoneVerifiedAtUtc = null;
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                message = phoneChanged
+                    ? "Profilin güncellendi. Telefon numaran değiştiği için telefon doğrulaman yeniden gerekiyor."
+                    : "Profilin güncellendi.",
+                phoneVerificationReset = phoneChanged,
+                user = ToUserResponse(user)
+            });
+        })
+        .RequireAuthorization();
+
         return app;
     }
 
@@ -691,15 +830,28 @@ public static class AuthEndpoints
             digits = digits[1..];
         }
 
-        return digits;
+        return digits.Length == 10 && digits.StartsWith("5")
+            ? $"+90{digits}"
+            : digits;
     }
 
     private static string FormatPhoneForDisplay(string normalized)
-        => normalized.Length == 10
-            ? $"0{normalized}"
+    {
+        var digits = new string(
+            normalized.Where(char.IsDigit).ToArray());
+
+        if (digits.StartsWith("90") && digits.Length == 12)
+        {
+            digits = digits[2..];
+        }
+
+        return digits.Length == 10
+            ? $"+90 {digits[..3]} {digits.Substring(3, 3)} {digits.Substring(6, 2)} {digits.Substring(8, 2)}"
             : normalized;
+    }
 
     private static Dictionary<string, string[]> ValidateRegister(
+
         RegisterRequest request)
     {
         var errors = new Dictionary<string, string[]>();
@@ -725,8 +877,8 @@ public static class AuthEndpoints
 
         var phone = NormalizePhone(request.PhoneNumber ?? string.Empty);
 
-        if (phone.Length != 10 ||
-            !phone.StartsWith("5"))
+        if (phone.Length != 13 ||
+            !phone.StartsWith("+905"))
         {
             errors["phoneNumber"] =
                 ["Cep telefonu 05xx xxx xx xx formatında olmalıdır."];
@@ -801,6 +953,9 @@ public static class AuthEndpoints
             user.Email,
             user.PhoneNumber,
             user.DisplayName,
+            user.CitySlug,
+            user.DistrictSlug,
+            user.CreatedAtUtc,
             role = user.Role.ToString().ToLowerInvariant(),
             emailVerified = user.EmailVerifiedAtUtc != null,
             phoneVerified = user.PhoneVerifiedAtUtc != null
@@ -816,6 +971,12 @@ public sealed record RegisterRequest(
 public sealed record LoginRequest(
     string Email,
     string Password);
+
+public sealed record UpdateProfileRequest(
+    string DisplayName,
+    string PhoneNumber,
+    string CitySlug,
+    string DistrictSlug);
 
 public sealed record VerifyCodeRequest(
     Guid UserId,

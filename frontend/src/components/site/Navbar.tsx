@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/site/BrandLogo";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 
@@ -5,17 +6,9 @@ import { AuthMenu } from "@/components/site/AuthMenu";
 
 export function Navbar() {
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur responsive-site-navbar">
       <div className="section-shell flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-lg bg-primary font-display text-lg font-bold text-primary-foreground">
-            N
-          </span>
-
-          <span className="font-display text-lg font-bold">
-            Neye İhtiyaç Var?
-          </span>
-        </Link>
+        <BrandLogo />
 
         <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
           <Link href="/">Ana Sayfa</Link>

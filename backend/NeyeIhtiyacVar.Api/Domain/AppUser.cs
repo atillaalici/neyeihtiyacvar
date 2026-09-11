@@ -20,6 +20,10 @@ public sealed class AppUser
 
     public string DisplayName { get; set; } = string.Empty;
 
+    public string? CitySlug { get; set; }
+
+    public string? DistrictSlug { get; set; }
+
     public UserRole Role { get; set; } = UserRole.User;
 
     public bool IsActive { get; set; } = true;

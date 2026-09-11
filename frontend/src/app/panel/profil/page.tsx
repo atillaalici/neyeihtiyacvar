@@ -85,11 +85,9 @@ function sanitizeAdditionalServices(
   profile: ProviderProfile,
   categories: CategoryDto[],
 ) {
-  const category =
-    categories.find((item) => item.slug === profile.categorySlug) ?? null;
-
   const validSlugs = new Set(
-    (category?.services ?? [])
+    categories
+      .flatMap((category) => category.services)
       .map(toSlug)
       .filter((slug) => slug !== profile.serviceSlug),
   );
@@ -130,6 +128,8 @@ export default function ProviderProfileEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [additionalServiceSearch, setAdditionalServiceSearch] = useState("");
+  const [additionalServiceOpen, setAdditionalServiceOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -216,34 +216,59 @@ export default function ProviderProfileEditPage() {
     }));
   }
 
-  function toggleAdditionalService(serviceSlug: string) {
-    setForm((current) => {
-      const exists = current.additionalServices.includes(serviceSlug);
+  const allAdditionalServiceOptions = Array.from(
+    new Map(
+      categories
+        .flatMap((category) =>
+          category.services.map((service) => ({
+            slug: toSlug(service),
+            name: service,
+            categoryName: category.name,
+          })),
+        )
+        .filter((item) => item.slug !== (profile?.serviceSlug ?? ""))
+        .map((item) => [item.slug, item] as const),
+    ).values(),
+  ).sort((left, right) =>
+    left.name.localeCompare(right.name, "tr-TR"),
+  );
 
-      if (exists) {
-        return {
-          ...current,
-          additionalServices: current.additionalServices.filter(
-            (item) => item !== serviceSlug,
-          ),
-        };
-      }
+  const selectedAdditionalService =
+    allAdditionalServiceOptions.find(
+      (item) => item.slug === form.additionalServices[0],
+    ) ?? null;
 
-      if (current.additionalServices.length >= 1) {
-        setError("En fazla 1 ek hizmet seçebilirsiniz.");
-        return current;
-      }
+  const filteredAdditionalServiceOptions =
+    additionalServiceSearch.trim().length === 0
+      ? allAdditionalServiceOptions
+      : allAdditionalServiceOptions.filter((item) =>
+          `${item.name} ${item.categoryName}`
+            .toLocaleLowerCase("tr-TR")
+            .includes(additionalServiceSearch.toLocaleLowerCase("tr-TR")),
+        );
 
-      setError("");
+  function selectAdditionalService(serviceSlug: string) {
+    if (!serviceSlug) {
+      update("additionalServices", []);
+      setAdditionalServiceSearch("");
+      setAdditionalServiceOpen(false);
+      return;
+    }
 
-      return {
-        ...current,
-        additionalServices: [
-          ...current.additionalServices,
-          serviceSlug,
-        ],
-      };
-    });
+    if (serviceSlug === profile?.serviceSlug) {
+      setError("Ana hizmet ek hizmet olarak seçilemez.");
+      return;
+    }
+
+    setError("");
+    update("additionalServices", [serviceSlug]);
+
+    const selected = allAdditionalServiceOptions.find(
+      (item) => item.slug === serviceSlug,
+    );
+
+    setAdditionalServiceSearch(selected?.name ?? serviceSlug);
+    setAdditionalServiceOpen(false);
   }
 
   async function handleSubmit(
@@ -340,7 +365,10 @@ export default function ProviderProfileEditPage() {
 
       setProfile(sanitizedUpdated);
       setForm(formFromProfile(sanitizedUpdated, categories));
-      setMessage("İşletme profilin başarıyla güncellendi.");
+      router.replace("/panel");
+      router.refresh();
+      return;
+
     } catch {
       setError("Sunucuya bağlanılamadı.");
     } finally {
@@ -374,11 +402,6 @@ export default function ProviderProfileEditPage() {
       </SiteLayout>
     );
   }
-
-  const selectedCategory =
-    categories.find(
-      (item) => item.slug === profile.categorySlug,
-    ) ?? null;
 
   return (
     <SiteLayout>
@@ -469,56 +492,91 @@ export default function ProviderProfileEditPage() {
             <div className="sm:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <label className="block text-sm font-medium">
-                  Ek hizmetler
+                  Ek hizmet
                 </label>
                 <span className="text-xs text-muted-foreground">
                   {form.additionalServices.length}/1 seçildi
                 </span>
               </div>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {(selectedCategory?.services ?? [])
-                  .filter(
-                    (service) =>
-                      toSlug(service) !== profile.serviceSlug,
-                  )
-                  .map((service) => {
-                    const slug = toSlug(service);
-                    const checked =
-                      form.additionalServices.includes(slug);
-                    const disabled =
-                      !checked &&
-                      form.additionalServices.length >= 1;
+              <div className="relative mt-3">
+                <input
+                  type="search"
+                  value={additionalServiceSearch}
+                  onFocus={() => setAdditionalServiceOpen(true)}
+                  onChange={(event) => {
+                    setAdditionalServiceSearch(event.target.value);
+                    setAdditionalServiceOpen(true);
+                  }}
+                  placeholder={
+                    selectedAdditionalService?.name ??
+                    "Ek hizmet ara veya listeden seç"
+                  }
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
+                />
 
-                    return (
-                      <label
-                        key={service}
-                        className={[
-                          "flex items-center gap-3 rounded-xl border p-3 text-sm",
-                          checked
-                            ? "border-primary/40 bg-primary/5"
-                            : "border-border bg-background",
-                          disabled
-                            ? "opacity-60"
-                            : "cursor-pointer",
-                        ].join(" ")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() =>
-                            toggleAdditionalService(slug)
-                          }
-                        />
-                        <span>{service}</span>
-                      </label>
-                    );
-                  })}
+                {additionalServiceOpen && (
+                  <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-border bg-background p-2 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => selectAdditionalService("")}
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      Ek hizmet yok
+                    </button>
+
+                    {filteredAdditionalServiceOptions.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-muted-foreground">
+                        Aramana uygun hizmet bulunamadı.
+                      </div>
+                    ) : (
+                      filteredAdditionalServiceOptions.map((item) => (
+                        <button
+                          key={item.slug}
+                          type="button"
+                          onClick={() => selectAdditionalService(item.slug)}
+                          className={[
+                            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted",
+                            form.additionalServices.includes(item.slug)
+                              ? "bg-primary/5 text-primary"
+                              : "",
+                          ].join(" ")}
+                        >
+                          <span>{item.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.categoryName}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
+              {selectedAdditionalService && (
+                <div className="mt-2 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                  <div>
+                    <span className="font-medium">
+                      {selectedAdditionalService.name}
+                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {selectedAdditionalService.categoryName}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => selectAdditionalService("")}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Kaldır
+                  </button>
+                </div>
+              )}
+
               <p className="mt-2 text-xs text-muted-foreground">
-                Ana hizmet dışında en fazla 1 ek hizmet seçebilirsin.
+                Ana hizmet dışında tüm kategorilerden en fazla 1 ek hizmet
+                seçebilirsin. İkinci ek hizmet alanı ileride limit artırıldığında
+                açılacak.
               </p>
             </div>
 

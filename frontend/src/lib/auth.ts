@@ -3,6 +3,9 @@ export type AuthUser = {
   email: string;
   phoneNumber: string | null;
   displayName: string;
+  citySlug: string | null;
+  districtSlug: string | null;
+  createdAtUtc: string;
   role: "user" | "provider" | "admin";
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -27,6 +30,15 @@ export function saveAuth(response: AuthResponse) {
   localStorage.setItem(userKey, JSON.stringify(response.user));
   localStorage.setItem(expiresKey, response.expiresAtUtc);
 
+  window.dispatchEvent(new Event("auth-changed"));
+}
+
+export function updateStoredUser(user: AuthUser) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(userKey, JSON.stringify(user));
   window.dispatchEvent(new Event("auth-changed"));
 }
 
