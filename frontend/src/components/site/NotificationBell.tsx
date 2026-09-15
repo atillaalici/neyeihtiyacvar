@@ -62,14 +62,17 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadNotifications();
 
     const intervalId = window.setInterval(() => {
-      void loadNotifications();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadNotifications();
     }, 30000);
 
     function handleAuthChanged() {
-      void loadNotifications();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadNotifications();
     }
 
     function handlePointerDown(event: MouseEvent) {

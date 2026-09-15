@@ -23,6 +23,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ProviderCard } from "@/components/site/ProviderCard";
 import { LocationSearch } from "@/components/site/LocationSearch";
+import { HeroSearch } from "@/components/site/HeroSearch";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
@@ -92,6 +93,69 @@ const popularSearches = [
   "Klima servisi",
   "Bilgisayar servisi",
 ];
+
+type SearchIntentSuggestion = {
+  label: string;
+  query: string;
+  kind: "service" | "product";
+};
+
+const intentSuggestions: Array<{
+  terms: string[];
+  suggestions: SearchIntentSuggestion[];
+}> = [
+  {
+    terms: ["priz", "piriz"],
+    suggestions: [
+      { label: "Priz arızalı / çalışmıyor", query: "priz arızalı", kind: "service" },
+      { label: "Priz satın almak istiyorum", query: "priz satışı", kind: "product" },
+    ],
+  },
+  {
+    terms: ["musluk", "batarya"],
+    suggestions: [
+      { label: "Musluk arızalı / su kaçırıyor", query: "musluk arızası", kind: "service" },
+      { label: "Musluk / batarya satın almak istiyorum", query: "musluk satışı", kind: "product" },
+    ],
+  },
+  {
+    terms: ["matkap"],
+    suggestions: [
+      { label: "Matkap tamiri / servisi", query: "matkap tamiri", kind: "service" },
+      { label: "Matkap satın almak istiyorum", query: "matkap satışı", kind: "product" },
+    ],
+  },
+  {
+    terms: ["boya"],
+    suggestions: [
+      { label: "Boya ustası arıyorum", query: "boya ustası", kind: "service" },
+      { label: "Boya satın almak istiyorum", query: "boya satışı", kind: "product" },
+    ],
+  },
+  {
+    terms: ["fayans", "seramik"],
+    suggestions: [
+      { label: "Fayans / seramik ustası arıyorum", query: "fayans ustası", kind: "service" },
+      { label: "Fayans / seramik satın almak istiyorum", query: "fayans satışı", kind: "product" },
+    ],
+  },
+  {
+    terms: ["kablo"],
+    suggestions: [
+      { label: "Kablo / elektrik tesisatı işi yaptıracağım", query: "elektrik tesisatı", kind: "service" },
+      { label: "Elektrik kablosu satın almak istiyorum", query: "kablo satışı", kind: "product" },
+    ],
+  },
+];
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .trim();
+}
 
 function formatSlug(value: string | null | undefined) {
   if (!value) {
@@ -170,6 +234,24 @@ function ExplorePageContent() {
 
   const smartMode = q.length > 0;
 
+  const visibleIntentSuggestions = useMemo(() => {
+    const normalized = normalizeSearchText(queryInput);
+
+    if (normalized.length < 2) {
+      return [] as SearchIntentSuggestion[];
+    }
+
+    const matches = intentSuggestions
+      .filter((group) =>
+        group.terms.some((term) => normalized.includes(normalizeSearchText(term))),
+      )
+      .flatMap((group) => group.suggestions);
+
+    return Array.from(
+      new Map(matches.map((item) => [item.query, item])).values(),
+    ).slice(0, 6);
+  }, [queryInput]);
+
 
   const providerQueryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -222,7 +304,7 @@ function ExplorePageContent() {
       try {
         if (smartMode) {
           const response = await fetch(
-            `${apiBaseUrl}/api/recommendations?${recommendationQueryString}`,
+            `${apiBaseUrl}/api/search/smart?${recommendationQueryString}`,
             { cache: "no-store" },
           );
 
@@ -335,6 +417,15 @@ function ExplorePageContent() {
     setQueryInput(value);
 
     const params = buildSearchParamsWithPreferredLocation(value);
+
+    router.push(`/kesfet?${params.toString()}`);
+  }
+
+  function selectIntentSuggestion(item: SearchIntentSuggestion) {
+    setQueryInput(item.label);
+
+    const params = buildSearchParamsWithPreferredLocation(item.query);
+    params.set("niyet", item.kind);
 
     router.push(`/kesfet?${params.toString()}`);
   }
@@ -514,11 +605,21 @@ function ExplorePageContent() {
     .map((item) => formatSlug(item))
     .join(" / ");
 
-  const understoodService =
-    recommendationData?.understanding.serviceName ||
-    formatSlug(service) ||
-    "İhtiyaç";
+  const explicitCatalogSelection = Boolean(
+    category?.trim() || service?.trim(),
+  );
 
+  const understandingReliable = Boolean(
+    recommendationData &&
+      (explicitCatalogSelection ||
+        recommendationData.understanding.confidence >= 0.72),
+  );
+
+  const understoodService = understandingReliable
+    ? recommendationData?.understanding.serviceName ||
+      formatSlug(service) ||
+      "İhtiyaç"
+    : "İhtiyaç";
   const locationComplete = Boolean(
     recommendationData?.location.citySlug &&
       recommendationData?.location.districtSlug,
@@ -526,78 +627,7 @@ function ExplorePageContent() {
 
   return (
     <SiteLayout>
-      <section className="border-b border-border bg-cream">
-        <div className="section-shell py-8 sm:py-10">
-          <div className="mx-auto max-w-4xl text-center">
-            <span className="inline-flex rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
-              Türkiye&apos;nin Yerel İhtiyaç Platformu
-            </span>
-
-            <h1 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-              Neye ihtiyaç{" "}
-              <span className="text-primary">var?</span>
-            </h1>
-
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              İhtiyacını yaz, doğru ihtiyacı biz bulalım.
-            </p>
-
-            <form
-              onSubmit={submitSearch}
-              className="mx-auto mt-6 flex max-w-3xl items-center rounded-2xl border border-border bg-background p-1.5 shadow-soft"
-            >
-              <Search
-                className="ml-3 size-5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-
-              <input
-                value={queryInput}
-                onChange={(event) =>
-                  setQueryInput(event.target.value)
-                }
-                className="h-12 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
-                placeholder="Örneğin: Musluk akıtıyor, Osmaniye Merkez'de tesisatçı arıyorum"
-              />
-
-              {queryInput && (
-                <button
-                  type="button"
-                  onClick={() => setQueryInput("")}
-                  className="mr-1 rounded-lg px-2 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  aria-label="Arama metnini temizle"
-                >
-                  ×
-                </button>
-              )}
-
-              <button
-                type="submit"
-                className="h-12 shrink-0 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-              >
-                İhtiyacı Bul
-              </button>
-            </form>
-
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <span className="mr-1 text-xs text-muted-foreground">
-                Popüler aramalar:
-              </span>
-
-              {popularSearches.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => selectPopularSearch(item)}
-                  className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-primary"
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <HeroSearch />
 
       <section className="section-shell py-8 sm:py-10">
         {loading && (
@@ -622,7 +652,43 @@ function ExplorePageContent() {
         {!loading &&
           !error &&
           smartMode &&
-          recommendationData && (
+          recommendationData &&
+          !understandingReliable && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-soft">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                    <Sparkles className="size-4" aria-hidden="true" />
+                    Bu ihtiyacı henüz tanımlayamadık
+                  </div>
+
+                  <h2 className="mt-2 font-display text-2xl font-bold text-foreground">
+                    Yanlış hizmet göstermek yerine burada durduk.
+                  </h2>
+
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                    Aramanı geliştirme havuzuna kaydettik. Böylece daha sonra
+                    inceleyip doğru kategori, hizmet ve arama ifadeleriyle
+                    sisteme ekleyebileceğiz.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="inline-flex w-fit items-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium transition hover:bg-muted"
+                >
+                  <RotateCcw className="size-4" aria-hidden="true" />
+                  Aramayı Temizle
+                </button>
+              </div>
+            </div>
+          )}
+        {!loading &&
+          !error &&
+          smartMode &&
+          recommendationData &&
+          understandingReliable && (
             <>
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">

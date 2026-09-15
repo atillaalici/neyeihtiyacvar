@@ -9,6 +9,7 @@ import {
   History,
   LayoutDashboard,
   Store,
+  TicketPercent,
   Users,
 } from "lucide-react";
 
@@ -43,6 +44,11 @@ const items = [
     href: "/admin/pasifler",
     label: "Pasifler",
     icon: Archive,
+  },
+  {
+    href: "/admin/promosyonlar",
+    label: "Promosyonlar",
+    icon: TicketPercent,
   },
   {
     href: "/admin/islem-gecmisi",
@@ -85,7 +91,27 @@ export function AdminNav() {
               </Link>
             );
           })}
-        </nav>
+                <Link
+          href="/admin/yetkiler"
+          className={`inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl border px-4 text-sm font-semibold transition ${
+            pathname === "/admin/yetkiler"
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+          }`}
+        >
+          Admin Yetkileri
+        </Link>
+              <Link
+          href="/admin/istatistik"
+          className={`inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl border px-4 text-sm font-semibold transition ${
+            pathname === "/admin/istatistik"
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background text-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+          }`}
+        >
+          İstatistikler
+        </Link>
+      </nav>
       </div>
     </div>
   );

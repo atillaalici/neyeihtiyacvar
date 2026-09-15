@@ -16,13 +16,13 @@ import { useEffect, useMemo, useState } from "react";
 
 const categories = [
   { title: "Usta & Tamir", image: "/vitrin/usta-tamir.png", href: "/kategoriler/usta-tamir" },
-  { title: "Ev & YaÅŸam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
-  { title: "Nakliye & TaÅŸÄ±ma", image: "/vitrin/nakliye-tasima.png", href: "/kategoriler/nakliye-tasima" },
+  { title: "Ev & Yaşam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
+  { title: "Nakliye & Taşıma", image: "/vitrin/nakliye-tasima.png", href: "/kategoriler/nakliye-tasima" },
   { title: "Teknoloji", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji" },
   { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
-  { title: "EÄŸitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
+  { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
   { title: "Organizasyon", image: "/vitrin/organizasyon.png", href: "/kategoriler/organizasyon" },
-  { title: "DiÄŸer", image: "/vitrin/diger.png", href: "/kategoriler/diger" },
+  { title: "Diğer", image: "/vitrin/diger.png", href: "/kategoriler/diger" },
 ];
 
 type FeaturedProvider = {
@@ -91,7 +91,7 @@ export function ShowcaseSection() {
         if (controller.signal.aborted) return;
 
         console.error("Vitrin isletmeleri yuklenemedi:", error);
-        setProviderError("Ä°ÅŸletmeler ÅŸu anda yÃ¼klenemedi.");
+        setProviderError("İşletmeler şu anda yüklenemedi.");
       } finally {
         if (!controller.signal.aborted) {
           setLoadingProviders(false);
@@ -107,17 +107,17 @@ export function ShowcaseSection() {
   const providers = featured?.providers ?? [];
 
   const providerSubtitle = useMemo(() => {
-    if (!featured) return "YayÄ±ndaki iÅŸletmeleri keÅŸfet.";
+    if (!featured) return "Yayındaki işletmeleri keşfet.";
 
     if (featured.totalEligible === 0) {
-      return "YayÄ±na alÄ±nan iÅŸletmeler burada gÃ¶rÃ¼necek.";
+      return "Yayına alınan işletmeler burada görünecek.";
     }
 
     if (featured.rotationActive) {
-      return `${featured.totalEligible} uygun iÅŸletme arasÄ±ndan gÃ¼ven sinyali gÃ¼Ã§lÃ¼ iÅŸletmeler vitrinde.`;
+      return `${featured.totalEligible} uygun işletme arasından güven sinyali güçlü işletmeler vitrinde.`;
     }
 
-    return `${featured.totalEligible} uygun iÅŸletme vitrinde.`;
+    return `${featured.totalEligible} uygun işletme vitrinde.`;
   }, [featured]);
 
   return (
@@ -129,10 +129,10 @@ export function ShowcaseSection() {
               Vitrin
             </span>
             <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-              SÄ±k Aranan Hizmetler
+              Sık Aranan Hizmetler
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              En Ã§ok ihtiyaÃ§ duyulan hizmetleri keÅŸfet, sana uygun olanÄ± seÃ§.
+              En çok ihtiyaç duyulan hizmetleri keşfet, sana uygun olanı seç.
             </p>
           </div>
 
@@ -140,7 +140,7 @@ export function ShowcaseSection() {
             href="/hizmetler"
             className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
           >
-            TÃ¼m hizmetleri keÅŸfet â†’
+            Tüm hizmetleri keşfet â†’
           </Link>
         </div>
 
@@ -167,7 +167,7 @@ export function ShowcaseSection() {
         <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">
-              Ã–ne Ã‡Ä±kan Ä°ÅŸletmeler
+              Öne Çıkan İşletmeler
             </h2>
             <p className="mt-1 text-sm text-muted-foreground sm:text-base">
               {providerSubtitle}
@@ -178,7 +178,7 @@ export function ShowcaseSection() {
             href="/kesfet"
             className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
           >
-            TÃ¼m iÅŸletmeleri gÃ¶r â†’
+            Tüm işletmeleri gör â†’
           </Link>
         </div>
 
@@ -186,7 +186,7 @@ export function ShowcaseSection() {
           <div className="mt-5 flex min-h-40 items-center justify-center rounded-2xl border border-orange-100 bg-white/70">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Ä°ÅŸletmeler yÃ¼kleniyor...
+              İşletmeler yükleniyor...
             </div>
           </div>
         ) : providerError ? (
@@ -196,9 +196,9 @@ export function ShowcaseSection() {
         ) : providers.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-orange-200 bg-white/70 p-8 text-center">
             <Building2 className="mx-auto h-9 w-9 text-orange-500" />
-            <h3 className="mt-3 font-bold">Vitrin hazÄ±rlanÄ±yor</h3>
+            <h3 className="mt-3 font-bold">Vitrin hazırlanıyor</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Aktif ve yayÄ±ndaki ilk iÅŸletmeler burada otomatik olarak gÃ¶rÃ¼necek.
+              Aktif ve yayındaki ilk işletmeler burada otomatik olarak görünecek.
             </p>
           </div>
         ) : (
@@ -212,7 +212,7 @@ export function ShowcaseSection() {
               <div className="relative h-28 w-full overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-cream to-background">
                 <img
                   src={`${apiBaseUrl}/api/providers/${business.id}/image`}
-                  alt={`${business.businessName} iÅŸletme gÃ¶rseli`}
+                  alt={`${business.businessName} işletme görseli`}
                   className="h-full w-full object-cover"
                   onError={(event) => {
                     event.currentTarget.style.display = "none";
@@ -263,7 +263,7 @@ export function ShowcaseSection() {
                       </div>
 
                       <p className="mt-1 text-[11px] font-semibold text-amber-800 sm:text-xs">
-                        {business.reviewCount} gerÃ§ek deÄŸerlendirme
+                        {business.reviewCount} gerçek değerlendirme
                       </p>
                     </div>
                   ) : (
@@ -275,7 +275,7 @@ export function ShowcaseSection() {
                       </div>
 
                       <p className="mt-1 text-[11px] font-semibold text-orange-700 sm:text-xs">
-                        HenÃ¼z deÄŸerlendirme yok
+                        Henüz değerlendirme yok
                       </p>
                     </div>
                   )}
@@ -300,7 +300,7 @@ export function ShowcaseSection() {
                     href={`/isletme/${business.slug}`}
                     className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-orange-600 sm:text-sm"
                   >
-                    Ä°ÅŸletmeyi Ä°ncele
+                    İşletmeyi İncele
                   </Link>
                 </div>
               </article>
@@ -316,7 +316,7 @@ export function ShowcaseSection() {
           </span>
           <div>
             <p className="text-lg font-extrabold sm:text-xl">10.000+</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">KullanÄ±cÄ±</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">Kullanıcı</p>
           </div>
         </div>
 
@@ -326,7 +326,7 @@ export function ShowcaseSection() {
           </span>
           <div>
             <p className="text-lg font-extrabold sm:text-xl">2.500+</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">Ä°ÅŸletme</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">İşletme</p>
           </div>
         </div>
 
@@ -335,8 +335,8 @@ export function ShowcaseSection() {
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-extrabold sm:text-base">GÃ¼venli ve Åeffaf</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">DoÄŸrulanmÄ±ÅŸ sÃ¼reÃ§</p>
+            <p className="text-sm font-extrabold sm:text-base">Güvenli ve Åeffaf</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">Doğrulanmış süreç</p>
           </div>
         </div>
 
@@ -345,8 +345,8 @@ export function ShowcaseSection() {
             <MapPin className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-lg font-extrabold sm:text-xl">81 Ä°l</p>
-            <p className="text-xs text-muted-foreground sm:text-sm">TÃ¼rkiye genelinde</p>
+            <p className="text-lg font-extrabold sm:text-xl">81 İl</p>
+            <p className="text-xs text-muted-foreground sm:text-sm">Türkiye genelinde</p>
           </div>
         </div>
       </div>

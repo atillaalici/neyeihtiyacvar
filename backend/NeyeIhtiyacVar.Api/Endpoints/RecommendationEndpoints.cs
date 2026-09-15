@@ -657,7 +657,7 @@ public static class RecommendationEndpoints
                         {
                             score += 50;
                             matchLevel = "additional-service";
-                            reasons.Add("Aradığın hizmet işletmenin ek hizmetleri arasında");
+                            reasons.Add("Aradığın hizmet işletmenin 2. hizmeti");
                         }
                         else if (usedFallback)
                         {

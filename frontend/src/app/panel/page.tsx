@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Suspense, FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -109,6 +109,30 @@ type ProviderReviewSummary = {
   reviews: ProviderReview[];
 };
 
+type ProviderAnalyticsPeriod = {
+  profileViews: number;
+  phoneClicks: number;
+  whatsappClicks: number;
+  totalContactClicks: number;
+  startUtc: string | null;
+  endUtc: string;
+};
+
+type ProviderAnalyticsSummary = {
+  provider: {
+    id: string;
+    businessName: string;
+    slug: string;
+  };
+  generatedAtUtc: string;
+  periods: {
+    weekly: ProviderAnalyticsPeriod;
+    monthly: ProviderAnalyticsPeriod;
+    yearly: ProviderAnalyticsPeriod;
+    total: ProviderAnalyticsPeriod;
+  };
+};
+
 function offerStatusLabel(status: ProviderOffer["status"]) {
   if (status === "accepted") return "Kabul Edildi";
   if (status === "rejected") return "Reddedildi";
@@ -149,7 +173,7 @@ function RatingStars({ value }: { value: number }) {
   );
 }
 
-export default function ProviderPanelPage() {
+function ProviderPanelPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const notificationNeedId = searchParams.get("talep");
@@ -160,6 +184,10 @@ export default function ProviderPanelPage() {
   const [offers, setOffers] = useState<ProviderOffer[]>([]);
   const [reviewSummary, setReviewSummary] =
     useState<ProviderReviewSummary | null>(null);
+  const [analytics, setAnalytics] =
+    useState<ProviderAnalyticsSummary | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsError, setAnalyticsError] = useState("");
 
   const [drafts, setDrafts] = useState<Record<string, OfferDraft>>({});
   const [sendingNeedId, setSendingNeedId] = useState<string | null>(null);
@@ -285,6 +313,39 @@ export default function ProviderPanelPage() {
         setNeeds(needsData);
         setOffers(offersData);
         setReviewSummary(reviewsData);
+
+        void (async () => {
+          try {
+            const analyticsResponse = await fetch(
+              `${apiBaseUrl}/api/provider-panel/analytics`,
+              {
+                headers,
+                cache: "no-store",
+              },
+            );
+
+            if (!active) return;
+
+            if (!analyticsResponse.ok) {
+              setAnalyticsError("İstatistik verileri şu anda alınamadı.");
+              return;
+            }
+
+            const analyticsData =
+              (await analyticsResponse.json()) as ProviderAnalyticsSummary;
+
+            if (!active) return;
+
+            setAnalytics(analyticsData);
+            setAnalyticsError("");
+          } catch {
+            if (active) {
+              setAnalyticsError("İstatistik verileri şu anda alınamadı.");
+            }
+          } finally {
+            if (active) setAnalyticsLoading(false);
+          }
+        })();
       } catch {
         if (active) setError("İşletme paneli yüklenemedi.");
       } finally {
@@ -696,6 +757,73 @@ export default function ProviderPanelPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+          <div>
+            <h2 className="font-display text-xl font-semibold">
+              İşletme İstatistikleri
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Profil görüntülenmesi ve kullanıcıların işletmenizle iletişime geçmek için yaptığı tıklamalar.
+            </p>
+          </div>
+
+          {analyticsLoading ? (
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[1, 2, 3, 4].map((item) => (
+                <div
+                  key={item}
+                  className="h-40 animate-pulse rounded-xl border border-border bg-muted/40"
+                />
+              ))}
+            </div>
+          ) : analytics ? (
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["Haftalık", analytics.periods.weekly],
+                ["Aylık", analytics.periods.monthly],
+                ["Yıllık", analytics.periods.yearly],
+                ["Toplam", analytics.periods.total],
+              ].map(([label, period]) => {
+                const data = period as ProviderAnalyticsPeriod;
+
+                return (
+                  <div
+                    key={label as string}
+                    className="rounded-xl border border-border bg-background p-4"
+                  >
+                    <div className="text-sm font-semibold text-primary">
+                      {label as string}
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Profil Görüntülenme</div>
+                        <div className="mt-1 text-2xl font-bold">{data.profileViews}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Toplam İletişim</div>
+                        <div className="mt-1 text-2xl font-bold">{data.totalContactClicks}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Telefon</div>
+                        <div className="mt-1 font-semibold">{data.phoneClicks}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">WhatsApp</div>
+                        <div className="mt-1 font-semibold">{data.whatsappClicks}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+              {analyticsError || "Henüz görüntülenecek istatistik bulunmuyor."}
+            </div>
+          )}
         </div>
 
         {message && (
@@ -1193,5 +1321,24 @@ export default function ProviderPanelPage() {
         </div>
       </section>
     </SiteLayout>
+  );
+}
+
+export default function ProviderPanelPage() {
+  return (
+    <Suspense
+      fallback={
+        <SiteLayout>
+          <div
+            data-panel-suspense-wrapper
+            className="section-shell py-12"
+          >
+            <div className="h-96 animate-pulse rounded-2xl border border-border bg-card" />
+          </div>
+        </SiteLayout>
+      }
+    >
+      <ProviderPanelPageContent />
+    </Suspense>
   );
 }

@@ -1,0 +1,23 @@
+[Unit]
+Description=Neye Ihtiyac Var Next.js Frontend
+After=network.target neyeihtiyacvar-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=neyeihtiyacvar
+Group=www-data
+WorkingDirectory=/var/www/neyeihtiyacvar/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/pnpm start
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=neyeihtiyacvar-web
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

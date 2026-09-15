@@ -12,12 +12,15 @@ import {
   ShieldCheck,
   Star,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   FormEvent,
   Suspense,
   useEffect,
   useMemo,
+  useRef,
+
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken, getStoredUser } from "@/lib/auth";
+import { trackPlatformAnalytics } from "@/lib/platform-analytics";
 
 type Category = {
   id: string;
@@ -143,11 +147,14 @@ function NeedCreatePageContent() {
   const [cities, setCities] = useState<City[]>([]);
   const [recommendationData, setRecommendationData] =
     useState<RecommendationResponse | null>(null);
+  const [liveRecommendationData, setLiveRecommendationData] =
+    useState<RecommendationResponse | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searching, setSearching] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState("");
   const [trackingSuccess, setTrackingSuccess] = useState("");
+  const searchSourceRef = useRef<"enter" | "button">("button");
 
   const selectedCity = useMemo(
     () => cities.find((item) => item.slug === citySlug) ?? null,
@@ -160,14 +167,23 @@ function NeedCreatePageContent() {
   const understoodService =
     recommendationData?.understanding.serviceSlug ?? "";
 
+  const liveCategorySlug =
+    liveRecommendationData?.understanding.categorySlug ?? "";
+  const liveServiceSlug =
+    liveRecommendationData?.understanding.serviceSlug ?? "";
+
   const selectedCategoryName =
     recommendationData?.understanding.categoryName ??
-    categories.find((item) => item.slug === understoodCategory)?.name ??
-    formatSlug(understoodCategory);
+    liveRecommendationData?.understanding.categoryName ??
+    categories.find(
+      (item) => item.slug === (understoodCategory || liveCategorySlug),
+    )?.name ??
+    formatSlug(understoodCategory || liveCategorySlug);
 
   const selectedServiceName =
     recommendationData?.understanding.serviceName ??
-    formatSlug(understoodService);
+    liveRecommendationData?.understanding.serviceName ??
+    formatSlug(understoodService || liveServiceSlug);
 
   const recommendations = useMemo(() => {
     return [...(recommendationData?.recommendations ?? [])]
@@ -217,6 +233,62 @@ function NeedCreatePageContent() {
     };
   }, []);
 
+  useEffect(() => {
+    const cleanQuery = query.trim();
+
+    if (
+      cleanQuery.length < 3 ||
+      !citySlug ||
+      !districtSlug ||
+      loadingCatalog
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveRecommendationData(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({
+          q: cleanQuery,
+          il: citySlug,
+          ilce: districtSlug,
+          limit: "1",
+        });
+
+        const response = await fetch(
+          `${apiBaseUrl}/api/recommendations?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) return;
+
+        const data = (await response.json()) as RecommendationResponse;
+
+        if (!controller.signal.aborted) {
+          setLiveRecommendationData(data);
+        }
+      } catch (error) {
+        if (
+          error instanceof DOMException &&
+          error.name === "AbortError"
+        ) {
+          return;
+        }
+      }
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, citySlug, districtSlug, loadingCatalog]);
+
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const cleanQuery = query.trim();
@@ -230,6 +302,13 @@ function NeedCreatePageContent() {
       setError("İl ve ilçe bilgisi gerekli.");
       return;
     }
+
+    trackPlatformAnalytics({
+      eventType: "search_submit",
+      searchTerm: cleanQuery,
+      source: searchSourceRef.current,
+    });
+    searchSourceRef.current = "button";
 
     setSearching(true);
     setError("");
@@ -352,9 +431,19 @@ function NeedCreatePageContent() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
             <div>
               <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-                <h1 className="font-display text-3xl font-bold sm:text-4xl">
-                  Neye İhtiyaç <span className="text-primary">Var?</span>
-                </h1>
+                <div className="flex items-center gap-3">
+                  <Image
+                    src="/brand/neyeihtiyacvar-logo.png"
+                    alt="Neye İhtiyaç Var"
+                    width={56}
+                    height={56}
+                    className="size-14 shrink-0 object-contain"
+                    priority
+                  />
+                  <h1 className="font-display text-3xl font-bold sm:text-4xl">
+                    Neye İhtiyaç <span className="text-primary">Var?</span>
+                  </h1>
+                </div>
 
                 <div className="hidden text-right text-sm italic text-muted-foreground md:block">
                   İhtiyaçlar birleşir,
@@ -371,9 +460,16 @@ function NeedCreatePageContent() {
                   <Search className="ml-3 size-5 shrink-0 text-primary" />
                   <input
                     value={query}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        searchSourceRef.current = "enter";
+                      }
+                    }}
                     onChange={(event) => {
                       setQuery(event.target.value);
                       setRecommendationData(null);
+                      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveRecommendationData(null);
                       setTrackingSuccess("");
                     }}
                     placeholder="Örneğin: musluk su akıtıyor"
@@ -381,6 +477,9 @@ function NeedCreatePageContent() {
                   />
                   <button
                     type="submit"
+                    onClick={() => {
+                      searchSourceRef.current = "button";
+                    }}
                     disabled={searching}
                     className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
                   >
@@ -397,6 +496,8 @@ function NeedCreatePageContent() {
                         setCitySlug(value);
                         setDistrictSlug("");
                         setRecommendationData(null);
+                        // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveRecommendationData(null);
                       }}
                       disabled={loadingCatalog}
                     >
@@ -420,6 +521,8 @@ function NeedCreatePageContent() {
                       onValueChange={(value) => {
                         setDistrictSlug(value);
                         setRecommendationData(null);
+                        // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveRecommendationData(null);
                       }}
                       disabled={!citySlug || loadingCatalog}
                     >

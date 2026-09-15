@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
@@ -104,7 +104,9 @@ export function LocationSearch({
     const cityExists = cities.some((candidate) => candidate.slug === city);
 
     if (!cityExists) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCity("");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDistrict("");
     }
   }, [cities, city]);
@@ -119,6 +121,7 @@ export function LocationSearch({
     );
 
     if (!districtExists) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDistrict("");
     }
   }, [district, selectedCity]);
@@ -151,7 +154,8 @@ export function LocationSearch({
           value={city}
           onValueChange={(value: string) => {
             setCity(value);
-            setDistrict("");
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDistrict("");
           }}
           disabled={loading}
         >

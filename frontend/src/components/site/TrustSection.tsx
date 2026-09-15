@@ -1,3 +1,55 @@
-import {LayoutGrid,ClipboardList,MapPinned,PhoneCall} from "lucide-react";
-const f=[[LayoutGrid,"İhtiyacına Uygun Hizmetler","Kategori ve hizmet seçenekleriyle aradığın hizmete ulaş."],[MapPinned,"Bölgendeki İşletmeler","İl ve ilçe seçerek bölgendeki işletmeleri keşfet."],[ClipboardList,"Detaylı İşletme Profilleri","Hizmetleri, çalışma bilgilerini ve iletişim seçeneklerini incele."],[PhoneCall,"Doğrudan İletişim","Telefon veya WhatsApp üzerinden işletmeyle iletişime geç."]] as const;
-export function TrustSection(){return }
+import {
+  ClipboardList,
+  LayoutGrid,
+  MapPinned,
+  PhoneCall,
+} from "lucide-react";
+
+const features = [
+  [
+    LayoutGrid,
+    "İhtiyacına Uygun Hizmetler",
+    "Kategori ve hizmet seçenekleriyle aradığın hizmete ulaş.",
+  ],
+  [
+    MapPinned,
+    "Bölgendeki İşletmeler",
+    "İl ve ilçe seçerek bölgendeki işletmeleri keşfet.",
+  ],
+  [
+    ClipboardList,
+    "Detaylı İşletme Profilleri",
+    "Hizmetleri, çalışma bilgilerini ve iletişim seçeneklerini incele.",
+  ],
+  [
+    PhoneCall,
+    "Doğrudan İletişim",
+    "Telefon veya WhatsApp üzerinden işletmeyle iletişime geç.",
+  ],
+] as const;
+
+export function TrustSection() {
+  return (
+    <section className="home-trust section-shell py-16 sm:py-20">
+      <h2 className="font-display text-3xl font-bold sm:text-4xl">
+        Doğru kişiyi bulmak artık daha kolay
+      </h2>
+
+      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {features.map(([Icon, title, description]) => (
+          <div key={title}>
+            <span className="grid size-11 place-items-center rounded-xl border border-border bg-surface text-primary">
+              <Icon className="size-5" />
+            </span>
+
+            <h3 className="mt-4 font-semibold">{title}</h3>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              {description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

@@ -81,41 +81,105 @@ public static class ProviderPanelEndpoints
 
             var errors = ValidateOwnUpdate(request);
 
-            var normalizedAdditionalServices = request.AdditionalServices
-                .Select(x => x?.Trim().ToLowerInvariant() ?? string.Empty)
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            var categorySlug =
+                request.CategorySlug?.Trim() ?? string.Empty;
+            var serviceSlug =
+                request.ServiceSlug?.Trim() ?? string.Empty;
+
+            var category = await dbContext.Categories
+                .AsNoTracking()
+                .Include(x => x.Services)
+                .FirstOrDefaultAsync(x =>
+                    x.IsActive &&
+                    x.Slug == categorySlug);
+
+            if (category is null)
+            {
+                errors["categorySlug"] =
+                    ["Geçerli bir ana kategori seçin."];
+            }
+
+            var categoryServiceSlugs = category is null
+                ? new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase)
+                : category.Services
+                    .Where(x => x.IsActive)
+                    .Select(x => ToSlug(x.Name))
+                    .ToHashSet(
+                        StringComparer.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(serviceSlug) ||
+                !categoryServiceSlugs.Contains(serviceSlug))
+            {
+                errors["serviceSlug"] =
+                    ["Ana hizmet seçilen kategoriye ait olmalıdır."];
+            }
+            var normalizedAdditionalServices =
+                request.AdditionalServices
+                    .Select(x =>
+                        x?.Trim().ToLowerInvariant()
+                        ?? string.Empty)
+                    .Where(x => x.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
             if (normalizedAdditionalServices.Length > 1)
             {
                 errors["additionalServices"] =
-                    ["En fazla 1 ek hizmet seçebilirsiniz."];
+                    ["En fazla 1 adet 2. Hizmet seçebilirsiniz."];
             }
 
-            if (normalizedAdditionalServices.Any(x =>
-                string.Equals(
-                    x,
-                    provider.ServiceSlug,
-                    StringComparison.OrdinalIgnoreCase)))
+            var secondCategorySlug =
+                request.AdditionalCategorySlug?.Trim() ?? string.Empty;
+            var secondServiceSlug =
+                normalizedAdditionalServices.FirstOrDefault() ?? string.Empty;
+
+            var hasSecondCategory =
+                !string.IsNullOrWhiteSpace(secondCategorySlug);
+            var hasSecondService =
+                !string.IsNullOrWhiteSpace(secondServiceSlug);
+
+            if (hasSecondCategory != hasSecondService)
             {
                 errors["additionalServices"] =
-                    ["Ana hizmet ek hizmetler arasında tekrar seçilemez."];
+                    ["2. Hizmet için hem ana kategori hem ana hizmet seçilmelidir."];
             }
-
-            var validServiceSlugs = (await dbContext.CategoryServices
+            else if (hasSecondService)
+            {
+                var secondCategory = await dbContext.Categories
                     .AsNoTracking()
-                    .Where(x => x.IsActive)
-                    .Select(x => x.Name)
-                    .ToListAsync())
-                .Select(ToSlug)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    .Include(x => x.Services)
+                    .FirstOrDefaultAsync(x =>
+                        x.IsActive &&
+                        x.Slug == secondCategorySlug);
 
-            if (normalizedAdditionalServices.Any(x =>
-                !validServiceSlugs.Contains(x)))
-            {
-                errors["additionalServices"] =
-                    ["Ek hizmet aktif hizmet kataloğunda bulunmalıdır."];
+                if (secondCategory is null)
+                {
+                    errors["additionalCategorySlug"] =
+                        ["2. Hizmet için geçerli bir ana kategori seçin."];
+                }
+                else
+                {
+                    var secondServiceSlugs = secondCategory.Services
+                        .Where(x => x.IsActive)
+                        .Select(x => ToSlug(x.Name))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    if (!secondServiceSlugs.Contains(secondServiceSlug))
+                    {
+                        errors["additionalServices"] =
+                            ["2. Hizmet seçilen 2. kategoriye ait olmalıdır."];
+                    }
+                }
+
+                if (string.Equals(
+                        secondServiceSlug,
+                        serviceSlug,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    errors["additionalServices"] =
+                        ["1. Hizmet ile 2. Hizmet aynı olamaz."];
+                }
             }
 
             if (errors.Count > 0)
@@ -130,6 +194,9 @@ public static class ProviderPanelEndpoints
             var previousAdditionalServices =
                 provider.AdditionalServices
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            provider.CategorySlug = categorySlug;
+            provider.ServiceSlug = serviceSlug;
             provider.Description = Optional(request.Description);
             provider.AdditionalServices = normalizedAdditionalServices;
             provider.PublicPhone = Optional(request.PublicPhone);
@@ -500,6 +567,9 @@ public sealed record LinkProviderOwnerRequest(
 
 public sealed record UpdateOwnProviderRequest(
     int ExpectedVersion,
+    string CategorySlug,
+    string ServiceSlug,
+    string? AdditionalCategorySlug,
     string? Description,
     List<string> AdditionalServices,
     string? PublicPhone,

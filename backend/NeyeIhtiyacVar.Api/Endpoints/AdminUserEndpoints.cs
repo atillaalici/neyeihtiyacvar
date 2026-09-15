@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
@@ -25,6 +25,12 @@ public static class AdminUserEndpoints
                 TryParseRole(role, out var parsedRole))
             {
                 query = query.Where(x => x.Role == parsedRole);
+            }
+            else
+            {
+                // İşletme sahipleri İşletmeler ekranından yönetilir.
+                // Kullanıcılar ekranında aynı hesabı ikinci kez göstermeyiz.
+                query = query.Where(x => x.Role != UserRole.Provider);
             }
 
             if (isActive.HasValue)
@@ -85,54 +91,121 @@ public static class AdminUserEndpoints
                 });
             }
 
-            var hasNeeds = await dbContext.NeedRequests
-                .AsNoTracking()
-                .AnyAsync(x => x.OwnerUserId == userId);
-
-            var hasProvider = await dbContext.Providers
-                .AsNoTracking()
-                .AnyAsync(x => x.OwnerUserId == userId);
-
-            if (hasNeeds || hasProvider)
+            if (user.Role == UserRole.Admin)
             {
                 return Results.Conflict(new
                 {
-                    message = "Bu kullanıcıya bağlı geçmiş kayıtlar bulunduğu için hesap doğrudan silinemez. Hesabı pasif hale getirin. Kalıcı silme/anonimleştirme işlemini KVKK veri saklama politikasıyla birlikte uygulayacağız."
+                    message = "Admin hesabı bu ekrandan kalıcı olarak silinemez."
                 });
             }
 
-            dbContext.Users.Remove(user);
+            var ownedProvider = await dbContext.Providers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (ownedProvider is not null)
+            {
+                return Results.Conflict(new
+                {
+                    message =
+                        "Bu hesap bir işletmenin sahibidir. İşletmeler ekranından işletmeyi silin; bağlı hesap birlikte temizlenecektir."
+                });
+            }
+
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync();
 
             try
             {
-                await dbContext.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                return Results.Conflict(new
+                var needs = await dbContext.NeedRequests
+                    .Where(x => x.OwnerUserId == userId)
+                    .ToListAsync();
+
+                foreach (var need in needs)
                 {
-                    message = "Bu hesaba bağlı başka kayıtlar bulunduğu için hesap silinemedi. Hesabı pasif hale getirin."
+                    need.OwnerUserId = null;
+                }
+
+                var reviews = await dbContext.ProviderReviews
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+
+                if (reviews.Count > 0)
+                {
+                    dbContext.ProviderReviews.RemoveRange(reviews);
+                }
+
+                var memberships = await dbContext.ProviderMemberships
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+
+                if (memberships.Count > 0)
+                {
+                    dbContext.ProviderMemberships.RemoveRange(memberships);
+                }
+
+                var verificationCodes = await dbContext.AccountVerificationCodes
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+
+                if (verificationCodes.Count > 0)
+                {
+                    dbContext.AccountVerificationCodes.RemoveRange(verificationCodes);
+                }
+
+                var notifications = await dbContext.Notifications
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+
+                if (notifications.Count > 0)
+                {
+                    dbContext.Notifications.RemoveRange(notifications);
+                }
+
+                var deletedEmail = user.Email;
+                var deletedPhone = user.PhoneNumber;
+                var deletedName = user.DisplayName;
+
+                dbContext.Users.Remove(user);
+                await dbContext.SaveChangesAsync();
+
+                dbContext.AdminAuditLogs.Add(new AdminAuditLog
+                {
+                    AdminUserId = currentUserId,
+                    AdminEmail =
+                        principal.FindFirstValue(ClaimTypes.Email) ??
+                        principal.Identity?.Name ??
+                        "unknown",
+                    Action = "user.hard-delete",
+                    EntityType = "user",
+                    EntityId = userId.ToString(),
+                    EntityName = deletedName ?? deletedEmail,
+                    Details = $"Kullanıcı kalıcı silindi: {deletedEmail}",
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+
+                await dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Results.Ok(new
+                {
+                    userId,
+                    deletedEmail,
+                    deletedPhone,
+                    message =
+                        "Kullanıcı hesabı kalıcı olarak silindi. E-posta ve telefon yeniden kullanılabilir."
                 });
             }
-
-            dbContext.AdminAuditLogs.Add(new AdminAuditLog
+            catch (Exception exception)
             {
-                AdminUserId = currentUserId,
-                AdminEmail = principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity?.Name ?? "unknown",
-                Action = "user.delete",
-                EntityType = "user",
-                EntityId = userId.ToString(),
-                EntityName = user.DisplayName ?? user.Email,
-                Details = $"Kullanici silindi: {user.Email}",
-                CreatedAtUtc = DateTime.UtcNow
-            });
-            await dbContext.SaveChangesAsync();
+                await transaction.RollbackAsync();
 
-            return Results.Ok(new
-            {
-                userId,
-                message = "Kullanıcı hesabı silindi."
-            });
+                return Results.Conflict(new
+                {
+                    message = "Kullanıcı silinirken bağlı kayıtlar temizlenemedi.",
+                    detail = exception.Message
+                });
+            }
         });
         group.MapPost("/{userId:guid}/status", async (
             Guid userId,

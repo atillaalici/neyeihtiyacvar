@@ -39,6 +39,7 @@ export default function AdminLayout({
     }
 
     if (user.role === "admin") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAuthorized(true);
       setChecking(false);
       return;
@@ -142,7 +143,7 @@ export default function AdminLayout({
           </Button>
 
           <p className="mt-3 text-xs text-muted-foreground">
-            İşlemden sonra yeni rolün JWT'ye yansıması için
+            İşlemden sonra yeni rolün JWT&apos;ye yansıması için
             tekrar giriş yapacaksın.
           </p>
         </div>

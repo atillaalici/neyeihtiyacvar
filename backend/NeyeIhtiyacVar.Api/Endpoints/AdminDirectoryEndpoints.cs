@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -295,6 +296,7 @@ public static class AdminDirectoryEndpoints
 
         group.MapDelete("/providers/{id:guid}", async (
             Guid id,
+            ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
             var provider = await dbContext.Providers
@@ -304,47 +306,200 @@ public static class AdminDirectoryEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme bulunamadı."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
-            var hasOffers = await dbContext.ProviderOffers
-                .AsNoTracking()
-                .AnyAsync(x => x.ProviderId == id);
+            var providerName = provider.BusinessName;
+            var ownerUserId = provider.OwnerUserId;
+            var sourceApplicationId = provider.SourceApplicationId;
 
-            var hasReviews = await dbContext.ProviderReviews
-                .AsNoTracking()
-                .AnyAsync(x => x.ProviderId == id);
+            AppUser? ownerUser = null;
 
-            if (hasOffers || hasReviews)
+            if (ownerUserId.HasValue)
             {
-                return Results.Conflict(new
-                {
-                    message =
-                        "Bu işletmeye bağlı teklif veya değerlendirme kayıtları bulunduğu için kalıcı olarak silinemez."
-                });
+                ownerUser = await dbContext.Users
+                    .FirstOrDefaultAsync(x => x.Id == ownerUserId.Value);
             }
 
-            dbContext.Providers.Remove(provider);
+            await using var transaction =
+                await dbContext.Database.BeginTransactionAsync();
 
             try
             {
+                // İşletmeye bağlı teklif ve değerlendirmeleri kaldır.
+                var reviews = await dbContext.ProviderReviews
+                    .Where(x =>
+                        x.ProviderId == id ||
+                        (ownerUserId.HasValue &&
+                         x.UserId == ownerUserId.Value))
+                    .ToListAsync();
+
+                if (reviews.Count > 0)
+                {
+                    dbContext.ProviderReviews.RemoveRange(reviews);
+                }
+
+                var offers = await dbContext.ProviderOffers
+                    .Where(x => x.ProviderId == id)
+                    .ToListAsync();
+
+                if (offers.Count > 0)
+                {
+                    dbContext.ProviderOffers.RemoveRange(offers);
+                }
+
+                // Üyelik kayıtlarını hem işletme hem sahip kullanıcı açısından temizle.
+                var memberships = await dbContext
+                    .Set<ProviderMembership>()
+                    .Where(x =>
+                        x.ProviderId == id ||
+                        (ownerUserId.HasValue &&
+                         x.UserId == ownerUserId.Value))
+                    .ToListAsync();
+
+                if (memberships.Count > 0)
+                {
+                    dbContext.RemoveRange(memberships);
+                }
+
+                // İşletmeye doğrudan yönlendirilmiş ihtiyaçları bozmadan ilişkiyi kaldır.
+                var targetedNeeds = await dbContext.NeedRequests
+                    .Where(x => x.TargetProviderId == id)
+                    .ToListAsync();
+
+                foreach (var need in targetedNeeds)
+                {
+                    need.TargetProviderId = null;
+                }
+
+                if (ownerUserId.HasValue)
+                {
+                    // Kullanıcının geçmiş ihtiyaçlarını koru, sadece sahip bağlantısını kaldır.
+                    var ownedNeeds = await dbContext.NeedRequests
+                        .Where(x => x.OwnerUserId == ownerUserId.Value)
+                        .ToListAsync();
+
+                    foreach (var need in ownedNeeds)
+                    {
+                        need.OwnerUserId = null;
+                    }
+
+                    var verificationCodes =
+                        await dbContext.AccountVerificationCodes
+                            .Where(x => x.UserId == ownerUserId.Value)
+                            .ToListAsync();
+
+                    if (verificationCodes.Count > 0)
+                    {
+                        dbContext.AccountVerificationCodes
+                            .RemoveRange(verificationCodes);
+                    }
+
+                    var notifications = await dbContext.Notifications
+                        .Where(x => x.UserId == ownerUserId.Value)
+                        .ToListAsync();
+
+                    if (notifications.Count > 0)
+                    {
+                        dbContext.Notifications.RemoveRange(notifications);
+                    }
+                }
+
+                dbContext.Providers.Remove(provider);
                 await dbContext.SaveChangesAsync();
+
+                // Kaynağı bir başvuru ise test başvurusunu da kaldır.
+                if (sourceApplicationId.HasValue)
+                {
+                    var application =
+                        await dbContext.ProviderApplications
+                            .FirstOrDefaultAsync(
+                                x => x.Id == sourceApplicationId.Value);
+
+                    if (application is not null)
+                    {
+                        dbContext.ProviderApplications.Remove(application);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
+
+                var ownerDeleted = false;
+                string? deletedEmail = null;
+                string? deletedPhone = null;
+
+                if (ownerUser is not null &&
+                    ownerUser.Role != UserRole.Admin)
+                {
+                    var hasAnotherProvider = await dbContext.Providers
+                        .AsNoTracking()
+                        .AnyAsync(x =>
+                            x.OwnerUserId == ownerUser.Id &&
+                            x.Id != id);
+
+                    if (!hasAnotherProvider)
+                    {
+                        deletedEmail = ownerUser.Email;
+                        deletedPhone = ownerUser.PhoneNumber;
+
+                        dbContext.Users.Remove(ownerUser);
+                        await dbContext.SaveChangesAsync();
+                        ownerDeleted = true;
+                    }
+                }
+
+                var adminUserIdValue =
+                    principal.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                Guid? adminUserId =
+                    Guid.TryParse(
+                        adminUserIdValue,
+                        out var parsedAdminUserId)
+                        ? parsedAdminUserId
+                        : null;
+
+                dbContext.AdminAuditLogs.Add(new AdminAuditLog
+                {
+                    AdminUserId = adminUserId,
+                    AdminEmail =
+                        principal.FindFirstValue(ClaimTypes.Email) ??
+                        principal.Identity?.Name ??
+                        "unknown",
+                    Action = "provider.hard-delete",
+                    EntityType = "provider",
+                    EntityId = id.ToString(),
+                    EntityName = providerName,
+                    Details = ownerDeleted
+                        ? $"İşletme ve bağlı test hesabı silindi: {providerName}"
+                        : $"İşletme silindi: {providerName}",
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+
+                await dbContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Results.Ok(new
+                {
+                    id,
+                    ownerDeleted,
+                    deletedEmail,
+                    deletedPhone,
+                    message = ownerDeleted
+                        ? "İşletme ve bağlı kullanıcı hesabı kalıcı olarak silindi. E-posta ve telefon yeniden kullanılabilir."
+                        : "İşletme kalıcı olarak silindi."
+                });
             }
-            catch (DbUpdateException)
+            catch (Exception exception)
             {
+                await transaction.RollbackAsync();
+
                 return Results.Conflict(new
                 {
                     message =
-                        "Bu işletmeye bağlı başka kayıtlar bulunduğu için silinemedi."
+                        "İşletme silinirken bağlı kayıtlar temizlenemedi.",
+                    detail = exception.Message
                 });
             }
-
-            return Results.Ok(new
-            {
-                id,
-                message = "İşletme kalıcı olarak silindi."
-            });
         });
         return app;
     }

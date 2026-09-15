@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
+import { SearchableCatalogSelect } from "@/components/auth/SearchableCatalogSelect";
 import { apiBaseUrl } from "@/lib/api";
 import {
   clearAuth,
@@ -45,6 +46,8 @@ type ProviderProfile = {
 };
 
 type FormState = {
+  categorySlug: string;
+  serviceSlug: string;
   description: string;
   additionalServices: string[];
   publicPhone: string;
@@ -57,6 +60,8 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  categorySlug: "",
+  serviceSlug: "",
   description: "",
   additionalServices: [],
   publicPhone: "",
@@ -102,6 +107,8 @@ function formFromProfile(
   categories: CategoryDto[],
 ): FormState {
   return {
+    categorySlug: profile.categorySlug,
+    serviceSlug: profile.serviceSlug,
     description: profile.description ?? "",
     additionalServices: sanitizeAdditionalServices(profile, categories),
     publicPhone: profile.publicPhone ?? "",
@@ -129,6 +136,7 @@ export default function ProviderProfileEditPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [additionalServiceSearch, setAdditionalServiceSearch] = useState("");
+  const [additionalCategorySlug, setAdditionalCategorySlug] = useState("");
   const [additionalServiceOpen, setAdditionalServiceOpen] = useState(false);
 
   useEffect(() => {
@@ -216,22 +224,27 @@ export default function ProviderProfileEditPage() {
     }));
   }
 
-  const allAdditionalServiceOptions = Array.from(
-    new Map(
-      categories
-        .flatMap((category) =>
-          category.services.map((service) => ({
-            slug: toSlug(service),
-            name: service,
-            categoryName: category.name,
-          })),
-        )
-        .filter((item) => item.slug !== (profile?.serviceSlug ?? ""))
-        .map((item) => [item.slug, item] as const),
-    ).values(),
-  ).sort((left, right) =>
-    left.name.localeCompare(right.name, "tr-TR"),
-  );
+  const selectedCategory =
+    categories.find(
+      (category) => category.slug === form.categorySlug,
+    ) ?? null;
+const selectedAdditionalCategory =
+    categories.find(
+      (category) => category.slug === additionalCategorySlug,
+    ) ?? null;
+
+  const allAdditionalServiceOptions = (
+    selectedAdditionalCategory?.services ?? []
+  )
+    .map((service) => ({
+      slug: toSlug(service),
+      name: service,
+      categoryName: selectedAdditionalCategory?.name ?? "",
+    }))
+    .filter((item) => item.slug !== form.serviceSlug)
+    .sort((left, right) =>
+      left.name.localeCompare(right.name, "tr-TR"),
+    );
 
   const selectedAdditionalService =
     allAdditionalServiceOptions.find(
@@ -255,7 +268,7 @@ export default function ProviderProfileEditPage() {
       return;
     }
 
-    if (serviceSlug === profile?.serviceSlug) {
+    if (serviceSlug === form.serviceSlug) {
       setError("Ana hizmet ek hizmet olarak seçilemez.");
       return;
     }
@@ -324,6 +337,9 @@ export default function ProviderProfileEditPage() {
           },
           body: JSON.stringify({
             expectedVersion: profile.version,
+            categorySlug: form.categorySlug,
+            serviceSlug: form.serviceSlug,
+            additionalCategorySlug: additionalCategorySlug || null,
             description: form.description.trim() || null,
             additionalServices: form.additionalServices,
             publicPhone: form.publicPhone.trim() || null,
@@ -419,9 +435,8 @@ export default function ProviderProfileEditPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            İletişim ve hizmet bilgilerini güncelle. İşletme adı,
-            kategori, ana hizmet, konum ve yayın durumu admin
-            kontrolündedir.
+            İletişim, kategori ve hizmet bilgilerini güncelle. İşletme adı,
+            konum ve yayın durumu yönetim kontrolündedir.
           </p>
         </div>
       </section>
@@ -452,24 +467,133 @@ export default function ProviderProfileEditPage() {
                   </div>
                 </div>
 
+                <div className="sm:col-span-2">
+                  <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                    1. Hizmet - Ana Kategori
+                  </div>
+                  <SearchableCatalogSelect
+                    value={form.categorySlug}
+                    placeholder="Kategori ara veya seç"
+                    searchPlaceholder="Örn. hafriyat, teknoloji, market..."
+                    options={categories.map((category) => ({
+                      value: category.slug,
+                      label: category.name,
+                      keywords: category.services.join(" "),
+                    }))}
+                    onValueChange={(value) => {
+                      update("categorySlug", value);
+                      update("serviceSlug", "");
+                      update("additionalServices", []);
+                      setAdditionalServiceSearch("");
+                    }}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                    1. Hizmet - Ana Hizmet / Alt Kategori
+                  </div>
+                  <SearchableCatalogSelect
+                    value={form.serviceSlug}
+                    disabled={!form.categorySlug}
+                    placeholder={
+                      form.categorySlug
+                        ? "Hizmet ara veya seç"
+                        : "Önce kategori seç"
+                    }
+                    searchPlaceholder="Örn. hafriyat, ekskavatör, elektrikçi..."
+                    options={
+                      (
+                        categories.find(
+                          (category) =>
+                            category.slug === form.categorySlug,
+                        )?.services ?? []
+                      ).map((service) => ({
+                        value: toSlug(service),
+                        label: service,
+                      }))
+                    }
+                    onValueChange={(value) => {
+                      update("serviceSlug", value);
+                      update("additionalServices", []);
+                      setAdditionalServiceSearch("");
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+                        <div className="sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="mb-4">
+                <div className="text-sm font-semibold text-foreground">
+                  2. Hizmet
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  İsteğe bağlıdır. İşletmenin sunduğu ikinci hizmeti seçebilirsin.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <div className="text-xs text-muted-foreground">
-                    Kategori
-                  </div>
-                  <div className="mt-1 font-medium">
-                    {profile.categorySlug}
-                  </div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Ana Kategori
+                  </label>
+                  <SearchableCatalogSelect
+                    value={additionalCategorySlug}
+                    placeholder="Kategori ara veya seç"
+                    searchPlaceholder="Kategori yaz..."
+                    options={categories.map((category) => ({
+                      value: category.slug,
+                      label: category.name,
+                      keywords: category.services.join(" "),
+                    }))}
+                    onValueChange={(value) => {
+                      setAdditionalCategorySlug(value);
+                      update("additionalServices", []);
+                      setAdditionalServiceSearch("");
+                    }}
+                  />
                 </div>
 
                 <div>
-                  <div className="text-xs text-muted-foreground">
-                    Ana hizmet
-                  </div>
-                  <div className="mt-1 font-medium">
-                    {profile.serviceSlug}
-                  </div>
+                  <label className="mb-2 block text-sm font-medium">
+                    Ana Hizmet / Alt Kategori
+                  </label>
+                  <SearchableCatalogSelect
+                    value={form.additionalServices[0] ?? ""}
+                    disabled={!selectedAdditionalCategory}
+                    placeholder={
+                      selectedAdditionalCategory
+                        ? "Hizmet ara veya seç"
+                        : "Önce kategori seç"
+                    }
+                    searchPlaceholder="Hizmet yaz..."
+                    options={allAdditionalServiceOptions.map((item) => ({
+                      value: item.slug,
+                      label: item.name,
+                    }))}
+                    onValueChange={(value) => {
+                      update("additionalServices", value ? [value] : []);
+                      setAdditionalServiceSearch("");
+                    }}
+                  />
                 </div>
               </div>
+
+              {additionalCategorySlug ||
+              form.additionalServices.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdditionalCategorySlug("");
+                    update("additionalServices", []);
+                    setAdditionalServiceSearch("");
+                  }}
+                  className="mt-3 text-xs font-semibold text-primary hover:underline"
+                >
+                  2. Hizmeti temizle
+                </button>
+              ) : null}
             </div>
 
             <div className="sm:col-span-2">
@@ -487,97 +611,6 @@ export default function ProviderProfileEditPage() {
                 className="w-full resize-y rounded-md border border-input bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
                 placeholder="İşletmeni, uzmanlıklarını ve hizmet anlayışını anlat."
               />
-            </div>
-
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="block text-sm font-medium">
-                  Ek hizmet
-                </label>
-                <span className="text-xs text-muted-foreground">
-                  {form.additionalServices.length}/1 seçildi
-                </span>
-              </div>
-
-              <div className="relative mt-3">
-                <input
-                  type="search"
-                  value={additionalServiceSearch}
-                  onFocus={() => setAdditionalServiceOpen(true)}
-                  onChange={(event) => {
-                    setAdditionalServiceSearch(event.target.value);
-                    setAdditionalServiceOpen(true);
-                  }}
-                  placeholder={
-                    selectedAdditionalService?.name ??
-                    "Ek hizmet ara veya listeden seç"
-                  }
-                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                />
-
-                {additionalServiceOpen && (
-                  <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-border bg-background p-2 shadow-lg">
-                    <button
-                      type="button"
-                      onClick={() => selectAdditionalService("")}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
-                    >
-                      Ek hizmet yok
-                    </button>
-
-                    {filteredAdditionalServiceOptions.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-muted-foreground">
-                        Aramana uygun hizmet bulunamadı.
-                      </div>
-                    ) : (
-                      filteredAdditionalServiceOptions.map((item) => (
-                        <button
-                          key={item.slug}
-                          type="button"
-                          onClick={() => selectAdditionalService(item.slug)}
-                          className={[
-                            "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted",
-                            form.additionalServices.includes(item.slug)
-                              ? "bg-primary/5 text-primary"
-                              : "",
-                          ].join(" ")}
-                        >
-                          <span>{item.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.categoryName}
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {selectedAdditionalService && (
-                <div className="mt-2 flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
-                  <div>
-                    <span className="font-medium">
-                      {selectedAdditionalService.name}
-                    </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {selectedAdditionalService.categoryName}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => selectAdditionalService("")}
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Kaldır
-                  </button>
-                </div>
-              )}
-
-              <p className="mt-2 text-xs text-muted-foreground">
-                Ana hizmet dışında tüm kategorilerden en fazla 1 ek hizmet
-                seçebilirsin. İkinci ek hizmet alanı ileride limit artırıldığında
-                açılacak.
-              </p>
             </div>
 
             <div>

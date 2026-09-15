@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Ban,
-  Search,
-  UserRound,
-} from "lucide-react";
+import { Search } from "lucide-react";
 
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -72,7 +68,11 @@ export default function AdminUsersPage() {
   }, []);
 
   useEffect(() => {
-    void loadUsers();
+    const timer = window.setTimeout(() => {
+      void loadUsers();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadUsers]);
 
   const filtered = useMemo(() => {
@@ -109,7 +109,11 @@ export default function AdminUsersPage() {
   );
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => {
+      setPage(1);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [query, roleFilter, sort]);
 async function updateStatus(user: AdminUser, isActive: boolean) {
     if (user.id === currentUser?.id && !isActive) {
@@ -182,7 +186,7 @@ async function updateStatus(user: AdminUser, isActive: boolean) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data?.message ?? "Kullanıcı silinemedi.");
+        setError(data?.detail ? `${data.message} ${data.detail}` : (data?.message ?? "Kullanıcı silinemedi."));
         return;
       }
 
@@ -208,8 +212,9 @@ async function updateStatus(user: AdminUser, isActive: boolean) {
                 Kullanıcılar
               </h1>
               <p className="mt-3 max-w-2xl text-muted-foreground">
-                Aktif kullanıcı, işletme sahibi ve admin hesaplarını yönet.
-                Pasife alınan hesaplar Pasifler bölümüne taşınır.
+                Normal kullanıcı ve admin hesaplarını yönet. İşletme sahibi
+                hesapları İşletmeler bölümünden yönetilir. Pasife alınan
+                hesaplar Pasifler bölümüne taşınır.
               </p>
             </div>
 
@@ -229,7 +234,6 @@ async function updateStatus(user: AdminUser, isActive: boolean) {
             {[
               ["all", "Tümü"],
               ["user", "Normal Kullanıcı"],
-              ["provider", "İşletme Sahibi"],
               ["admin", "Admin"],
             ].map(([value, label]) => (
               <button

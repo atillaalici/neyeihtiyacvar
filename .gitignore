@@ -116,3 +116,14 @@ backup-*/
 **/node_modules/
 **/dist/
 **/coverage/
+frontend/.env.local
+backend/NeyeIhtiyacVar.Api/secrets.production.env
+backend/NeyeIhtiyacVar.Api/appsettings.Production.local.json
+*.production.env
+
+# Local test / audit / deployment artifacts
+/_quarantine_*/
+/frontend/playwright-report/
+/frontend/test-results/
+/deploy/_publish-check/
+/backend/NeyeIhtiyacVar.Api/c

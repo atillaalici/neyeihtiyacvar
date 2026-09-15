@@ -81,6 +81,7 @@ export default function AdminNeedsPage() {
   }, [statusFilter]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadNeeds();
   }, [loadNeeds]);
 

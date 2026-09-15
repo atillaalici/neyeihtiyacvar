@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { apiBaseUrl } from "@/lib/api";
 
 type Service = {
   name: string;
@@ -17,6 +18,34 @@ type Category = {
   services: Service[];
 };
 
+
+type LiveCatalogCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  services: string[];
+};
+
+type PublicProvider = {
+  id: string;
+  slug: string;
+  businessName: string;
+  categorySlug: string;
+  serviceSlug: string;
+};
+
+function toServiceSlug(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ü", "u")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ç", "c")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 const categories: Record<string, Category> = {
   "usta-tamir": {
     title: "Usta & Tamir",
@@ -118,6 +147,53 @@ export default async function CategoryDetailPage({
   if (!category) {
     notFound();
   }
+  let liveServiceNames: string[] =
+    category.services.map((service) => service.name);
+
+  let providers: PublicProvider[] = [];
+
+  try {
+    const [categoryResponse, providerResponse] =
+      await Promise.all([
+        fetch(`${apiBaseUrl}/api/categories`, {
+          cache: "no-store",
+        }),
+        fetch(
+          `${apiBaseUrl}/api/providers?kategori=${encodeURIComponent(slug)}`,
+          {
+            cache: "no-store",
+          },
+        ),
+      ]);
+
+    if (categoryResponse.ok) {
+      const catalog =
+        (await categoryResponse.json()) as LiveCatalogCategory[];
+
+      const liveCategory =
+        catalog.find((item) => item.slug === slug) ?? null;
+
+      if (liveCategory?.services?.length) {
+        liveServiceNames = liveCategory.services;
+      }
+    }
+
+    if (providerResponse.ok) {
+      providers =
+        (await providerResponse.json()) as PublicProvider[];
+    }
+  } catch {
+    // Backend gecici olarak ulasilamazsa mevcut statik hizmet adlari kullanilir.
+  }
+
+  const providerCountByService = new Map<string, number>();
+
+  for (const provider of providers) {
+    providerCountByService.set(
+      provider.serviceSlug,
+      (providerCountByService.get(provider.serviceSlug) ?? 0) + 1,
+    );
+  }
 
   return (
     <SiteLayout>
@@ -172,25 +248,41 @@ export default async function CategoryDetailPage({
               Hizmeti seç; ilgili işletmeleri Keşfet ekranında listeleyelim.
             </p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {category.services.map((service) => (
-                <Link
-                  key={service.slug}
-                  href={`/kesfet?hizmet=${service.slug}`}
-                  className="group flex min-h-24 items-center justify-between rounded-2xl border border-orange-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
-                >
-                  <div>
-                    <p className="font-bold text-slate-900">{service.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Uygun işletmeleri gör
-                    </p>
-                  </div>
+            <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+{liveServiceNames.map((serviceName) => {
+  const serviceSlug = toServiceSlug(serviceName);
+  const providerCount =
+    providerCountByService.get(serviceSlug) ?? 0;
 
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600 transition group-hover:bg-orange-100">
-                    <ArrowRight className="h-4 w-4" />
-                  </span>
-                </Link>
-              ))}
+  return (
+    <Link
+      key={serviceName}
+      href={`/kesfet?kategori=${encodeURIComponent(slug)}&hizmet=${encodeURIComponent(serviceSlug)}`}
+      className="group flex min-h-24 items-center justify-between rounded-2xl border border-border bg-card px-4 py-4 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
+    >
+      <div className="min-w-0">
+        <h3 className="font-semibold text-foreground">
+          {serviceName}
+        </h3>
+
+        <p className="mt-1 text-xs font-semibold text-primary">
+          {providerCount} uygun işletme
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Uygun işletmeleri gör
+        </p>
+      </div>
+
+      <span
+        className="ml-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground"
+        aria-hidden="true"
+      >
+        <ArrowRight className="h-4 w-4" />
+      </span>
+    </Link>
+  );
+})}
             </div>
           </section>
         ) : (

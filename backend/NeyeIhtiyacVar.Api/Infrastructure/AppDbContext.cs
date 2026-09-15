@@ -18,6 +18,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Provider> Providers => Set<Provider>();
 
+    public DbSet<ProviderMembership> ProviderMemberships => Set<ProviderMembership>();
+
+    public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
+
+    public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
+
+    public DbSet<PromotionCode> PromotionCodes => Set<PromotionCode>();
+
+    public DbSet<PromotionOrganization> PromotionOrganizations => Set<PromotionOrganization>();
+
+    public DbSet<PromotionCampaign> PromotionCampaigns => Set<PromotionCampaign>();
+
+    public DbSet<PromotionUsage> PromotionUsages => Set<PromotionUsage>();
+
     public DbSet<ProviderApplication> ProviderApplications => Set<ProviderApplication>();
 
     public DbSet<AppUser> Users => Set<AppUser>();
@@ -177,8 +191,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasForeignKey<Provider>(x => x.OwnerUserId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
-
-        modelBuilder.Entity<ProviderApplication>(entity =>
+modelBuilder.Entity<ProviderApplication>(entity =>
         {
             entity.HasIndex(x => x.Status);
 entity.HasIndex(x => x.CreatedAtUtc);
@@ -295,6 +308,212 @@ entity.HasIndex(x => x.CreatedAtUtc);
         });
 
 
+
+        modelBuilder.Entity<PromotionOrganization>(entity =>
+        {
+            entity.HasIndex(x => x.Name);
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.Type)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.ContactName)
+                .HasMaxLength(150);
+
+            entity.Property(x => x.ContactPhone)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.ContactEmail)
+                .HasMaxLength(254);
+
+            entity.Property(x => x.Notes)
+                .HasMaxLength(2000);
+        });
+
+        modelBuilder.Entity<PromotionCampaign>(entity =>
+        {
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => new { x.IsActive, x.ExpiresAtUtc });
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(250)
+                .IsRequired();
+
+            entity.Property(x => x.CodePrefix)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(x => x.DiscountType)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.DiscountValue)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.PlanCode)
+                .HasMaxLength(50);
+
+            entity.HasOne<PromotionOrganization>()
+                .WithMany()
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PromotionCode>(entity =>
+        {
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => x.CampaignId);
+            entity.HasIndex(x => x.UsedByUserId);
+            entity.HasIndex(x => new { x.IsActive, x.ExpiresAtUtc });
+            entity.HasIndex(x => new { x.CampaignId, x.UsedCount });
+
+            entity.Property(x => x.Code)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(500);
+
+            entity.Property(x => x.DiscountType)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.DiscountValue)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.PlanCode)
+                .HasMaxLength(50);
+
+            entity.HasOne<PromotionCampaign>()
+                .WithMany()
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<AppUser>()
+                .WithMany()
+                .HasForeignKey(x => x.UsedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<PromotionUsage>(entity =>
+        {
+            entity.HasIndex(x => x.PromotionCodeId).IsUnique();
+            entity.HasIndex(x => x.CampaignId);
+            entity.HasIndex(x => x.OrganizationId);
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.UsedAtUtc);
+            entity.HasIndex(x => x.PaymentStatus);
+
+            entity.Property(x => x.UserDisplayName)
+                .HasMaxLength(150);
+
+            entity.Property(x => x.UserEmail)
+                .HasMaxLength(254);
+
+            entity.Property(x => x.PlanCode)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.OriginalPrice)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.DiscountAmount)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.FinalPrice)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.PaymentStatus)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.HasOne<PromotionCode>()
+                .WithMany()
+                .HasForeignKey(x => x.PromotionCodeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne<PromotionCampaign>()
+                .WithMany()
+                .HasForeignKey(x => x.CampaignId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne<PromotionOrganization>()
+                .WithMany()
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne<AppUser>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        modelBuilder.Entity<MembershipPlan>(entity =>
+        {
+            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => new { x.IsActive, x.SortOrder });
+
+            entity.Property(x => x.Code)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.Name)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Description)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(x => x.AnnualPrice)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.ServiceLimit)
+                .IsRequired();
+        });
+
+        modelBuilder.Entity<ProviderMembership>(entity =>
+        {
+            entity.HasIndex(x => x.IsActive);
+
+            entity.HasIndex(x => x.ProviderId)
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+
+            entity.HasIndex(x => x.UserId)
+                .IsUnique()
+                .HasFilter("\"IsActive\" = TRUE");
+
+            entity.HasIndex(x => new
+            {
+                x.ProviderId,
+                x.UserId
+            }).IsUnique();
+
+            entity.Property(x => x.AnnualPriceSnapshot)
+                .HasPrecision(12, 2);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Plan)
+                .WithMany(x => x.Memberships)
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
         modelBuilder.Entity<AccountVerificationCode>(entity =>
         {
             entity.HasIndex(x => new

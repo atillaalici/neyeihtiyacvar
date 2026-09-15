@@ -32,24 +32,51 @@ public static class ProviderEndpoints
                 query = query.Where(x => x.DistrictSlug == ilce.Trim());
             }
 
-            if (!string.IsNullOrWhiteSpace(kategori))
+            if (!string.IsNullOrWhiteSpace(hizmet))
+            {
+                var service = hizmet.Trim();
+
+                query = query.Where(x =>
+                    x.ServiceSlug == service ||
+                    x.AdditionalServices.Contains(service));
+            }
+            else if (!string.IsNullOrWhiteSpace(kategori))
             {
                 query = query.Where(x => x.CategorySlug == kategori.Trim());
             }
 
-            if (!string.IsNullOrWhiteSpace(hizmet))
-            {
-                query = query.Where(x => x.ServiceSlug == hizmet.Trim());
-            }
-
             if (!string.IsNullOrWhiteSpace(q))
             {
-                var search = $"%{q.Trim()}%";
+                var cleanQuery = q.Trim();
+                var search = $"%{cleanQuery}%";
+
+                var detectedServiceSlugs =
+                    SearchIntentResolver.ResolveServiceSlugs(
+                        cleanQuery)
+                    .ToArray();
 
                 query = query.Where(x =>
-                    EF.Functions.ILike(x.BusinessName, search) ||
-                    EF.Functions.ILike(x.ShortDescription, search) ||
-                    (x.Description != null && EF.Functions.ILike(x.Description, search)));
+                    EF.Functions.ILike(
+                        x.BusinessName,
+                        search) ||
+                    EF.Functions.ILike(
+                        x.ShortDescription,
+                        search) ||
+                    (x.Description != null &&
+                     EF.Functions.ILike(
+                         x.Description,
+                         search)) ||
+                    EF.Functions.ILike(
+                        x.CategorySlug,
+                        search) ||
+                    EF.Functions.ILike(
+                        x.ServiceSlug,
+                        search) ||
+                    (
+                        detectedServiceSlugs.Length > 0 &&
+                        detectedServiceSlugs.Contains(
+                            x.ServiceSlug)
+                    ));
             }
 
             var providers = await query

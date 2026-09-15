@@ -442,7 +442,7 @@ export default function AdminNeedDetailPage() {
 
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 Talebin iş akışına müdahale etmeden görünürlüğünü yönet.
-                Aktif/pasif işlemleri İşlem Geçmişi'ne kaydedilir.
+                Aktif/pasif işlemleri İşlem Geçmişi&apos;ne kaydedilir.
               </p>
 
               {actionMessage && (

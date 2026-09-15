@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BadgeCheck,
   BriefcaseBusiness,
@@ -18,6 +18,7 @@ import { useParams, useRouter } from "next/navigation";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken, getStoredUser } from "@/lib/auth";
+import { trackPlatformAnalytics } from "@/lib/platform-analytics";
 import {
   phoneHref,
   type ProviderDetail,
@@ -87,6 +88,7 @@ export default function ProviderDetailPage() {
   const [sendingNeed, setSendingNeed] = useState(false);
   const [needError, setNeedError] = useState("");
   const [needSuccess, setNeedSuccess] = useState("");
+  const profileViewTrackedRef = useRef(false);
 
   useEffect(() => {
     if (!slug) {
@@ -143,6 +145,15 @@ export default function ProviderDetailPage() {
           setProvider(providerData);
           setImageFailed(false);
           setReviewSummary(reviewData);
+
+          if (!profileViewTrackedRef.current) {
+            profileViewTrackedRef.current = true;
+            trackPlatformAnalytics({
+              eventType: "provider_view",
+              providerSlug: slug,
+              source: "profile",
+            });
+          }
         }
       } catch {
         if (active) {
@@ -177,6 +188,12 @@ export default function ProviderDetailPage() {
       setShowVerificationPrompt(true);
       return;
     }
+
+    trackPlatformAnalytics({
+      eventType: href.startsWith("tel:") ? "phone_click" : "whatsapp_click",
+      providerSlug: slug,
+      source: "profile",
+    });
 
     window.location.href = href;
   }
@@ -731,80 +748,85 @@ export default function ProviderDetailPage() {
       )}
 
       {showNeedModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 p-4 backdrop-blur-[1px]">
-          <div className="mx-auto my-6 w-full max-w-5xl rounded-3xl border border-border bg-card shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5 sm:px-8">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/45 p-3 backdrop-blur-[1px] sm:p-4">
+          <div className="mx-auto my-4 w-full max-w-6xl overflow-hidden rounded-3xl border border-border bg-card shadow-2xl sm:my-6">
+            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-5 sm:px-8 sm:py-6">
               <div>
                 <h2 className="font-display text-2xl font-bold sm:text-3xl">
-                  {provider!.businessName}&apos;e İhtiyacını İlet
+                  {provider!.businessName}&apos;a İhtiyacını İlet
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
                   İhtiyacını bu işletmeye ilet. İşletme talebini aldıktan sonra
-                  seçtiğin iletişim kanalları üzerinden seninle iletişime geçebilir.
+                  seninle seçtiğin iletişim kanalları üzerinden iletişime geçebilir.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowNeedModal(false)}
-                className="grid size-10 shrink-0 place-items-center rounded-full border border-border text-lg hover:bg-accent"
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-background text-xl transition hover:bg-accent"
                 aria-label="Pencereyi kapat"
               >
                 ×
               </button>
             </div>
 
-            <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.75fr)]">
+            <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.75fr)]">
               <div className="space-y-5">
-                <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4">
-                  <div className="font-semibold">
-                    {new URLSearchParams(window.location.search).get("needId")
-                      ? "Mevcut talebin hazır"
-                      : "İhtiyacını işletmeye ilet"}
+                <div className="rounded-2xl border border-orange-200 bg-orange-50/70 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <Send
+                      className="mt-0.5 size-6 shrink-0 text-orange-600"
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <div className="font-semibold">
+                        {new URLSearchParams(window.location.search).get("needId")
+                          ? "Mevcut talebin hazır"
+                          : "İhtiyacını işletmeye ilet"}
+                      </div>
+
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        {new URLSearchParams(window.location.search).get("needId")
+                          ? "Daha önce oluşturduğun takip talebi bu işletmeye yönlendirilecek. Yeni bir genel talep oluşturulmayacak."
+                          : "Açıklaman doğrudan bu işletmeye gönderilecek."}
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {new URLSearchParams(window.location.search).get("needId")
-                      ? "Daha önce oluşturduğun takip talebi bu işletmeye yönlendirilecek. Yeni bir genel talep oluşturulmayacak."
-                      : "Açıklaman doğrudan bu işletmeye gönderilecek."}
-                  </p>
                 </div>
 
-                <div className="rounded-2xl border border-border p-5">
-                  <h3 className="font-semibold">Talep bilgileri</h3>
+                <div className="rounded-2xl border border-border p-5 sm:p-6">
+                  <h3 className="font-display text-lg font-semibold">Talep bilgileri</h3>
 
-                  <label className="mt-4 block">
-                    <span className="mb-2 block text-sm font-medium">
-                      İhtiyacın
-                    </span>
+                  <label className="mt-5 block">
+                    <span className="mb-2 block text-sm font-medium">İhtiyacın</span>
+
                     <textarea
                       value={needText}
-                      onChange={(event) =>
-                        setNeedText(event.target.value)
-                      }
+                      onChange={(event) => setNeedText(event.target.value)}
                       rows={5}
                       maxLength={2000}
-                      placeholder="İhtiyacını ve işletmenin bilmesi gereken detayları yaz..."
-                      className="w-full resize-y rounded-xl border border-input bg-background px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      placeholder="İhtiyacını kısaca anlat..."
+                      className="w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
                     />
+
                     <div className="mt-1 text-right text-xs text-muted-foreground">
                       {needText.length}/2000
                     </div>
                   </label>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <div className="text-xs text-muted-foreground">
-                        Konum
-                      </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <div className="text-xs text-muted-foreground">Konum</div>
                       <div className="mt-1 font-semibold">
                         {provider!.citySlug} / {provider!.districtSlug}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
-                      <div className="text-xs text-muted-foreground">
-                        Hizmet
-                      </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-4">
+                      <div className="text-xs text-muted-foreground">Hizmet</div>
                       <div className="mt-1 font-semibold">
                         {new URLSearchParams(window.location.search).get("q")
                           ? "Mevcut ihtiyacın"
@@ -814,56 +836,71 @@ export default function ProviderDetailPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-border p-5">
-                  <h3 className="font-semibold">
+                <div className="rounded-2xl border border-border p-5 sm:p-6">
+                  <h3 className="font-display text-lg font-semibold">
                     İşletme seninle nasıl iletişime geçsin?
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Telefon zorunlu ve varsayılan iletişim kanalıdır.
-                    İstersen başka kanallar da ekleyebilirsin.
+
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Telefon zorunlu ve varsayılan iletişim kanalıdır. İstersen
+                    başka kanalları da ekleyebilirsin.
                   </p>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="flex items-center justify-between rounded-xl border border-primary/40 bg-primary/5 p-4">
-                      <div>
-                        <div className="font-semibold">Telefon</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Arama yoluyla
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-orange-200 bg-orange-50/40 p-4 transition hover:bg-orange-50">
+                      <div className="flex items-center gap-3">
+                        <Phone className="size-5 text-orange-600" aria-hidden="true" />
+
+                        <div>
+                          <div className="font-semibold">Telefon</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Arama yoluyla
+                          </div>
                         </div>
                       </div>
+
                       <input
                         type="checkbox"
                         checked
                         readOnly
-                        className="size-5 accent-primary"
-                        aria-label="Telefon seçili"
+                        className="size-5 accent-orange-600"
+                        aria-label="Telefon zorunlu"
                       />
-                    </div>
+                    </label>
 
-                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
-                      <div>
-                        <div className="font-semibold">WhatsApp</div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Mesaj yoluyla
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 transition hover:bg-accent/40">
+                      <div className="flex items-center gap-3">
+                        <MessageCircle
+                          className="size-5 text-green-600"
+                          aria-hidden="true"
+                        />
+
+                        <div>
+                          <div className="font-semibold">WhatsApp</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Mesaj yoluyla
+                          </div>
                         </div>
                       </div>
+
                       <input
                         type="checkbox"
                         checked={contactByWhatsapp}
                         onChange={(event) =>
                           setContactByWhatsapp(event.target.checked)
                         }
-                        className="size-5 accent-primary"
+                        className="size-5 accent-green-600"
                       />
                     </label>
 
-                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 transition hover:bg-accent/40">
                       <div>
                         <div className="font-semibold">E-posta</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           E-posta yoluyla
                         </div>
                       </div>
+
                       <input
                         type="checkbox"
                         checked={contactByEmail}
@@ -874,15 +911,14 @@ export default function ProviderDetailPage() {
                       />
                     </label>
 
-                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 hover:bg-accent/40">
+                    <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border p-4 transition hover:bg-accent/40">
                       <div>
-                        <div className="font-semibold">
-                          Uygulama içi bildirim
-                        </div>
+                        <div className="font-semibold">Uygulama içi bildirim</div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           Platform üzerinden
                         </div>
                       </div>
+
                       <input
                         type="checkbox"
                         checked={contactByPush}
@@ -895,8 +931,8 @@ export default function ProviderDetailPage() {
                   </div>
 
                   <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-800">
-                    İletişim bilgilerin yalnızca seçtiğin kanallar üzerinden
-                    bu işletmeyle paylaşılır.
+                    İletişim bilgilerin yalnızca seçtiğin kanallar üzerinden bu
+                    işletmeyle paylaşılır.
                   </div>
                 </div>
 
@@ -907,60 +943,156 @@ export default function ProviderDetailPage() {
                 )}
               </div>
 
-              <aside className="h-fit rounded-2xl border border-border bg-muted/20 p-5">
-                <div className="text-xl font-bold">
-                  {provider!.businessName}
-                </div>
+              <aside className="h-fit rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6">
+                <div>
+                  <h3 className="font-display text-xl font-bold">
+                    {provider!.businessName}
+                  </h3>
 
-                {provider!.isVerifiedBusiness && (
-                  <div className="mt-2 inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+                  <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                    <ShieldCheck className="size-4" aria-hidden="true" />
                     Doğrulanmış İşletme
                   </div>
-                )}
+                </div>
 
                 <div className="mt-5 space-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Konum:</span>{" "}
-                    <strong>
-                      {provider!.citySlug} / {provider!.districtSlug}
-                    </strong>
+                  <div className="flex items-start gap-3">
+                    <MapPin
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <span className="text-muted-foreground">Konum:</span>{" "}
+                      <strong>
+                        {provider!.citySlug} / {provider!.districtSlug}
+                      </strong>
+                    </div>
                   </div>
 
-                  <div>
-                    <span className="text-muted-foreground">Ana hizmet:</span>{" "}
-                    <strong>{provider!.serviceSlug}</strong>
+                  <div className="flex items-start gap-3">
+                    <Wrench
+                      className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <span className="text-muted-foreground">Ana hizmet:</span>{" "}
+                      <strong>{provider!.serviceSlug}</strong>
+                    </div>
                   </div>
 
                   {provider!.publicPhone && (
-                    <div>
-                      <span className="text-muted-foreground">Telefon:</span>{" "}
-                      {provider!.publicPhone}
+                    <div className="flex items-start gap-3">
+                      <Phone
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+
+                      <div>
+                        <span className="text-muted-foreground">Telefon:</span>{" "}
+                        {provider!.publicPhone}
+                      </div>
                     </div>
                   )}
 
                   {provider!.publicWhatsapp && (
-                    <div>
-                      <span className="text-muted-foreground">WhatsApp:</span>{" "}
-                      {provider!.publicWhatsapp}
+                    <div className="flex items-start gap-3">
+                      <MessageCircle
+                        className="mt-0.5 size-4 shrink-0 text-green-600"
+                        aria-hidden="true"
+                      />
+
+                      <div>
+                        <span className="text-muted-foreground">WhatsApp:</span>{" "}
+                        {provider!.publicWhatsapp}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4 text-sm leading-6 text-green-800">
-                  <strong>Güvenle iletişim kur</strong>
-                  <div className="mt-1">
-                    Talebin yalnızca bu işletmeye iletilir. Seçmediğin ek
-                    iletişim kanalları paylaşılmaz.
+                {(phone || whatsapp) && (
+                  <div className="mt-6 rounded-2xl border border-green-200 bg-green-50/70 p-4">
+                    <div className="font-display text-lg font-bold text-green-900">
+                      Hemen iletişime geç
+                    </div>
+
+                    <p className="mt-1 text-sm leading-6 text-green-900/80">
+                      Talep oluşturmadan önce de işletmeyi doğrudan arayabilir veya
+                      WhatsApp&apos;tan yazabilirsin.
+                    </p>
+
+                    <div className="mt-4 grid gap-3">
+                      {phone && (
+                        <button
+                          type="button"
+                          onClick={() => requestContact(phone)}
+                          className="inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-orange-600 px-5 py-3 text-left text-white shadow-sm transition hover:bg-orange-700"
+                        >
+                          <Phone className="size-6 shrink-0" aria-hidden="true" />
+
+                          <span>
+                            <span className="block text-lg font-bold">Hemen Ara</span>
+                            {provider!.publicPhone && (
+                              <span className="block text-xs text-white/85">
+                                {provider!.publicPhone}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      )}
+
+                      {whatsapp && (
+                        <button
+                          type="button"
+                          onClick={() => requestContact(whatsapp)}
+                          className="inline-flex min-h-16 w-full items-center justify-center gap-3 rounded-xl bg-green-600 px-5 py-3 text-left text-white shadow-sm transition hover:bg-green-700"
+                        >
+                          <MessageCircle
+                            className="size-6 shrink-0"
+                            aria-hidden="true"
+                          />
+
+                          <span>
+                            <span className="block text-lg font-bold">
+                              WhatsApp&apos;tan Yaz
+                            </span>
+                            {provider!.publicWhatsapp && (
+                              <span className="block text-xs text-white/85">
+                                {provider!.publicWhatsapp}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <ShieldCheck className="size-4" aria-hidden="true" />
+                    Güvenle iletişim kur
+                  </div>
+
+                  <p className="mt-1">
+                    Talebin yalnızca bu işletmeye iletilir. Seçmediğin ek iletişim
+                    kanalları paylaşılmaz.
+                  </p>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm leading-6 text-orange-900">
+                  <strong>İpucu:</strong> Acil ihtiyaçlarda doğrudan telefon ile
+                  aramak en hızlı sonucu verir.
                 </div>
               </aside>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-border px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div className="flex flex-col-reverse gap-3 border-t border-border px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
               <button
                 type="button"
                 onClick={() => setShowNeedModal(false)}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-input bg-background px-6 text-sm font-semibold hover:bg-accent"
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-input bg-background px-6 text-sm font-semibold transition hover:bg-accent"
               >
                 İptal
               </button>
@@ -969,8 +1101,9 @@ export default function ProviderDetailPage() {
                 type="button"
                 onClick={() => void submitNeed()}
                 disabled={sendingNeed || needText.trim().length < 3}
-                className="inline-flex h-12 items-center justify-center rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-orange-600 px-8 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
+                <Send className="size-4" aria-hidden="true" />
                 {sendingNeed ? "İletiliyor..." : "İhtiyacımı İlet"}
               </button>
             </div>

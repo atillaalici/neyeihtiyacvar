@@ -1,0 +1,21 @@
+[Unit]
+Description=Neye Ihtiyac Var ASP.NET Core API
+After=network.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=neyeihtiyacvar
+Group=www-data
+WorkingDirectory=/var/www/neyeihtiyacvar/backend
+EnvironmentFile=/etc/neyeihtiyacvar/backend.env
+ExecStart=/usr/bin/dotnet /var/www/neyeihtiyacvar/backend/NeyeIhtiyacVar.Api.dll
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+SyslogIdentifier=neyeihtiyacvar-api
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

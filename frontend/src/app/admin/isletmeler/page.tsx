@@ -219,7 +219,7 @@ export default function AdminProvidersPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data?.message ?? "İşletme silinemedi.");
+        setError(data?.detail ? `${data.message} ${data.detail}` : (data?.message ?? "İşletme silinemedi."));
         return;
       }
 

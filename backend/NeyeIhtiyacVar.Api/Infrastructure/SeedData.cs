@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 
@@ -70,6 +70,73 @@ public static class SeedData
             dbContext.Cities.AddRange(cities);
         }
 
+
+        if (!await dbContext.MembershipPlans.AnyAsync())
+        {
+            var now = DateTime.UtcNow;
+
+            dbContext.MembershipPlans.AddRange(
+                new MembershipPlan
+                {
+                    Code = "kobi",
+                    Name = "KOBİ",
+                    Description = "Esnaf, usta ve küçük işletmeler için ideal başlangıç paketi.",
+                    AnnualPrice = 1200m,
+                    ServiceLimit = 2,
+                    IsRecommended = false,
+                    SortOrder = 1,
+                    MapVisibility = true,
+                    PhotoEnabled = true,
+                    VideoEnabled = false,
+                    FeaturedBadgeEnabled = false,
+                    SearchPriorityEnabled = false,
+                    AdvancedStatisticsEnabled = false,
+                    CatalogCampaignEnabled = false,
+                    PrioritySupportEnabled = false,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                },
+                new MembershipPlan
+                {
+                    Code = "avantaj",
+                    Name = "Avantaj",
+                    Description = "Daha fazla hizmet alanında görünmek isteyen işletmeler için önerilen paket.",
+                    AnnualPrice = 2400m,
+                    ServiceLimit = 5,
+                    IsRecommended = true,
+                    SortOrder = 2,
+                    MapVisibility = true,
+                    PhotoEnabled = true,
+                    VideoEnabled = true,
+                    FeaturedBadgeEnabled = true,
+                    SearchPriorityEnabled = true,
+                    AdvancedStatisticsEnabled = false,
+                    CatalogCampaignEnabled = false,
+                    PrioritySupportEnabled = true,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                },
+                new MembershipPlan
+                {
+                    Code = "profesyonel",
+                    Name = "Profesyonel",
+                    Description = "Geniş hizmet ağı bulunan işletmeler ve ekipler için gelişmiş paket.",
+                    AnnualPrice = 5000m,
+                    ServiceLimit = 12,
+                    IsRecommended = false,
+                    SortOrder = 3,
+                    MapVisibility = true,
+                    PhotoEnabled = true,
+                    VideoEnabled = true,
+                    FeaturedBadgeEnabled = true,
+                    SearchPriorityEnabled = true,
+                    AdvancedStatisticsEnabled = true,
+                    CatalogCampaignEnabled = true,
+                    PrioritySupportEnabled = true,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+        }
         await dbContext.SaveChangesAsync();
     }
 

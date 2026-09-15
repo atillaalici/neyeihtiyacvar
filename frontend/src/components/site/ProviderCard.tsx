@@ -10,6 +10,7 @@ import {
 
 import { ProviderCardMedia } from "@/components/site/ProviderCardMedia";
 import { getAccessToken } from "@/lib/auth";
+import { trackPlatformAnalytics } from "@/lib/platform-analytics";
 import {
   phoneHref,
   type ProviderSummary,
@@ -89,6 +90,13 @@ export function ProviderCard({
               getAccessToken() ? (
                 <a
                   href={phone}
+                  onClick={() =>
+                    trackPlatformAnalytics({
+                      eventType: "phone_click",
+                      providerSlug: provider.slug,
+                      source: "search_results",
+                    })
+                  }
                   className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-semibold transition hover:bg-accent"
                 >
                   <Phone
@@ -121,6 +129,13 @@ export function ProviderCard({
                 {getAccessToken() ? (
                   <a
                     href={whatsapp}
+                    onClick={() =>
+                      trackPlatformAnalytics({
+                        eventType: "whatsapp_click",
+                        providerSlug: provider.slug,
+                        source: "search_results",
+                      })
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-semibold transition hover:border-green-300 hover:bg-green-50"

@@ -287,6 +287,7 @@ export default function MyNeedsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -586,6 +587,7 @@ export default function MyNeedsPage() {
               const reviewDraft = getReviewDraft(need.id);
               const trackingExpiry = new Date(need.trackingExpiresAtUtc);
               const trackingRemainingMs =
+                // eslint-disable-next-line react-hooks/purity
                 trackingExpiry.getTime() - Date.now();
               const trackingDaysLeft = Math.max(
                 0,

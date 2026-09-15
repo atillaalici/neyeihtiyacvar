@@ -91,6 +91,7 @@ if (string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
 
 builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddHttpClient<SmartSearchService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -118,6 +119,8 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(UserRole.Admin.ToString());
     });
 });
+
+builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, NeyeIhtiyacVar.Api.Infrastructure.Security.AdminAccessClaimsTransformation>();
 
 var app = builder.Build();
 
@@ -156,6 +159,7 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await SeedData.InitializeAsync(dbContext);
+    await ExpandedCatalogSeeder.EnsureAsync(dbContext);
 }
 
 app.MapGet("/", () => Results.Ok(new
@@ -172,10 +176,17 @@ app.MapLocationEndpoints();
 app.MapProviderEndpoints();
 app.MapFeaturedProviderEndpoints();
 app.MapRecommendationEndpoints();
+app.MapSmartSearchEndpoints();
+app.MapSearchIntentLibraryEndpoints();
+app.MapTaxonomyV3Endpoints();
 app.MapProviderApplicationEndpoints();
 app.MapBusinessRegistrationEndpoints();
 app.MapAuthEndpoints();
 app.MapProviderPanelEndpoints();
+app.MapAnalyticsEndpoints();
+app.MapMembershipPlanEndpoints();
+app.MapMembershipSelectionEndpoints();
+app.MapPromotionEndpoints();
 app.MapProviderImageEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
@@ -190,6 +201,7 @@ if (app.Environment.IsDevelopment())
     app.MapAdminNeedEndpoints();
     app.MapAdminDashboardEndpoints();
     app.MapAdminUserEndpoints();
+app.MapAdminRoleManagementEndpoints();
     app.MapDevelopmentAdminEndpoints();
 }
 else
@@ -200,4 +212,5 @@ else
     app.MapAdminUserEndpoints();
 }
 
+app.MapAdminAnalyticsEndpoints();
 app.Run();

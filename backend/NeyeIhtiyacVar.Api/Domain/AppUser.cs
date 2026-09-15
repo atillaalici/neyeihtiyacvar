@@ -26,6 +26,8 @@ public sealed class AppUser
 
     public UserRole Role { get; set; } = UserRole.User;
 
+    public bool IsAdmin { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

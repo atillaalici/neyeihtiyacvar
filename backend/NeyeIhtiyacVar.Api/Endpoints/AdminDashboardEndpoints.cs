@@ -30,15 +30,24 @@ public static class AdminDashboardEndpoints
                 await dbContext.ProviderApplications.CountAsync(
                     x => x.Status == ProviderApplicationStatus.Approved);
 
-            var totalUsers = await dbContext.Users.CountAsync();
-            var activeUsers = await dbContext.Users.CountAsync(
-                x => x.IsActive);
+            // Kullanıcılar ekranıyla aynı kapsam:
+            // İşletme sahibi (Provider) hesapları burada kullanıcı sayısına dahil edilmez.
+            var totalUsers = await dbContext.Users.CountAsync(
+                x => x.Role != UserRole.Provider);
 
-            var totalProviders = await dbContext.Providers.CountAsync();
+            var activeUsers = await dbContext.Users.CountAsync(
+                x => x.Role != UserRole.Provider && x.IsActive);
+
+            // İşletmeler ekranıyla aynı kapsam:
+            // Pasif işletmeler "Pasifler" bölümünde yönetildiği için ana toplamda sayılmaz.
+            var totalProviders = await dbContext.Providers.CountAsync(
+                x => x.IsActive);
 
             var publishedProviders =
                 await dbContext.Providers.CountAsync(
-                    x => x.PublicationStatus == PublicationStatus.Published);
+                    x =>
+                        x.IsActive &&
+                        x.PublicationStatus == PublicationStatus.Published);
 
             var totalOffers = await dbContext.ProviderOffers.CountAsync();
             var pendingOffers = await dbContext.ProviderOffers.CountAsync(

@@ -1,3 +1,8 @@
+const configuredApiBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "");
+
 export const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
-  "http://localhost:5155";
+  configuredApiBaseUrl ??
+  (process.env.NODE_ENV === "production"
+    ? ""
+    : "http://localhost:5155");
