@@ -255,6 +255,87 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.ToTable("Categories");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryLibraryPhrase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryLibraryWorkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("NormalizedPhrase")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Phrase")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedPhrase");
+
+                    b.HasIndex("CategoryLibraryWorkId", "NormalizedPhrase")
+                        .IsUnique();
+
+                    b.ToTable("CategoryLibraryPhrases");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryServiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryServiceId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("CategoryLibraryWorks");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryService", b =>
                 {
                     b.Property<Guid>("Id")
@@ -872,6 +953,12 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<bool>("NotifyByEmail")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1001,6 +1088,12 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision");
+
                     b.Property<string>("Note")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1009,6 +1102,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<string>("PublicAddress")
+                        .HasColumnType("text");
 
                     b.Property<string>("ReviewNote")
                         .HasMaxLength(2000)
@@ -1197,6 +1293,54 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.ToTable("ProviderReviews");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.UnmatchedNeedSearch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("FirstSearchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastSearchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NormalizedQuery")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedCategoryLibraryPhraseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SearchCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("pending");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedQuery")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "LastSearchedAtUtc");
+
+                    b.ToTable("UnmatchedNeedSearches");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.AccountVerificationCode", b =>
                 {
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "User")
@@ -1215,6 +1359,28 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasForeignKey("ProviderId");
 
                     b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryLibraryPhrase", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", "Work")
+                        .WithMany("Phrases")
+                        .HasForeignKey("CategoryLibraryWorkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Work");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.CategoryService", "CategoryService")
+                        .WithMany()
+                        .HasForeignKey("CategoryServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CategoryService");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryService", b =>
@@ -1398,6 +1564,11 @@ namespace NeyeIhtiyacVar.Api.Migrations
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.Category", b =>
                 {
                     b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", b =>
+                {
+                    b.Navigation("Phrases");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.City", b =>

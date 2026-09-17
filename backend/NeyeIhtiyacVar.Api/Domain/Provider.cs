@@ -1,4 +1,4 @@
-namespace NeyeIhtiyacVar.Api.Domain;
+﻿namespace NeyeIhtiyacVar.Api.Domain;
 
 public sealed class Provider
 {
@@ -33,6 +33,10 @@ public sealed class Provider
     public string? PublicWhatsapp { get; set; }
 
     public string? PublicAddress { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
 
     public string? WorkingHours { get; set; }
 

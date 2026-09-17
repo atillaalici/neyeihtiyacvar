@@ -5,46 +5,24 @@ import { ArrowRight, Search } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 
 const categories = [
-  {
-    title: "Usta & Tamir",
-    image: "/vitrin/usta-tamir.png",
-    href: "/kategoriler/usta-tamir",
-  },
-  {
-    title: "Ev & Yaşam",
-    image: "/vitrin/ev-yasam.png",
-    href: "/kategoriler/ev-yasam",
-  },
-  {
-    title: "Nakliye & Taşıma",
-    image: "/vitrin/nakliye-tasima.png",
-    href: "/kategoriler/nakliye-tasima",
-  },
-  {
-    title: "Teknoloji",
-    image: "/vitrin/teknoloji.png",
-    href: "/kategoriler/teknoloji",
-  },
-  {
-    title: "Otomotiv",
-    image: "/vitrin/otomotiv.png",
-    href: "/kategoriler/otomotiv",
-  },
-  {
-    title: "Eğitim",
-    image: "/vitrin/egitim.png",
-    href: "/kategoriler/egitim",
-  },
-  {
-    title: "Organizasyon",
-    image: "/vitrin/organizasyon.png",
-    href: "/kategoriler/organizasyon",
-  },
-  {
-    title: "Diğer",
-    image: "/vitrin/diger.png",
-    href: "/kategoriler/diger",
-  },
+  { title: "Usta & Tamir", image: "/vitrin/usta-tamir.png", href: "/kategoriler/usta-tamir" },
+  { title: "Ev & Yaşam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
+  { title: "Nakliye & Hafriyat", image: "/vitrin/nakliye-tasima.png", href: "/kategoriler/nakliye-tasima" },
+  { title: "Teknoloji & Yazılım", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji-yazilim" },
+  { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
+  { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
+  { title: "Organizasyon", image: "/vitrin/organizasyon.png", href: "/kategoriler/organizasyon" },
+  { title: "Sağlık & Bakım", image: "/vitrin/saglik-bakim.png", href: "/kategoriler/saglik-bakim" },
+  { title: "Güzellik & Kişisel Bakım", image: "/vitrin/guzellik-kisisel-bakim.png", href: "/kategoriler/guzellik-kisisel-bakim" },
+  { title: "Yeme & İçme", image: "/vitrin/yeme-icme.png", href: "/kategoriler/yeme-icme" },
+  { title: "Alışveriş & Mağazalar", image: "/vitrin/alisveris-magazalar.png", href: "/kategoriler/alisveris-magazalar" },
+  { title: "Emlak", image: "/vitrin/emlak.png", href: "/kategoriler/emlak" },
+  { title: "İnşaat & Yapı", image: "/vitrin/insaat-yapi.png", href: "/kategoriler/insaat-yapi" },
+  { title: "Tarım & Hayvancılık", image: "/vitrin/tarim-hayvancilik.png", href: "/kategoriler/tarim-hayvancilik" },
+  { title: "Turizm & Konaklama", image: "/vitrin/turizm-konaklama.png", href: "/kategoriler/turizm-konaklama" },
+  { title: "Profesyonel Hizmetler", image: "/vitrin/profesyonel-hizmetler.png", href: "/kategoriler/profesyonel-hizmetler" },
+  { title: "Spor & Fitness", image: "/vitrin/spor-fitness.png", href: "/kategoriler/spor-fitness" },
+  { title: "Diğer Hizmetler", image: "/vitrin/diger.png", href: "/kategoriler/digerleri" },
 ];
 
 export default function CategoriesPage() {
@@ -61,7 +39,7 @@ export default function CategoriesPage() {
           </h1>
 
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            En çok ihtiyaç duyulan hizmetleri hızlıca keşfet. Aradığın hizmet burada yoksa ihtiyacını kendi cümlenle yaz.
+            En Çok ihtiyaÇ duyulan hizmetleri hızlıca keŞfet. AradıĞın hizmet burada yoksa ihtiyacını kendi cÜmlenle yaz.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -70,14 +48,14 @@ export default function CategoriesPage() {
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600"
             >
               <Search className="h-4 w-4" />
-              Keşfet
+              KeÅŸfet
             </Link>
 
             <Link
               href="/ihtiyac-olustur"
               className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50"
             >
-              İhtiyacını Yaz
+              Ä°htiyacÄ±nÄ± Yaz
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -90,7 +68,7 @@ export default function CategoriesPage() {
                 En Çok Arananlar
               </h2>
               <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-                Ana sayfadaki vitrin görünümüyle aynı düzen.
+                Ana sayfadaki vitrin gÖrÜnÜmÜyle aynı dÜzen.
               </p>
             </div>
 
@@ -98,7 +76,7 @@ export default function CategoriesPage() {
               href="/hizmetler"
               className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
             >
-              Tüm hizmetleri keşfet →
+              TÜm hizmetleri keŞfet →
             </Link>
           </div>
 

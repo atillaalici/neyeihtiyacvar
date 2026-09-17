@@ -178,6 +178,8 @@ app.MapFeaturedProviderEndpoints();
 app.MapRecommendationEndpoints();
 app.MapSmartSearchEndpoints();
 app.MapSearchIntentLibraryEndpoints();
+app.MapDbCategoryLibrarySearchEndpoints();
+app.MapAdminCategoryLibraryEndpoints();
 app.MapTaxonomyV3Endpoints();
 app.MapProviderApplicationEndpoints();
 app.MapBusinessRegistrationEndpoints();

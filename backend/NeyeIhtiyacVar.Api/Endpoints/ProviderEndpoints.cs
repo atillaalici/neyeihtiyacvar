@@ -94,6 +94,8 @@ public static class ProviderEndpoints
                     x.DistrictSlug,
                     x.PublicPhone,
                     x.PublicWhatsapp,
+                    x.Latitude,
+                    x.Longitude,
                     isVerifiedBusiness =
                         x.OwnerUserId != null &&
                         x.OwnerUser != null &&
@@ -130,6 +132,8 @@ public static class ProviderEndpoints
                     x.PublicPhone,
                     x.PublicWhatsapp,
                     x.PublicAddress,
+                    x.Latitude,
+                    x.Longitude,
                     x.WorkingHours,
                     x.ExperienceYears,
                     x.EmergencyService,

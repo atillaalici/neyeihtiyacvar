@@ -4,13 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { apiBaseUrl } from "@/lib/api";
 
 type DistrictDto = {
@@ -47,41 +40,47 @@ export function LocationSearch({
   const [error, setError] = useState("");
 
   const selectedCity = useMemo(
-    () => cities.find((candidate) => candidate.slug === city) ?? null,
+    () => cities.find((item) => item.slug === city) ?? null,
     [cities, city],
   );
-
-  const districts = selectedCity?.districts ?? [];
 
   useEffect(() => {
     let active = true;
 
     async function loadLocations() {
-      setLoading(true);
-      setError("");
-
       try {
+        setLoading(true);
+        setError("");
+
         const response = await fetch(`${apiBaseUrl}/api/locations`, {
           cache: "no-store",
         });
 
         if (!response.ok) {
-          throw new Error("Konum verileri alınamadı.");
+          throw new Error(`HTTP ${response.status}`);
         }
 
-        const data = (await response.json()) as CityDto[];
+        const json: unknown = await response.json();
 
-        if (!active) {
-          return;
+        if (!Array.isArray(json)) {
+          throw new Error("Konum API dizi dondurmedi.");
         }
 
-        setCities(data);
-      } catch {
-        if (!active) {
-          return;
+        const data = json as CityDto[];
+
+        if (data.length < 81) {
+          throw new Error(`Eksik il listesi: ${data.length}`);
         }
 
-        setError("İl ve ilçe bilgileri yüklenemedi.");
+        if (active) {
+          setCities(data);
+        }
+      } catch (err) {
+        console.error("LocationSearch:", err);
+        if (active) {
+          setCities([]);
+          setError("İl ve ilçe bilgileri yüklenemedi.");
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -97,123 +96,82 @@ export function LocationSearch({
   }, []);
 
   useEffect(() => {
-    if (!city || cities.length === 0) {
-      return;
-    }
-
-    const cityExists = cities.some((candidate) => candidate.slug === city);
-
-    if (!cityExists) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (city && cities.length > 0 && !cities.some((item) => item.slug === city)) {
       setCity("");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDistrict("");
     }
   }, [cities, city]);
 
   useEffect(() => {
-    if (!district || !selectedCity) {
-      return;
-    }
-
-    const districtExists = selectedCity.districts.some(
-      (candidate) => candidate.slug === district,
-    );
-
-    if (!districtExists) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (
+      district &&
+      selectedCity &&
+      !selectedCity.districts.some((item) => item.slug === district)
+    ) {
       setDistrict("");
     }
   }, [district, selectedCity]);
+
+  const districts = selectedCity?.districts ?? [];
 
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
 
-        if (!city || !district) {
-          return;
-        }
+        if (!city || !district) return;
 
-        onSearch?.({
-          city,
-          district,
-        });
+        window.dispatchEvent(
+          new CustomEvent("niv:home-location-filter", {
+            detail: { city, district },
+          }),
+        );
+
+        onSearch?.({ city, district });
       }}
       className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
     >
       <div className="min-w-0">
-        <label
-          htmlFor="il-sec"
-          className="mb-1.5 block text-sm font-medium"
-        >
+        <label htmlFor="niv-city" className="mb-1.5 block text-sm font-medium">
           İl
         </label>
-
-        <Select
+        <select
+          id="niv-city"
           value={city}
-          onValueChange={(value: string) => {
-            setCity(value);
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDistrict("");
+          onChange={(event) => {
+            setCity(event.target.value);
+            setDistrict("");
           }}
           disabled={loading}
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <SelectTrigger
-            id="il-sec"
-            className="w-full"
-          >
-            <SelectValue
-              placeholder={loading ? "İller yükleniyor..." : "İl Seç"}
-            />
-          </SelectTrigger>
-
-          <SelectContent>
-            {cities.map((candidate) => (
-              <SelectItem
-                key={candidate.id}
-                value={candidate.slug}
-              >
-                {candidate.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="">{loading ? "İller yükleniyor..." : "İl Seç"}</option>
+          {cities.map((item) => (
+            <option key={item.id} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="min-w-0">
-        <label
-          htmlFor="ilce-sec"
-          className="mb-1.5 block text-sm font-medium"
-        >
+        <label htmlFor="niv-district" className="mb-1.5 block text-sm font-medium">
           İlçe
         </label>
-
-        <Select
+        <select
+          id="niv-district"
           value={district}
-          onValueChange={(value: string) => {
-            setDistrict(value);
-          }}
+          onChange={(event) => setDistrict(event.target.value)}
           disabled={loading || !selectedCity}
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <SelectTrigger
-            id="ilce-sec"
-            className="w-full"
-          >
-            <SelectValue placeholder="İlçe Seç" />
-          </SelectTrigger>
-
-          <SelectContent>
-            {districts.map((districtItem) => (
-              <SelectItem
-                key={districtItem.id}
-                value={districtItem.slug}
-              >
-                {districtItem.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="">İlçe Seç</option>
+          {districts.map((item) => (
+            <option key={item.id} value={item.slug}>
+              {item.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <Button
@@ -221,18 +179,13 @@ export function LocationSearch({
         className="w-full sm:w-auto"
         disabled={loading || !city || !district}
       >
-        <MapPin
-          className="size-4"
-          aria-hidden="true"
-        />
+        <MapPin className="size-4" aria-hidden="true" />
         Hizmetleri Göster
       </Button>
 
-      {error && (
-        <p className="text-sm text-red-600 sm:col-span-3">
-          {error}
-        </p>
-      )}
+      {error ? (
+        <p className="text-sm text-destructive sm:col-span-3">{error}</p>
+      ) : null}
     </form>
   );
 }

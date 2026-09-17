@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { BrandLogo } from "@/components/site/BrandLogo";
 
 const groups = [
@@ -24,7 +24,7 @@ export function Footer() {
                 <h3 className="text-sm font-bold text-slate-900">{group.title}</h3>
                 <ul className="mt-3 space-y-2.5">
                   {group.links.map(([label,href]) => (
-                    <li key={href}>
+                    <li key={`${label}-${href}`}>
                       <Link href={href} className="text-sm text-muted-foreground transition hover:text-orange-600">{label}</Link>
                     </li>
                   ))}

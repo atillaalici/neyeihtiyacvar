@@ -465,6 +465,9 @@ public static class RecommendationEndpoints
                     .OrderBy(x => x.SortOrder)
                     .ToListAsync();
 
+                var resolvedServiceSlugs =
+                    SearchIntentResolver.ResolveServiceSlugs(searchText);
+
                 var matches = catalog
                     .SelectMany(category => category.Services
                         .Where(service => service.IsActive)
@@ -476,6 +479,59 @@ public static class RecommendationEndpoints
                                 category.Name,
                                 service.Name,
                                 serviceCandidateSlug);
+
+                            var resolvedServiceIndex = -1;
+
+                            for (var i = 0; i < resolvedServiceSlugs.Count; i++)
+                            {
+                                if (string.Equals(
+                                    resolvedServiceSlugs[i],
+                                    serviceCandidateSlug,
+                                    StringComparison.OrdinalIgnoreCase))
+                                {
+                                    resolvedServiceIndex = i;
+                                    break;
+                                }
+                            }
+
+                            if (resolvedServiceIndex >= 0)
+                            {
+                                score += 100 - Math.Min(resolvedServiceIndex, 9);
+                            }
+
+                            // Nakliye niyetinde "sehir ici" ile "sehirlerarasi" birbirine
+                            // karismasin. Katalogdaki hizmet adina/slugina gore ek sinyal ver.
+                            var normalizedSearchText = NormalizeText(searchText);
+                            var normalizedServiceName = NormalizeText(service.Name);
+
+                            if (ContainsWholePhrase(normalizedSearchText, "sehir ici"))
+                            {
+                                if (ContainsWholePhrase(normalizedServiceName, "sehir ici") ||
+                                    serviceCandidateSlug.Contains("sehir-ici", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    score += 30;
+                                }
+
+                                if (ContainsWholePhrase(normalizedServiceName, "sehirlerarasi") ||
+                                    ContainsWholePhrase(normalizedServiceName, "sehirler arasi") ||
+                                    serviceCandidateSlug.Contains("sehirlerarasi", StringComparison.OrdinalIgnoreCase) ||
+                                    serviceCandidateSlug.Contains("sehirler-arasi", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    score = Math.Max(0, score - 40);
+                                }
+                            }
+
+                            if (ContainsWholePhrase(normalizedSearchText, "sehirler arasi") ||
+                                ContainsWholePhrase(normalizedSearchText, "sehirlerarasi"))
+                            {
+                                if (ContainsWholePhrase(normalizedServiceName, "sehirlerarasi") ||
+                                    ContainsWholePhrase(normalizedServiceName, "sehirler arasi") ||
+                                    serviceCandidateSlug.Contains("sehirlerarasi", StringComparison.OrdinalIgnoreCase) ||
+                                    serviceCandidateSlug.Contains("sehirler-arasi", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    score += 30;
+                                }
+                            }
 
                             return new ServiceMatch(
                                 category.Slug,
@@ -565,7 +621,9 @@ public static class RecommendationEndpoints
                 baseQuery = baseQuery.Where(_ => false);
             }
 
-            if (categorySlug is not null && serviceSlug is null)
+            // Kategori belli ise, hizmet de belli olsa arama havuzunu o kategoriyle sinirla.
+            // Boylece hizmet bulunamadiginda fallback sadece ayni kategoriden gelir.
+            if (categorySlug is not null)
             {
                 baseQuery = baseQuery.Where(
                     x => x.CategorySlug == categorySlug);
@@ -598,12 +656,17 @@ public static class RecommendationEndpoints
                         x.AdditionalServices.Contains(serviceSlug))
                     .ToList();
 
-            // Bir hizmet algilandiysa sadece ana hizmet veya ek hizmet
-            // olarak gercekten eslesen isletmeleri donduruyoruz.
-            // Ayni kategoride olmak tek basina alternatif sayilmaz.
-            var usedFallback = false;
+            // Once tam hizmet eslesmesini kullan. Tam eslesme yoksa ayni kategori ve
+            // ayni ildeki yayinlanmis isletmeleri yakin alternatif olarak getir.
+            var usedFallback =
+                serviceSlug is not null &&
+                exactProviders.Count == 0 &&
+                categorySlug is not null &&
+                categoryProviders.Count > 0;
 
-            var providers = exactProviders;
+            var providers = usedFallback
+                ? categoryProviders
+                : exactProviders;
 
             var providerIds = providers
                 .Select(x => x.Id)

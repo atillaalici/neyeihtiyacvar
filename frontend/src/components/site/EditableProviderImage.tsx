@@ -113,7 +113,7 @@ export function EditableProviderImage({
         )}
 
         <Link
-          href="/panel/isletme-gorseli"
+          href="/hesabim#isletme-fotograflari"
           title="İşletme görselini değiştir"
           aria-label="İşletme görselini değiştir"
           className="absolute right-2.5 top-2.5 inline-flex size-9 items-center justify-center rounded-full border border-white/70 bg-white/95 text-primary shadow-md transition hover:scale-105 hover:bg-white"
@@ -135,7 +135,7 @@ export function EditableProviderImage({
         </div>
 
         <Link
-          href="/panel/isletme-gorseli"
+          href="/hesabim#isletme-fotograflari"
           className="shrink-0 text-xs font-semibold text-primary hover:underline"
         >
           Değiştir

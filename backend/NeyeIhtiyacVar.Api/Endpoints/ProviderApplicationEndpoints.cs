@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -25,7 +25,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Gönderilen başvuru bilgileri geçerli değil.",
+                    message = "GÃ¶nderilen baÅŸvuru bilgileri geÃ§erli deÄŸil.",
                     errors
                 });
             }
@@ -38,6 +38,9 @@ public static class ProviderApplicationEndpoints
                 ServiceSlug = request.ServiceSlug.Trim(),
                 CitySlug = request.CitySlug.Trim(),
                 DistrictSlug = request.DistrictSlug.Trim(),
+                PublicAddress = request.PublicAddress?.Trim(),
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
                 ApplicantName = request.ApplicantName.Trim(),
                 Phone = request.Phone.Trim(),
                 Whatsapp = Optional(request.Whatsapp),
@@ -152,7 +155,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme başvurusu bulunamadı."
+                    message = "Ä°ÅŸletme baÅŸvurusu bulunamadÄ±."
                 });
             }
 
@@ -175,7 +178,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Reddedilmiş başvuru doğrudan onaylanamaz."
+                    message = "ReddedilmiÅŸ baÅŸvuru doÄŸrudan onaylanamaz."
                 });
             }
 
@@ -202,6 +205,9 @@ public static class ProviderApplicationEndpoints
                     AdditionalServices = [],
                     CitySlug = application.CitySlug,
                     DistrictSlug = application.DistrictSlug,
+                PublicAddress = application.PublicAddress,
+                Latitude = application.Latitude,
+                Longitude = application.Longitude,
                     PublicPhone = application.Phone,
                     PublicWhatsapp = application.Whatsapp,
                     PublicationStatus = PublicationStatus.Draft,
@@ -247,7 +253,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme başvurusu bulunamadı."
+                    message = "Ä°ÅŸletme baÅŸvurusu bulunamadÄ±."
                 });
             }
 
@@ -255,7 +261,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Onaylanmış başvuru reddedilemez."
+                    message = "OnaylanmÄ±ÅŸ baÅŸvuru reddedilemez."
                 });
             }
 
@@ -339,7 +345,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme profili bulunamadı."
+                    message = "Ä°ÅŸletme profili bulunamadÄ±."
                 });
             }
 
@@ -347,7 +353,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil başka bir işlemle değişti. Sayfayı yenileyip tekrar deneyin."
+                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti. SayfayÄ± yenileyip tekrar deneyin."
                 });
             }
 
@@ -355,7 +361,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Yayındaki profil önce yayından kaldırılmalıdır."
+                    message = "YayÄ±ndaki profil Ã¶nce yayÄ±ndan kaldÄ±rÄ±lmalÄ±dÄ±r."
                 });
             }
 
@@ -369,7 +375,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "En fazla 1 ek hizmet seçebilirsiniz."
+                    message = "En fazla 1 ek hizmet seÃ§ebilirsiniz."
                 });
             }
 
@@ -381,7 +387,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Ana hizmet ek hizmet olarak tekrar seçilemez."
+                    message = "Ana hizmet ek hizmet olarak tekrar seÃ§ilemez."
                 });
             }
 
@@ -421,7 +427,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme profili bulunamadı."
+                    message = "Ä°ÅŸletme profili bulunamadÄ±."
                 });
             }
 
@@ -469,7 +475,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme profili bulunamadı."
+                    message = "Ä°ÅŸletme profili bulunamadÄ±."
                 });
             }
 
@@ -477,7 +483,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil başka bir işlemle değişti."
+                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti."
                 });
             }
 
@@ -507,7 +513,7 @@ public static class ProviderApplicationEndpoints
                     return Results.BadRequest(new
                     {
                         code = "business_verification_required",
-                        message = "İşletme yayına alınmadan önce hesap sahibinin e-posta ve telefon doğrulamasını tamamlaması gerekir."
+                        message = "Ä°ÅŸletme yayÄ±na alÄ±nmadan Ã¶nce hesap sahibinin e-posta ve telefon doÄŸrulamasÄ±nÄ± tamamlamasÄ± gerekir."
                     });
                 }
             }
@@ -588,9 +594,9 @@ public static class ProviderApplicationEndpoints
                     {
                         UserId = need.UserId,
                         EventType = eventType,
-                        Title = "Talebine uygun işletme bulundu",
+                        Title = "Talebine uygun iÅŸletme bulundu",
                         Message =
-                            $"{provider.BusinessName} \"{need.Title}\" talebinizi karşılayabilir. Uygun işletmeleri görmek için dokunun.",
+                            $"{provider.BusinessName} \"{need.Title}\" talebinizi karÅŸÄ±layabilir. Uygun iÅŸletmeleri gÃ¶rmek iÃ§in dokunun.",
                         Link = link,
                         IsRead = false,
                         CreatedAtUtc = publishedAtUtc
@@ -617,7 +623,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "İşletme profili bulunamadı."
+                    message = "Ä°ÅŸletme profili bulunamadÄ±."
                 });
             }
 
@@ -625,7 +631,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil başka bir işlemle değişti."
+                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti."
                 });
             }
 
@@ -647,13 +653,13 @@ public static class ProviderApplicationEndpoints
     {
         var errors = new Dictionary<string, string[]>();
 
-        Required(errors, "businessName", request.BusinessName, 200, "İşletme adı");
-        Required(errors, "shortDescription", request.ShortDescription, 300, "Kısa açıklama");
+        Required(errors, "businessName", request.BusinessName, 200, "Ä°ÅŸletme adÄ±");
+        Required(errors, "shortDescription", request.ShortDescription, 300, "KÄ±sa aÃ§Ä±klama");
         Required(errors, "categorySlug", request.CategorySlug, 100, "Kategori");
         Required(errors, "serviceSlug", request.ServiceSlug, 150, "Hizmet");
-Required(errors, "citySlug", request.CitySlug, 100, "İl");
-        Required(errors, "districtSlug", request.DistrictSlug, 100, "İlçe");
-        Required(errors, "applicantName", request.ApplicantName, 150, "Başvuran adı");
+Required(errors, "citySlug", request.CitySlug, 100, "Ä°l");
+        Required(errors, "districtSlug", request.DistrictSlug, 100, "Ä°lÃ§e");
+        Required(errors, "applicantName", request.ApplicantName, 150, "BaÅŸvuran adÄ±");
         Required(errors, "phone", request.Phone, 30, "Telefon");
 
         if (errors.Count > 0)
@@ -667,7 +673,7 @@ Required(errors, "citySlug", request.CitySlug, 100, "İl");
 
         if (!categoryExists)
         {
-            errors["categorySlug"] = ["Geçerli bir kategori seçin."];
+            errors["categorySlug"] = ["GeÃ§erli bir kategori seÃ§in."];
         }
 
         var city = await dbContext.Cities
@@ -677,13 +683,13 @@ Required(errors, "citySlug", request.CitySlug, 100, "İl");
 
         if (city is null)
         {
-            errors["citySlug"] = ["Geçerli bir il seçin."];
+            errors["citySlug"] = ["GeÃ§erli bir il seÃ§in."];
         }
         else if (!city.Districts.Any(x =>
                      x.Slug == request.DistrictSlug &&
                      x.IsActive))
         {
-            errors["districtSlug"] = ["Seçilen ilçenin ile ait olduğunu kontrol edin."];
+            errors["districtSlug"] = ["SeÃ§ilen ilÃ§enin ile ait olduÄŸunu kontrol edin."];
         }
 
         return errors;
@@ -733,18 +739,18 @@ Required(errors, "citySlug", request.CitySlug, 100, "İl");
     private static string ToSlug(string value)
     {
         value = value
-            .Replace('ı', 'i')
-            .Replace('İ', 'I')
-            .Replace('ğ', 'g')
-            .Replace('Ğ', 'G')
-            .Replace('ü', 'u')
-            .Replace('Ü', 'U')
-            .Replace('ş', 's')
-            .Replace('Ş', 'S')
-            .Replace('ö', 'o')
-            .Replace('Ö', 'O')
-            .Replace('ç', 'c')
-            .Replace('Ç', 'C');
+            .Replace('\u0131', 'i')
+            .Replace('\u0130', 'I')
+            .Replace('\u011F', 'g')
+            .Replace('\u011E', 'G')
+            .Replace('\u00FC', 'u')
+            .Replace('\u00DC', 'U')
+            .Replace('\u015F', 's')
+            .Replace('\u015E', 'S')
+            .Replace('\u00F6', 'o')
+            .Replace('\u00D6', 'O')
+            .Replace('\u00E7', 'c')
+            .Replace('\u00C7', 'C');
 
         var normalized = value
             .Normalize(NormalizationForm.FormD);
@@ -810,7 +816,10 @@ public sealed record CreateProviderApplication(
     string ApplicantName,
     string Phone,
     string? Whatsapp,
-    string? Note);
+    string? Note,
+    string? PublicAddress,
+    double? Latitude,
+    double? Longitude);
 
 public sealed record ReviewProviderApplication(
     string? ReviewNote);
@@ -831,6 +840,8 @@ public sealed record UpdateProvider(
     string? PublicPhone,
     string? PublicWhatsapp,
     string? PublicAddress,
+    double? Latitude,
+    double? Longitude,
     string? WorkingHours,
     int? ExperienceYears,
     bool EmergencyService,
@@ -838,3 +849,7 @@ public sealed record UpdateProvider(
 
 public sealed record ProviderActiveStatusRequest(
     bool IsActive);
+
+
+
+

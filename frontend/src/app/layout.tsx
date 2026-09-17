@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { LocationPermissionPrompt } from "@/components/location/LocationPermissionPrompt";
+import { CookieConsent } from "@/components/consent/CookieConsent";
 
 import "./globals.css";
 
@@ -90,7 +92,9 @@ export default function RootLayout({
     <html lang="tr">
       <body>
         {children}
+        <CookieConsent />
         <GoogleAnalytics />
+        <LocationPermissionPrompt />
         <Script
           id="organization-jsonld"
           type="application/ld+json"
@@ -109,3 +113,4 @@ export default function RootLayout({
     </html>
   );
 }
+

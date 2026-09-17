@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ShowcaseSection } from "@/components/site/ShowcaseSection";
 import { HeroSearch } from "@/components/site/HeroSearch";
 import { HowItWorks } from "@/components/site/HowItWorks";
+import { HomeProvidersMap } from "@/components/site/HomeProvidersMap";
 import { LocationSearch } from "@/components/site/LocationSearch";
 import { ProviderCTA } from "@/components/site/ProviderCTA";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -45,6 +46,8 @@ export default function HomePage() {
               }}
             />
           </div>
+
+          <HomeProvidersMap />
         </section>
 
         <ProviderCTA />

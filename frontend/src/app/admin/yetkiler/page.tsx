@@ -1,7 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+
+import { AdminNav } from "@/components/admin/AdminNav";
+import { SiteLayout } from "@/components/site/SiteLayout";
 
 import { apiBaseUrl } from "@/lib/api";
 import {
@@ -172,7 +175,9 @@ export default function AdminAccessPage() {
   }
 
   return (
-    <div className="section-shell py-8 sm:py-10">
+    <SiteLayout>
+      <AdminNav />
+      <div className="section-shell py-8 sm:py-10">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <div className="text-sm font-semibold text-primary">Yönetim</div>
@@ -322,6 +327,7 @@ export default function AdminAccessPage() {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </SiteLayout>
   );
 }

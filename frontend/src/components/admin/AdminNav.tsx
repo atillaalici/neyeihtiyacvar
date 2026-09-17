@@ -25,6 +25,7 @@ const items = [
     label: "İhtiyaç Talepleri",
     icon: ClipboardList,
   },
+  { href: "/admin/kategori-kutuphanesi", label: "Kategori Kütüphanesi", icon: ClipboardList },
   {
     href: "/admin/basvurular",
     label: "İşletme Başvuruları",

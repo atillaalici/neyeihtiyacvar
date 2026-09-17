@@ -22,7 +22,7 @@ const categories = [
   { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
   { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
   { title: "Organizasyon", image: "/vitrin/organizasyon.png", href: "/kategoriler/organizasyon" },
-  { title: "Diğer", image: "/vitrin/diger.png", href: "/kategoriler/diger" },
+  { title: "Diğer", image: "/vitrin/diger.png", href: "/kategoriler" },
 ];
 
 type FeaturedProvider = {
@@ -140,7 +140,7 @@ export function ShowcaseSection() {
             href="/hizmetler"
             className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
           >
-            Tüm hizmetleri keşfet â†’
+            Tüm hizmetleri keşfet →
           </Link>
         </div>
 
@@ -178,7 +178,7 @@ export function ShowcaseSection() {
             href="/kesfet"
             className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
           >
-            Tüm işletmeleri gör â†’
+            Tüm işletmeleri gör →
           </Link>
         </div>
 
@@ -335,7 +335,7 @@ export function ShowcaseSection() {
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
-            <p className="text-sm font-extrabold sm:text-base">Güvenli ve Åeffaf</p>
+            <p className="text-sm font-extrabold sm:text-base">GÜvenli ve Şeffaf</p>
             <p className="text-xs text-muted-foreground sm:text-sm">Doğrulanmış süreç</p>
           </div>
         </div>

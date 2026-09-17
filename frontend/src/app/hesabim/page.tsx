@@ -1,5 +1,7 @@
-"use client";
+﻿"use client";
 
+import BusinessPhotoManager from "@/components/account/BusinessPhotoManager";
+import BusinessAccountManager from "@/components/account/BusinessAccountManager";
 import {
   BadgeCheck,
   CalendarDays,
@@ -50,6 +52,7 @@ export default function AccountPage() {
   const router = useRouter();
 
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isTeknonetAccount, setIsTeknonetAccount] = useState(false);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +82,7 @@ export default function AccountPage() {
       setUser(getStoredUser());
 
       try {
-        const [accountResponse, locationsResponse] = await Promise.all([
+        const [accountResponse, locationsResponse, providerResponse] = await Promise.all([
           fetch(`${apiBaseUrl}/api/auth/me`, {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -87,6 +90,12 @@ export default function AccountPage() {
             cache: "no-store",
           }),
           fetch(`${apiBaseUrl}/api/locations`, {
+            cache: "no-store",
+          }),
+          fetch(`${apiBaseUrl}/api/provider-panel/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
             cache: "no-store",
           }),
         ]);
@@ -113,9 +122,23 @@ export default function AccountPage() {
           locationData = (await locationsResponse.json()) as City[];
         }
 
+        let teknonetAccount = false;
+
+        if (providerResponse.ok) {
+          const providerData = (await providerResponse.json()) as {
+            businessName?: string;
+          };
+
+          teknonetAccount =
+            providerData.businessName
+              ?.toLocaleLowerCase("tr-TR")
+              .includes("teknonet") ?? false;
+        }
+
         if (active) {
           setUser(accountData);
           setCities(locationData);
+          setIsTeknonetAccount(teknonetAccount);
           updateStoredUser(accountData);
         }
       } catch {
@@ -244,28 +267,29 @@ export default function AccountPage() {
 
   return (
     <SiteLayout>
-      <div className="section-shell flex justify-end pt-7 sm:pt-8">
-        <div className="w-full md:w-1/2 md:max-w-[520px]">
-          <EditableProviderImage />
-        </div>
-      </div>
-      <section className="section-shell py-12 sm:py-16">
-        <div className="mx-auto max-w-5xl">
+
+      <section className="section-shell pb-10 pt-1 sm:pb-12 sm:pt-1">
+        <div className="mx-auto w-full max-w-5xl">
           <div>
-            <h1 className="font-display text-3xl font-bold sm:text-4xl">
-              Hesabım
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Hesap bilgilerini yönet, doğrulama durumunu kontrol et.
-            </p>
+<section className={`mb-3 grid items-start gap-4 ${isTeknonetAccount ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
+  <div className="pt-1">
+    <h1 className="font-display text-4xl font-black tracking-tight text-slate-950">Hesabım</h1>
+    <p className="mt-2 max-w-[220px] text-sm leading-6 text-slate-500">
+      İşletme bilgilerinizi buradan yönetebilir, profilinizi güncelleyebilirsiniz.
+    </p>
+  </div>
+  <BusinessPhotoManager />
+</section>
+
+
           </div>
 
           {loading && (
-            <div className="mt-8 h-80 animate-pulse rounded-2xl border border-border bg-card" />
+            <div className="mt-2 h-80 animate-pulse rounded-2xl border border-border bg-card" />
           )}
 
           {!loading && !user && (
-            <div className="mt-8 rounded-2xl border border-border bg-card p-8 shadow-soft">
+            <div className="mt-2 rounded-2xl border border-border bg-card p-8 shadow-soft">
               <h2 className="font-display text-xl font-semibold">
                 Oturum açık değil
               </h2>
@@ -306,187 +330,80 @@ export default function AccountPage() {
                 </div>
               )}
 
-              <div className="mt-8 grid gap-6 rounded-2xl border border-border bg-card p-6 shadow-soft lg:grid-cols-[0.95fr_1.55fr] lg:p-8">
-                <div className="flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <h2 className="font-display text-xl font-semibold">
-                        Hesap Bilgilerim
-                      </h2>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={startEditing}
-                      >
-                        <Pencil className="mr-2 size-4" aria-hidden="true" />
-                        Düzenle
-                      </Button>
+              <div id="hesabim-yonetim-grid" className={`mt-1 grid items-start gap-4 ${isTeknonetAccount ? "xl:grid-cols-[240px_minmax(0,1fr)]" : "lg:grid-cols-[240px_minmax(0,1fr)]"}`}>
+                <aside className={isTeknonetAccount ? "hidden xl:block" : "hidden lg:block"}>
+                  <nav className="sticky top-24 space-y-1 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+                    <a href="#genel-bilgiler" className="flex items-center justify-between rounded-xl bg-orange-50 px-4 py-3 text-sm font-bold text-orange-600"><span>Genel Bilgiler</span><span>›</span></a>
+                    <a href="#isletme-bilgileri" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">İşletme Bilgileri</a>
+                    <a href="#konum-adres" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Konum ve Adres</a>
+                    <a href="#isletme-fotograflari" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Fotoğraflar</a>
+                    <a href="#hizmetler-kategoriler" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Hizmetler ve Kategoriler</a>
+                    <a href="#calisma-saatleri" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Çalışma Saatleri</a>
+                    <a href="#sosyal-medya" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Sosyal Medya</a>
+                    <a href="#guvenlik" className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50">Güvenlik</a>
+                  </nav>
+                </aside>
+                <div id="genel-bilgiler" className="min-w-0 scroll-mt-24 space-y-4">
+                  <BusinessAccountManager />
+              <div id="guvenlik" className="mt-4 grid gap-4 md:grid-cols-2">
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-10 place-items-center rounded-full bg-emerald-50 text-emerald-600">
+                      <ShieldCheck className="size-5" aria-hidden="true" />
                     </div>
-
-                    <dl className="mt-6 space-y-5">
-                      <InfoRow
-                        icon={<UserRound className="size-4" />}
-                        label="Ad Soyad"
-                        value={user.displayName}
-                      />
-                      <InfoRow
-                        icon={<Mail className="size-4" />}
-                        label="E-posta"
-                        value={user.email}
-                      />
-                      <InfoRow
-                        icon={<Phone className="size-4" />}
-                        label="Telefon"
-                        value={user.phoneNumber || "Telefon bilgisi yok"}
-                      />
-                      <InfoRow
-                        icon={<MapPin className="size-4" />}
-                        label="Konum"
-                        value={locationLabel}
-                      />
-                      <InfoRow
-                        icon={<ShieldCheck className="size-4" />}
-                        label="Rol"
-                        value={
-                          user.role === "provider"
-                            ? "İşletme"
-                            : user.role === "admin"
-                              ? "Admin"
-                              : "Kullanıcı"
-                        }
-                      />
-                      <InfoRow
-                        icon={<CalendarDays className="size-4" />}
-                        label="Kayıt Tarihi"
-                        value={formatDate(user.createdAtUtc)}
-                      />
-                    </dl>
+                    <h2 className="font-display text-lg font-bold text-slate-900">Doğrulama Durumu</h2>
                   </div>
-
-                  <div className="mt-7 flex flex-wrap gap-3">
-                    {user.role === "provider" && (
-                      <Link
-                        href="/panel"
-                        className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-                      >
-                        İşletme Paneli
+                  <div className="mt-5 space-y-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className={user.emailVerified ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>
+                          {user.emailVerified ? "E-posta doğrulandı" : "E-posta doğrulanmadı"}
+                        </p>
+                        <p className="mt-1 truncate text-sm text-slate-600">{user.email}</p>
+                      </div>
+                      <Link href={buildVerificationUrl(user, "email")} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50">
+                        {user.emailVerified ? "Değiştir" : "Doğrula"}
                       </Link>
-                    )}
-
-                    {user.role !== "provider" && user.role !== "admin" && (
-                      <Link
-                        href="/kayit?hesap=isletme"
-                        className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-                      >
-                        İşletme Olmak İstiyorum
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className={user.phoneVerified ? "font-semibold text-emerald-700" : "font-semibold text-amber-700"}>
+                          {user.phoneVerified ? "Telefon doğrulandı" : "Telefon doğrulanmadı"}
+                        </p>
+                        <p className="mt-1 truncate text-sm text-slate-600">{user.phoneNumber || "Telefon bilgisi yok"}</p>
+                      </div>
+                      <Link href={buildVerificationUrl(user, "phone")} className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50">
+                        {user.phoneVerified ? "Değiştir" : "Doğrula"}
                       </Link>
-                    )}
-                    {user.role === "admin" && (
-                      <Link
-                        href="/admin/isletmeler"
-                        className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-                      >
-                        Admin Paneli
-                      </Link>
-                    )}
-
-                    <Button type="button" variant="outline" onClick={startEditing}>
-                      <Pencil className="mr-2 size-4" aria-hidden="true" />
-                      Düzenle
-                    </Button>
-
-                    <Button type="button" variant="outline" onClick={logout}>
-                      Çıkış Yap
-                    </Button>
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                <div className="grid gap-4">
-                  <VerificationCard
-                    icon={<Mail className="size-5" aria-hidden="true" />}
-                    title="E-posta Doğrulama"
-                    description="Hesabının güvenliği için e-posta adresini doğrula."
-                    destination={user.email}
-                    verified={user.emailVerified}
-                    href={buildVerificationUrl(user, "email")}
-                    verifiedLabel="E-posta doğrulandı"
-                    buttonLabel="E-posta Doğrula"
-                  />
-
-                  <VerificationCard
-                    icon={<Phone className="size-5" aria-hidden="true" />}
-                    title="Telefon Doğrulama"
-                    description="Daha güvenli bir deneyim için telefon numaranı doğrula."
-                    destination={user.phoneNumber ?? "Telefon bilgisi yok"}
-                    verified={user.phoneVerified}
-                    href={buildVerificationUrl(user, "phone")}
-                    verifiedLabel="Telefon doğrulandı"
-                    buttonLabel="Telefon Doğrula"
-                  />
-
-                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-                    <div className="flex items-start gap-3">
-                      <ShieldCheck
-                        className="mt-0.5 size-5 shrink-0 text-blue-600"
-                        aria-hidden="true"
-                      />
+                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-3">
+                      <div className="grid size-10 shrink-0 place-items-center rounded-full bg-orange-50 text-primary">
+                        <BadgeCheck className="size-5" aria-hidden="true" />
+                      </div>
                       <div>
-                        <p className="font-semibold">Neden doğrulama yapmalıyım?</p>
-                        <p className="mt-1 leading-6 text-blue-800">
-                          {user.role === "provider"
-                            ? "İşletme profilinin yayına alınabilmesi ve Doğrulanmış İşletme rozeti alabilmesi için e-posta ve telefon doğrulamalarının ikisi de tamamlanmalıdır."
-                            : "İhtiyaç talebi oluşturabilmek için e-posta veya telefon doğrulamalarından en az birini tamamlaman yeterlidir."}
+                        <h2 className="font-display text-lg font-bold text-slate-900">Hesap Durumu</h2>
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          İşletme hesabınız aktif olarak yayınlanmaktadır. Bilgilerinizi güncel tutarak daha fazla müşteriye ulaşabilirsiniz.
                         </p>
                       </div>
                     </div>
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">Aktif</span>
                   </div>
-                </div>
+                  <div className="mt-7 grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => document.getElementById("isletme-bilgileri")?.scrollIntoView({ behavior: "smooth" })} className="h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground hover:opacity-90">
+                      Bilgileri Düzenle
+                    </button>
+                    <button type="button" onClick={logout} className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold shadow-sm hover:bg-slate-50">
+                      Çıkış Yap
+                    </button>
+                  </div>
+                </section>
               </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-10 place-items-center rounded-xl bg-orange-50 text-primary">
-                      <ShieldCheck className="size-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h2 className="font-display text-lg font-semibold">
-                        Kullanıcı Hesabı
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Siteyi hemen kullanmaya başlayabilirsin.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl bg-green-50 p-4 text-sm leading-6 text-green-950">
-                    İhtiyaç talebi oluştururken e-posta veya telefon doğrulamasından
-                    <strong> en az biri yeterlidir.</strong>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-10 place-items-center rounded-xl bg-orange-50 text-primary">
-                      <BadgeCheck className="size-5" aria-hidden="true" />
-                    </div>
-                    <div>
-                      <h2 className="font-display text-lg font-semibold">
-                        İşletme Hesabı
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Doğrulama, işletme güveninin temelidir.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-                    İşletmenin yayına alınması için <strong>e-posta ve telefon</strong>
-                    doğrulamalarının ikisi de tamamlanmalıdır. Admin onayı sonrası
-                    “Doğrulanmış İşletme” rozeti görünür.
-                  </div>
                 </div>
               </div>
             </>
@@ -613,7 +530,8 @@ export default function AccountPage() {
           </div>
         </div>
       )}
-    </SiteLayout>
+            
+      </SiteLayout>
   );
 }
 
@@ -739,3 +657,5 @@ function formatDate(value: string) {
     year: "numeric",
   }).format(new Date(value));
 }
+
+

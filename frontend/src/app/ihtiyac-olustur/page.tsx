@@ -145,10 +145,17 @@ function NeedCreatePageContent() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
+  const [manualCategorySlug, setManualCategorySlug] = useState(
+    searchParams.get("kategori")?.trim() ?? "",
+  );
+  const [manualServiceSlug, setManualServiceSlug] = useState(
+    searchParams.get("hizmet")?.trim() ?? "",
+  );
   const [recommendationData, setRecommendationData] =
     useState<RecommendationResponse | null>(null);
   const [liveRecommendationData, setLiveRecommendationData] =
     useState<RecommendationResponse | null>(null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searching, setSearching] = useState(false);
   const [tracking, setTracking] = useState(false);
@@ -161,6 +168,27 @@ function NeedCreatePageContent() {
     [cities, citySlug],
   );
   const districts = selectedCity?.districts ?? [];
+
+  const manualCategory = useMemo(
+    () => categories.find((item) => item.slug === manualCategorySlug) ?? null,
+    [categories, manualCategorySlug],
+  );
+  const manualServices = manualCategory?.services ?? [];
+
+  function serviceToSlug(value: string) {
+    return value
+      .toLocaleLowerCase("tr-TR")
+      .replaceAll("ı", "i")
+      .replaceAll("Ğ", "g")
+      .replaceAll("Ü", "u")
+      .replaceAll("Ş", "s")
+      .replaceAll("Ö", "o")
+      .replaceAll("Ç", "c")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  }
 
   const understoodCategory =
     recommendationData?.understanding.categorySlug ?? "";
@@ -257,6 +285,8 @@ function NeedCreatePageContent() {
           ilce: districtSlug,
           limit: "1",
         });
+        if (manualCategorySlug) params.set("kategori", manualCategorySlug);
+        if (manualServiceSlug) params.set("hizmet", manualServiceSlug);
 
         const response = await fetch(
           `${apiBaseUrl}/api/recommendations?${params.toString()}`,
@@ -287,7 +317,7 @@ function NeedCreatePageContent() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, citySlug, districtSlug, loadingCatalog]);
+  }, [query, citySlug, districtSlug, loadingCatalog, manualCategorySlug, manualServiceSlug]);
 
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -321,6 +351,8 @@ function NeedCreatePageContent() {
         ilce: districtSlug,
         limit: "5",
       });
+      if (manualCategorySlug) params.set("kategori", manualCategorySlug);
+      if (manualServiceSlug) params.set("hizmet", manualServiceSlug);
 
       const response = await fetch(
         `${apiBaseUrl}/api/recommendations?${params.toString()}`,
@@ -456,23 +488,40 @@ function NeedCreatePageContent() {
                 onSubmit={runSearch}
                 className="space-y-4 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-5"
               >
-                <div className="flex items-center gap-2 rounded-xl border border-input bg-background p-1.5">
+                <div className="relative flex items-center gap-2 rounded-xl border border-input bg-background p-1.5">
                   <Search className="ml-3 size-5 shrink-0 text-primary" />
                   <input
-                    value={query}
-                    onKeyDown={(event) => {
+                    value={query}                    onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         searchSourceRef.current = "enter";
+                        return;
                       }
-                    }}
-                    onChange={(event) => {
+
+                      if (
+                        event.key === " " &&
+                        liveRecommendationData?.understanding?.categorySlug &&
+                        liveRecommendationData?.understanding?.serviceSlug
+                      ) {
+                        const selectedServiceSlug =
+                          liveRecommendationData.understanding.serviceSlug || "";
+
+                        setManualCategorySlug(
+                          liveRecommendationData.understanding.categorySlug,
+                        );
+                        setManualServiceSlug(selectedServiceSlug);
+                        window.setTimeout(() => {
+                          setManualServiceSlug(selectedServiceSlug);
+                        }, 0);
+                        setSuggestionDismissed(true);
+                        setLiveRecommendationData(null);
+                      }
+                    }}onChange={(event) => {
                       setQuery(event.target.value);
+                      setSuggestionDismissed(false);
                       setRecommendationData(null);
-                      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveRecommendationData(null);
                       setTrackingSuccess("");
-                    }}
-                    placeholder="Örneğin: musluk su akıtıyor"
+                    }}placeholder="Örneğin: musluk su akıtıyor"
+                    autoComplete="off"
                     className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
                   />
                   <button
@@ -485,6 +534,56 @@ function NeedCreatePageContent() {
                   >
                     {searching ? "Aranıyor..." : "İhtiyacı Bul"}
                   </button>
+                  {/* V50C-LIVE-SUGGESTION */}
+                  {!suggestionDismissed &&
+                    query.trim().length > 0 &&
+                    liveRecommendationData?.understanding?.categorySlug &&
+                    liveRecommendationData?.understanding?.serviceSlug && (
+                      <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
+                        <button
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            const understanding =
+                              liveRecommendationData.understanding;
+                            setSuggestionDismissed(true);
+
+                            setQuery(
+                              understanding.originalText?.trim() || query.trim(),
+                            );
+                            const selectedServiceSlug =
+                              understanding.serviceSlug || "";
+
+                            setManualCategorySlug(
+                              understanding.categorySlug || "",
+                            );
+                            setManualServiceSlug(selectedServiceSlug);
+                            window.setTimeout(() => {
+                              setManualServiceSlug(selectedServiceSlug);
+                            }, 0);
+                            setRecommendationData(null);
+                            setLiveRecommendationData(null);
+                            setTrackingSuccess("");
+                          }}
+                          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">
+                              {liveRecommendationData.understanding.originalText ||
+                                query.trim()}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                              {liveRecommendationData.understanding.categoryName}
+                              {" → "}
+                              {liveRecommendationData.understanding.serviceName}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs font-medium text-primary">
+                            Seç
+                          </span>
+                        </button>
+                      </div>
+                    )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -539,23 +638,59 @@ function NeedCreatePageContent() {
                     </Select>
                   </label>
 
-                  <div>
-                    <span className="mb-2 block text-sm font-medium">
-                      Kategori
-                    </span>
-                    <div className="flex h-11 items-center rounded-xl border border-input bg-muted/30 px-3 text-sm">
-                      {selectedCategoryName || "Otomatik belirlenecek"}
-                    </div>
-                  </div>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium">Kategori</span>
+                    <Select
+                      value={manualCategorySlug || "auto"}
+                      onValueChange={(value) => {
+                        const next = value === "auto" ? "" : value;
+                        setManualCategorySlug(next);
+                        setManualServiceSlug("");
+                        setRecommendationData(null);
+                        setLiveRecommendationData(null);
+                        setTrackingSuccess("");
+                      }}
+                      disabled={loadingCatalog}
+                    >
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder={selectedCategoryName || "Kategori seç"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Otomatik belirle</SelectItem>
+                        {categories.map((item) => (
+                          <SelectItem key={item.id} value={item.slug}>
+                            {item.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
 
-                  <div>
-                    <span className="mb-2 block text-sm font-medium">
-                      Hizmet
-                    </span>
-                    <div className="flex h-11 items-center rounded-xl border border-input bg-muted/30 px-3 text-sm">
-                      {selectedServiceName || "Otomatik belirlenecek"}
-                    </div>
-                  </div>
+                  <label>
+                    <span className="mb-2 block text-sm font-medium">Hizmet</span>
+                    <Select
+                      value={manualServiceSlug || "auto"}
+                      onValueChange={(value) => {
+                        setManualServiceSlug(value === "auto" ? "" : value);
+                        setRecommendationData(null);
+                        setLiveRecommendationData(null);
+                        setTrackingSuccess("");
+                      }}
+                      disabled={!manualCategorySlug || loadingCatalog}
+                    >
+                      <SelectTrigger className="h-11 w-full">
+                        <SelectValue placeholder={selectedServiceName || "Hizmet seç"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Otomatik belirle</SelectItem>
+                        {manualServices.map((service) => (
+                          <SelectItem key={service} value={serviceToSlug(service)}>
+                            {service}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
                 </div>
 
                 <label className="block">
@@ -605,88 +740,75 @@ function NeedCreatePageContent() {
 
                   {recommendations.length > 0 ? (
                     <>
-                      <div className="mt-5 space-y-3">
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                         {recommendations.map((provider, index) => {
                           const phone = phoneHref(provider.publicPhone);
 
                           return (
                             <article
-                              key={provider.id}
-                              className="rounded-2xl border border-border p-4"
-                            >
-                              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                      {index + 1}
-                                    </span>
-                                    <h3 className="font-display text-lg font-bold">
-                                      {provider.businessName}
-                                    </h3>
-                                    <BadgeCheck className="size-4 text-primary" />
-                                  </div>
-
-                                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1">
-                                      <Star className="size-4 fill-amber-400 text-amber-400" />
-                                      {provider.averageRating.toLocaleString(
-                                        "tr-TR",
-                                        {
-                                          minimumFractionDigits: 1,
-                                          maximumFractionDigits: 1,
-                                        },
-                                      )}{" "}
-                                      ({provider.reviewCount} değerlendirme)
-                                    </span>
-
-                                    <span className="inline-flex items-center gap-1">
-                                      <MapPin className="size-4 text-primary" />
-                                      {formatSlug(provider.citySlug)} /{" "}
-                                      {formatSlug(provider.districtSlug)}
-                                    </span>
-                                  </div>
-
-                                  <div className="mt-2 text-sm text-muted-foreground">
-                                    {formatSlug(provider.serviceSlug)}
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2">
-                                  <Link
-                                    href={`/isletme/${provider.slug}`}
-                                    className="inline-flex h-10 items-center justify-center rounded-xl border border-input bg-background px-4 text-sm font-semibold hover:bg-accent"
-                                  >
-                                    İşletmeyi İncele
-                                  </Link>
-
-                                  {phone ? (
-                                    <a
-                                      href={phone}
-                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-primary/40 px-4 text-sm font-semibold text-primary hover:bg-primary/5"
-                                    >
-                                      <Phone className="size-4" />
-                                      Ara
-                                    </a>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      disabled
-                                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-semibold opacity-50"
-                                    >
-                                      <Phone className="size-4" />
-                                      Ara
-                                    </button>
-                                  )}
-
-                                  <Link
-                                    href={providerContactHref(provider)}
-                                    className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-                                  >
-                                    Teklif İste
-                                  </Link>
-                                </div>
-                              </div>
-                            </article>
+  key={provider.id}
+  className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+>
+  <div className="relative h-36 overflow-hidden bg-gradient-to-br from-primary/15 via-orange-50 to-amber-100">
+    <Image
+      src={`${apiBaseUrl}/api/providers/${provider.id}/cover-image`}
+      alt={`${provider.businessName} kapak fotoğrafı`}
+      fill
+      unoptimized
+      sizes="(max-width: 767px) 100vw, (max-width: 1535px) 50vw, 33vw"
+      className="object-cover"
+    />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+    <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm">
+      <BadgeCheck className="size-3.5" />
+      {index === 0 ? "En Uygun" : `${index + 1}. Öneri`}
+    </div>
+  </div>
+  <div className="p-4">
+    <h3 className="font-display text-lg font-bold">{provider.businessName}</h3>
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      {provider.reviewCount > 0 && (
+        <span className="inline-flex items-center gap-1">
+          <Star className="size-4 fill-amber-400 text-amber-400" />
+          {provider.averageRating.toLocaleString("tr-TR",{minimumFractionDigits:1,maximumFractionDigits:1})}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1">
+        <MapPin className="size-4 text-primary" />
+        {formatSlug(provider.citySlug)} / {formatSlug(provider.districtSlug)}
+      </span>
+    </div>
+    <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
+      {provider.shortDescription || formatSlug(provider.serviceSlug)}
+    </p>
+    <div className="mt-3">
+      <span className="inline-flex rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+        {formatSlug(provider.serviceSlug)}
+      </span>
+    </div>
+    <div className="mt-4 rounded-xl bg-primary/5 p-3">
+      <div className="text-xs font-semibold text-primary">Neden bu işletme?</div>
+      <div className="mt-1.5 flex items-start gap-2 text-xs leading-5 text-muted-foreground">
+        <Check className="mt-0.5 size-3.5 shrink-0 text-green-600" />
+        <span>{provider.reasons[0] ?? (provider.matchLevel === "category-fallback" ? "Aynı kategoride yakın bir alternatif" : "İhtiyacınla eşleşen hizmet sunuyor")}</span>
+      </div>
+    </div>
+    <div className="mt-4 grid grid-cols-2 gap-2">
+      <Link href={`/isletme/${provider.slug}`} className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-xl border border-input bg-background px-3 text-sm font-semibold hover:bg-accent">
+        Detayları Gör
+      </Link>
+      {phone ? (
+        <a href={phone} className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          <Phone className="size-4" /> İletişime Geç
+        </a>
+      ) : (
+        <Link href={providerContactHref(provider)} className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+          İletişime Geç <ArrowRight className="size-4" />
+        </Link>
+      )}
+    </div>
+  </div>
+</article>
                           );
                         })}
                       </div>
@@ -815,3 +937,4 @@ export default function NeedCreatePage() {
     </Suspense>
   );
 }
+

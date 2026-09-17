@@ -20,15 +20,15 @@ public static class ExpandedCatalogSeeder
         "organizasyon",
         "egitim",
         "saglik-bakim",
-        "hukuk-danismanlik",
-        "finans-sigorta",
+        "guzellik-kisisel-bakim",
+        "yeme-icme",
+        "alisveris-magazalar",
+        "emlak",
+        "insaat-yapi",
         "tarim-hayvancilik",
-        "sanayi-uretim",
-        "reklam-medya",
-        "turizm-seyahat",
-        "giyim-tekstil",
-        "hurda-atik",
-        "kiralama",
+        "turizm-konaklama",
+        "profesyonel-hizmetler",
+        "spor-fitness",
         "digerleri"
     ];
 
@@ -207,111 +207,88 @@ public static class ExpandedCatalogSeeder
 
         new(
             "saglik-bakim",
-            "Sa\u011Fl\u0131k & Bak\u0131m",
+            "Sağlık & Bakım",
             [
-                "Evde Bak\u0131m",
-                "Ya\u015Fl\u0131 Bak\u0131m\u0131",
-                "Hasta Bak\u0131m\u0131",
-                "G\u00FCzellik & Ki\u015Fisel Bak\u0131m",
-                "Kuaf\u00F6r & Berber"
+                "Hastane", "Özel Hastane", "Tıp Merkezi", "Poliklinik", "Diş Kliniği",
+                "Diş Hekimi", "Psikolog", "Diyetisyen", "Fizyoterapi",
+                "Evde Sağlık & Bakım", "Yaşlı Bakımı", "Hasta Bakımı", "Medikal Ürünler"
             ]),
-
         new(
-            "hukuk-danismanlik",
-            "Hukuk & Dan\u0131\u015Fmanl\u0131k",
+            "guzellik-kisisel-bakim",
+            "Güzellik & Kişisel Bakım",
             [
-                "Hukuki Dan\u0131\u015Fmanl\u0131k",
-                "Mali M\u00FC\u015Favirlik",
-                "\u0130\u015F Dan\u0131\u015Fmanl\u0131\u011F\u0131",
-                "Terc\u00FCme"
+                "Kuaför", "Berber", "Güzellik Salonu", "Cilt Bakımı", "Lazer Epilasyon",
+                "Manikür & Pedikür", "Makyaj", "Masaj", "Spa & Wellness"
             ]),
-
         new(
-            "finans-sigorta",
-            "Finans & Sigorta",
+            "yeme-icme",
+            "Yeme & İçme",
             [
-                "Sigorta Acenteli\u011Fi",
-                "Finansal Dan\u0131\u015Fmanl\u0131k"
+                "Restoran", "Kafe", "Lokanta", "Pastane", "Fırın", "Fast Food",
+                "Paket Servis", "Catering", "Hazır Yemek", "Kasap", "Tatlı & Dondurma"
             ]),
-
+        new(
+            "alisveris-magazalar",
+            "Alışveriş & Mağazalar",
+            [
+                "Market", "Giyim", "Ayakkabı", "Beyaz Eşya", "Elektronik", "Mobilya",
+                "Züccaciye", "Yapı Market", "Hırdavat", "Kırtasiye", "Çiçekçi", "Pet Shop"
+            ]),
+        new(
+            "emlak",
+            "Emlak",
+            [
+                "Emlak Danışmanı", "Satılık Konut", "Kiralık Konut", "Arsa", "Tarla",
+                "Daire", "Villa", "İşyeri", "Ticari Gayrimenkul", "Günlük Kiralık"
+            ]),
+        new(
+            "insaat-yapi",
+            "İnşaat & Yapı",
+            [
+                "Müteahhit", "Kaba İnşaat", "İnce İnşaat", "Tadilat & Dekorasyon",
+                "Mimarlık", "İç Mimarlık", "İnşaat Mühendisliği", "Hazır Beton",
+                "Beton Pompası", "Karot & Beton Kesme", "İskele", "Çatı Sistemleri",
+                "Yalıtım & Mantolama", "Prefabrik Yapı", "İstinat Duvarı"
+            ]),
         new(
             "tarim-hayvancilik",
-            "Tar\u0131m & Hayvanc\u0131l\u0131k",
+            "Tarım & Hayvancılık",
             [
-                "Tar\u0131msal Hizmetler",
-                "Tar\u0131m Makinesi Hizmetleri",
-                "Hayvanc\u0131l\u0131k Hizmetleri",
-                "Veterinerlik Hizmetleri"
+                "Tarım Ürünleri", "Tarla İşleri", "Bahçe İşleri", "Fidan & Fide", "Tohum",
+                "Gübre", "Zirai İlaçlama", "Tarım Makineleri", "Zirai Ekipman",
+                "Sulama Sistemleri", "Büyükbaş Hayvancılık", "Küçükbaş Hayvancılık",
+                "Kanatlı Hayvancılık", "Hayvan Sağlığı", "Yem & Hayvancılık Ürünleri", "Arıcılık"
             ]),
-
         new(
-            "sanayi-uretim",
-            "Sanayi & \u00DCretim",
+            "turizm-konaklama",
+            "Turizm & Konaklama",
             [
-                "Kaynak & Metal \u0130\u015Fleri",
-                "Makine Bak\u0131m & Onar\u0131m",
-                "\u0130malat Hizmetleri",
-                "Ta\u015Feron Hizmetleri"
+                "Otel", "Pansiyon", "Apart", "Bungalov", "Tatil Köyü", "Kamp & Karavan",
+                "Günlük Konaklama", "Tur Organizasyonu", "Seyahat Acentesi",
+                "Araç Kiralama", "Rehberlik"
             ]),
-
         new(
-            "reklam-medya",
-            "Reklam & Medya",
+            "profesyonel-hizmetler",
+            "Profesyonel Hizmetler",
             [
-                "Reklam Ajans\u0131",
-                "Grafik Tasar\u0131m",
-                "Bask\u0131 Hizmetleri",
-                "Tabela",
-                "Promosyon \u00DCr\u00FCnleri"
+                "Muhasebe & Mali Müşavirlik", "Hukuk & Avukatlık", "Sigorta",
+                "Finansal Danışmanlık", "İş Danışmanlığı", "İnsan Kaynakları", "Tercüme",
+                "Reklam & Pazarlama", "Grafik Tasarım", "Fotoğraf & Video",
+                "Matbaa & Baskı", "Danışmanlık"
             ]),
-
         new(
-            "turizm-seyahat",
-            "Turizm & Seyahat",
+            "spor-fitness",
+            "Spor & Fitness",
             [
-                "Seyahat Acentesi",
-                "Tur Hizmetleri",
-                "Transfer Hizmetleri"
+                "Spor Salonu", "Fitness", "Personal Trainer", "Pilates", "Yoga", "Yüzme",
+                "Futbol", "Basketbol", "Tenis", "Dövüş Sporları", "Dans",
+                "Spor Kursları", "Spor Malzemeleri"
             ]),
-
-        new(
-            "giyim-tekstil",
-            "Giyim & Tekstil",
-            [
-                "Terzi",
-                "Tekstil Tadilat\u0131",
-                "Lostra & Ayakkab\u0131 Tamiri",
-                "Hal\u0131 & Overlok"
-            ]),
-
-        new(
-            "hurda-atik",
-            "Hurda & At\u0131k",
-            [
-                "Hurdac\u0131",
-                "At\u0131k Toplama",
-                "Geri D\u00F6n\u00FC\u015F\u00FCm"
-            ]),
-
-        new(
-            "kiralama",
-            "Kiralama",
-            [
-                "Ekipman Kiralama",
-                "Makine Kiralama",
-                "\u00DCr\u00FCn Kiralama"
-            ]),
-
         new(
             "digerleri",
-            "Di\u011Ferleri",
+            "Diğer Hizmetler",
             [
-                "Cenaze Hizmetleri",
-                "El Sanatlar\u0131",
-                "Bayilik & Franchise",
-                "Alt\u0131n & G\u00FCm\u00FC\u015F Tamiri",
-                "Saat Tamiri",
-                "Enstr\u00FCman Tamiri"
+                "Diğer Hizmetler"
             ])
     ];
 

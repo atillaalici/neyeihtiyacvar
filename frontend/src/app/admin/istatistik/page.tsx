@@ -1,7 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+
+import { AdminNav } from "@/components/admin/AdminNav";
+import { SiteLayout } from "@/components/site/SiteLayout";
 
 import { apiBaseUrl } from "@/lib/api";
 import {
@@ -127,7 +130,9 @@ export default function AdminAnalyticsPage() {
   );
 
   return (
-    <div className="section-shell py-8 sm:py-10">
+    <SiteLayout>
+      <AdminNav />
+      <div className="section-shell py-8 sm:py-10">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-sm font-semibold text-primary">
@@ -309,6 +314,7 @@ export default function AdminAnalyticsPage() {
           </div>
         </>
       ) : null}
-    </div>
+      </div>
+    </SiteLayout>
   );
 }

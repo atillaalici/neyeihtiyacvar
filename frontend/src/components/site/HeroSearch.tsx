@@ -238,6 +238,7 @@ function intentText(intent: IntentType) {
 }
 
 export function HeroSearch() {
+  const searchApiBaseUrl = apiBaseUrl || "http://localhost:5155";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const searchSourceRef = useRef<"enter" | "button" | "typing">("button");
@@ -297,7 +298,7 @@ export function HeroSearch() {
 
     const timer = window.setTimeout(() => {
       fetch(
-        `${apiBaseUrl}/api/search/intents/suggest?q=${encodeURIComponent(clean)}&limit=8`,
+        `${searchApiBaseUrl}/api/search/intents/db-suggest?q=${encodeURIComponent(clean)}&limit=8`,
         {
           cache: "no-store",
           signal: controller.signal,
@@ -312,7 +313,9 @@ export function HeroSearch() {
         })
         .then((data: SmartSuggestion[]) => {
           setRemoteSuggestions(
-            Array.isArray(data) ? data : [],
+            (Array.isArray(data) ? data : [])
+              .slice()
+              .sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
           );
         })
         .catch((error: unknown) => {
@@ -338,6 +341,25 @@ export function HeroSearch() {
     remoteSuggestions.length > 0
       ? remoteSuggestions
       : suggestions;
+
+  // Son kullanıcıya gösterilecek önerileri görünen etiket üzerinden tekilleştir.
+  // Aynı ihtiyacın backend'de farklı kayıt/id/serviceSlug ile dönmesi UI'da tekrar oluşturmaz.
+  const visibleSuggestions = useMemo(() => {
+    const unique = new Map<string, SmartSuggestion>();
+
+    for (const suggestion of librarySuggestions) {
+      const key = normalize(suggestion.label);
+      const current = unique.get(key);
+
+      if (!current || (suggestion.score ?? 0) > (current.score ?? 0)) {
+        unique.set(key, suggestion);
+      }
+    }
+
+    return Array.from(unique.values())
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, 8);
+  }, [librarySuggestions]);
 
   function goToSearch(
     value: string,
@@ -378,8 +400,8 @@ export function HeroSearch() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const first = librarySuggestions[0];
-    const second = librarySuggestions[1];
+    const first = visibleSuggestions[0];
+    const second = visibleSuggestions[1];
     const ambiguousTop =
       Boolean(first && second) &&
       (first?.score ?? 0) >= 70 &&
@@ -390,10 +412,10 @@ export function HeroSearch() {
       return;
     }
 
-    if (librarySuggestions.length === 1) {
+    if (visibleSuggestions.length === 1) {
       goToSearch(
-        librarySuggestions[0].label,
-        librarySuggestions[0],
+        visibleSuggestions[0].label,
+        visibleSuggestions[0],
         searchSourceRef.current,
       );
       return;
@@ -411,7 +433,7 @@ export function HeroSearch() {
   const showSuggestions =
     focused &&
     query.trim().length >= 2 &&
-    librarySuggestions.length > 0;
+    visibleSuggestions.length > 0;
 
   return (
     <section className="relative overflow-visible border-b border-border bg-cream">
@@ -512,7 +534,7 @@ export function HeroSearch() {
                 </div>
 
                 <div className="p-2">
-                  {librarySuggestions.map((suggestion) => {
+                  {visibleSuggestions.map((suggestion) => {
                     const Icon = iconForIntent(suggestion.intent);
 
                     return (

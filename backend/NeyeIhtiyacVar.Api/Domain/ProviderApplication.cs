@@ -16,6 +16,12 @@ public sealed class ProviderApplication
 
     public string DistrictSlug { get; set; } = string.Empty;
 
+    public string? PublicAddress { get; set; }
+
+    public double? Latitude { get; set; }
+
+    public double? Longitude { get; set; }
+
     public string ApplicantName { get; set; } = string.Empty;
 
     public string Phone { get; set; } = string.Empty;
@@ -36,3 +42,4 @@ public sealed class ProviderApplication
 
     public int Version { get; set; }
 }
+

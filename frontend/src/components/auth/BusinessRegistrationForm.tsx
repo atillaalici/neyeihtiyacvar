@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 type ProviderKind = "usta" | "esnaf";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -33,6 +35,8 @@ type CityDto = {
   name: string;
   districts: DistrictDto[];
 };
+
+const BusinessLocationMap = dynamic(() => import("@/components/location/BusinessLocationMap"), { ssr: false });
 
 const BUSINESS_DRAFT_KEY = "neyeihtiyacvar.businessRegistrationDraft";
 
@@ -99,6 +103,9 @@ export function BusinessRegistrationForm({
   onStepChange?: (step: number) => void;
 }) {
   const router = useRouter();
+  const [mapLatitude, setMapLatitude] = useState<number | null>(null);
+  const [mapLongitude, setMapLongitude] = useState<number | null>(null);
+  const [mapAddress, setMapAddress] = useState("");
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [cities, setCities] = useState<CityDto[]>([]);
@@ -309,6 +316,75 @@ function chooseProviderKind(kind: ProviderKind) {
     [categories, categorySlug],
   );
 
+  function normalizeLocationName(value: string) {
+    return value
+      .toLocaleLowerCase("tr-TR")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\b(ili|ilcesi|ilçesi)\b/g, "")
+      .replace(/[^a-z0-9çğıöşü]/g, "");
+  }
+
+  function applyMapAdministrativeArea(
+    cityName?: string,
+    districtName?: string,
+    districtCandidates: string[] = [],
+  ) {
+    if (!cityName) return;
+
+    const wantedCity = normalizeLocationName(cityName);
+    const matchedCity = cities.find((city) => {
+      const name = normalizeLocationName(city.name);
+      return (
+        name === wantedCity ||
+        wantedCity.includes(name) ||
+        name.includes(wantedCity)
+      );
+    });
+
+    if (!matchedCity) return;
+    setCitySlug(matchedCity.slug);
+
+    const rawCandidates = [
+      districtName,
+      ...districtCandidates,
+    ].filter((value): value is string => Boolean(value));
+
+    const candidates = Array.from(
+      new Set(rawCandidates.map((value) => normalizeLocationName(value))),
+    ).filter(Boolean);
+
+    const matchedDistrict = matchedCity.districts.find((district) => {
+      const districtKey = normalizeLocationName(district.name);
+      return candidates.some(
+        (candidate) =>
+          candidate === districtKey ||
+          candidate.startsWith(districtKey) ||
+          candidate.endsWith(districtKey),
+      );
+    });
+
+    // Buyuksehir olmayan illerde Nominatim merkez ilceyi bazen il adi,
+    // sehir veya belediye olarak dondurur. Katalogda "Merkez" varsa ve
+    // idari adaylardan biri il adina esitse Merkez'i sec.
+    const centerDistrict =
+      matchedDistrict ??
+      matchedCity.districts.find(
+        (district) => normalizeLocationName(district.name) === "merkez",
+      );
+
+    const cityAppearsAsDistrict = candidates.some(
+      (candidate) => candidate === normalizeLocationName(matchedCity.name),
+    );
+
+    if (matchedDistrict) {
+      setDistrictSlug(matchedDistrict.slug);
+    } else if (centerDistrict && cityAppearsAsDistrict) {
+      setDistrictSlug(centerDistrict.slug);
+    } else {
+      setDistrictSlug("");
+    }
+  }
   const selectedCity = useMemo(
     () => cities.find((item) => item.slug === citySlug) ?? null,
     [cities, citySlug],
@@ -411,19 +487,19 @@ function chooseProviderKind(kind: ProviderKind) {
     if (!existingAccountMode) {
       if (password !== passwordAgain) {
         setError(
-          "Şifreler birbiriyle aynı olmalıdır.",
+          "Åifreler birbiriyle aynÄ± olmalÄ±dÄ±r.",
         );
         return;
       }
 
       if (
         password.length < 8 ||
-        !/[A-ZÇĞİÖŞÜ]/.test(password) ||
+        !/[A-ZÃ‡ÄÄ°Ã–ÅÃœ]/.test(password) ||
         !/[a-zçğıöşü]/.test(password) ||
         !/\d/.test(password)
       ) {
         setError(
-          "Şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermelidir.",
+          "Åifre en az 8 karakter olmalÄ±; bÃ¼yÃ¼k harf, kÃ¼Ã§Ã¼k harf ve rakam iÃ§ermelidir.",
         );
         return;
       }
@@ -473,6 +549,9 @@ function chooseProviderKind(kind: ProviderKind) {
               `+90${phoneDigits}`,
             citySlug,
             districtSlug,
+            publicAddress: mapAddress.trim() || null,
+            latitude: mapLatitude,
+            longitude: mapLongitude,
             categorySlug,
             serviceSlug,
             additionalCategorySlug:
@@ -809,7 +888,8 @@ function chooseProviderKind(kind: ProviderKind) {
             </div>
           </button>
 
-          <button
+                    
+<button
             type="button"
             onClick={() => chooseProviderKind("esnaf")}
             className="group rounded-2xl border-2 border-border bg-background p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50"
@@ -953,7 +1033,103 @@ function chooseProviderKind(kind: ProviderKind) {
           </div>
         ) : null}
 
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                  <section
+            data-location-registration-map
+            className="mb-5 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm"
+          >
+            <div className="border-b border-orange-100 bg-orange-50/40 px-4 py-4 sm:px-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-xl">
+                  📍
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-950">İşletme Konumu</h3>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    İl ve ilçenizi seçin, açık adresinizi yazın. Ardından haritadan işletmenizin bulunduğu noktayı işaretleyin.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-800">
+                    İl <span className="text-orange-600">*</span>
+                  </span>
+                  <select
+                    value={citySlug}
+                    onChange={(event) => {
+                      setCitySlug(event.target.value);
+                      setDistrictSlug("");
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  >
+                    <option value="">İl seçin</option>
+                    {cities.map((city) => (
+                      <option key={city.slug} value={city.slug}>
+                        {city.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-800">
+                    İlçe <span className="text-orange-600">*</span>
+                  </span>
+                  <select
+                    value={districtSlug}
+                    onChange={(event) => setDistrictSlug(event.target.value)}
+                    disabled={!citySlug}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  >
+                    <option value="">İlçe seçin</option>
+                    {districtOptions.map((district) => (
+                      <option key={district.slug} value={district.slug}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  Açık Adres
+                </span>
+                <textarea
+                  value={mapAddress}
+                  onChange={(event) => setMapAddress(event.target.value)}
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Mahalle, cadde/sokak, bina no ve diğer adres bilgileri"
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Haritadan konum seçtiğinizde adres otomatik doldurulur; isterseniz elle düzenleyebilirsiniz.
+                </span>
+              </label>
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <BusinessLocationMap
+                  latitude={mapLatitude}
+                  longitude={mapLongitude}
+                  onChange={({ latitude, longitude, address, city, district, districtCandidates }) => {
+                    setMapLatitude(latitude);
+                    setMapLongitude(longitude);
+                    if (address) setMapAddress(address);
+                    applyMapAdministrativeArea(city, district, districtCandidates);
+                  }}
+                />
+              </div>
+
+              <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-3 text-xs leading-5 text-slate-600">
+                Haritada bir noktaya dokunabilir veya işaretçiyi sürükleyebilirsiniz. Telefonda “Mevcut Konumumu Kullan” seçeneğiyle GPS konumunuz alınabilir.
+              </div>
+            </div>
+          </section>
+<div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
           <button
             type="button"
             onClick={() => { setError(""); setProviderKind(null); setWizardStep(2); }}
@@ -1160,7 +1336,7 @@ function chooseProviderKind(kind: ProviderKind) {
           <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
             {existingAccountMode
               ? "Mevcut hesabın kullanılacak. İşletme kaydı için gerekli koşulları onaylayarak devam et."
-              : "Şifrenizi oluşturun ve kayıt koşullarını onaylayın."}
+              : "Åifrenizi oluÅŸturun ve kayÄ±t koÅŸullarÄ±nÄ± onaylayÄ±n."}
           </p>
 
           {!existingAccountMode ? (
@@ -1168,7 +1344,7 @@ function chooseProviderKind(kind: ProviderKind) {
               <div className="mt-3 grid gap-x-2 gap-y-2.5 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[13px] font-medium">
-                    Şifre *
+                    Åifre *
                   </label>
 
                   <div className="relative">
@@ -1199,8 +1375,8 @@ function chooseProviderKind(kind: ProviderKind) {
                       className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                       aria-label={
                         showPassword
-                          ? "Şifreyi gizle"
-                          : "Şifreyi göster"
+                          ? "Åifreyi gizle"
+                          : "Åifreyi gÃ¶ster"
                       }
                     >
                       <svg
@@ -1237,7 +1413,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
                 <div>
                   <label className="mb-1 block text-[13px] font-medium">
-                    Şifre Tekrar *
+                    Åifre Tekrar *
                   </label>
 
                   <div className="relative">
@@ -1254,7 +1430,7 @@ function chooseProviderKind(kind: ProviderKind) {
                         )
                       }
                       className="h-10 w-full rounded-xl border border-input bg-background px-3 pr-10 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
-                      placeholder="Şifreyi tekrar yazın"
+                      placeholder="Åifreyi tekrar yazÄ±n"
                     />
 
                     <button
@@ -1268,8 +1444,8 @@ function chooseProviderKind(kind: ProviderKind) {
                       className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
                       aria-label={
                         showPasswordAgain
-                          ? "Şifreyi gizle"
-                          : "Şifreyi göster"
+                          ? "Åifreyi gizle"
+                          : "Åifreyi gÃ¶ster"
                       }
                     >
                       <svg
@@ -1312,7 +1488,7 @@ function chooseProviderKind(kind: ProviderKind) {
           ) : (
             <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] leading-5 text-emerald-800">
               Giriş yaptığın mevcut kullanıcı hesabı kullanılacak.
-              Şifreni tekrar girmen gerekmiyor.
+              Åifreni tekrar girmen gerekmiyor.
             </div>
           )}
 
@@ -1335,7 +1511,37 @@ function chooseProviderKind(kind: ProviderKind) {
               </span>
             </label>
 
-            <label className="flex items-start gap-2 text-[13px] leading-5">
+                        <div className="sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
+              <div className="mb-3">
+                <div className="text-sm font-semibold">İşletme Konumunu Haritadan Seç</div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Haritaya dokun, işaretçiyi sürükle veya telefondan mevcut konumunu kullan. Seçilen noktadan adres otomatik alınır.
+                </p>
+              </div>
+              <BusinessLocationMap
+                latitude={mapLatitude}
+                longitude={mapLongitude}
+                onChange={({ latitude, longitude, address, city, district, districtCandidates }) => {
+                    setMapLatitude(latitude);
+                    setMapLongitude(longitude);
+                    if (address) setMapAddress(address);
+                    applyMapAdministrativeArea(city, district, districtCandidates);
+                  }}
+              />
+              {mapAddress ? (
+                <div className="mt-3">
+                  <label className="mb-2 block text-sm font-medium">Haritadan Alınan Açık Adres</label>
+                  <textarea
+                    value={mapAddress}
+                    onChange={(event) => setMapAddress(event.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    className="w-full resize-y rounded-md border border-input bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
+                  />
+                </div>
+              ) : null}
+            </div>
+<label className="flex items-start gap-2 text-[13px] leading-5">
               <input
                 type="checkbox"
                 checked={businessTermsAccepted}
@@ -1610,7 +1816,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Şifre *
+            Åifre *
           </label>
           <input
             type="password"
@@ -1629,7 +1835,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Şifre Tekrar *
+            Åifre Tekrar *
           </label>
           <input
             type="password"
@@ -1734,3 +1940,4 @@ function chooseProviderKind(kind: ProviderKind) {
     </form>
   );
 }
+

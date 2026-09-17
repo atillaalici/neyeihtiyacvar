@@ -11,6 +11,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<CategoryService> CategoryServices => Set<CategoryService>();
+    public DbSet<CategoryLibraryWork> CategoryLibraryWorks => Set<CategoryLibraryWork>();
+    public DbSet<CategoryLibraryPhrase> CategoryLibraryPhrases => Set<CategoryLibraryPhrase>();
+    public DbSet<UnmatchedNeedSearch> UnmatchedNeedSearches => Set<UnmatchedNeedSearch>();
 
     public DbSet<City> Cities => Set<City>();
 
@@ -48,6 +51,36 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // NIV-V71-CATEGORY-LIBRARY
+        modelBuilder.Entity<CategoryLibraryWork>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.NormalizedName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasIndex(x => new { x.CategoryServiceId, x.NormalizedName }).IsUnique();
+            entity.HasOne(x => x.CategoryService).WithMany().HasForeignKey(x => x.CategoryServiceId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<CategoryLibraryPhrase>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Phrase).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.NormalizedPhrase).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
+            entity.HasIndex(x => x.NormalizedPhrase);
+            entity.HasIndex(x => new { x.CategoryLibraryWorkId, x.NormalizedPhrase }).IsUnique();
+            entity.HasOne(x => x.Work).WithMany(x => x.Phrases).HasForeignKey(x => x.CategoryLibraryWorkId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<UnmatchedNeedSearch>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Query).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.NormalizedQuery).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).HasDefaultValue("pending");
+            entity.HasIndex(x => x.NormalizedQuery).IsUnique();
+            entity.HasIndex(x => new { x.Status, x.LastSearchedAtUtc });
+        });
+        // NIV-V71-CATEGORY-LIBRARY-END
         modelBuilder.Entity<Category>(entity =>
         {
             entity.HasIndex(x => x.Slug).IsUnique();
