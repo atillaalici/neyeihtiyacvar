@@ -29,11 +29,11 @@ export function LegalDocument({ document }: { document: LegalDocumentData }) {
         </article>
 
         <div className="mt-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm leading-6 text-slate-700">
-          <strong>Platform İşletmecisi:</strong> TEKNONET Yazılım ve Bilgisayar Atilla ALICI
+          <strong>Platform İşletmecisi:</strong> Teknonet Yazılım
           <br />
           <strong>Platform:</strong> Neye İhtiyaç Var – neyeihtiyacvar.com
           <br />
-          <strong>Adres:</strong> Ahmet Yesevi Mahallesi, 16723 Sokak No:10, Merkez / Osmaniye
+          <strong>Adres:</strong> Merkez / OSMANİYE
         </div>
       </div>
     </main>

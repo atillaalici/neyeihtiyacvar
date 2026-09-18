@@ -6,6 +6,7 @@ import { LocationPermissionPrompt } from "@/components/location/LocationPermissi
 import { CookieConsent } from "@/components/consent/CookieConsent";
 
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 
 const siteUrl = "https://neyeihtiyacvar.com";
 
@@ -109,6 +110,7 @@ export default function RootLayout({
         >
           {JSON.stringify(websiteJsonLd)}
         </Script>
+              <Analytics />
       </body>
     </html>
   );

@@ -48,14 +48,14 @@ export default function CategoriesPage() {
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600"
             >
               <Search className="h-4 w-4" />
-              KeÅŸfet
+              Keşfet
             </Link>
 
             <Link
               href="/ihtiyac-olustur"
               className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50"
             >
-              Ä°htiyacÄ±nÄ± Yaz
+              İhtiyacını Yaz
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

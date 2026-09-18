@@ -17,7 +17,7 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "Kullanıcı üyeliği, ihtiyaç oluşturma, eşleştirme, teklif, iletişim ve platform kullanım kuralları.",
     sections: [
       { title: "1. Taraflar ve Platform İşletmecisi", paragraphs: [
-        "neyeihtiyacvar.com ve buna bağlı dijital hizmetler TEKNONET Yazılım ve Bilgisayar Atilla ALICI tarafından işletilmektedir. Bu metinde TEKNONET platform işletmecisini, Platform Neye İhtiyaç Var hizmetlerini, Kullanıcı ihtiyaç sahibi kişiyi, İşletme ise bağımsız hizmet sağlayıcıları ifade eder."
+        "neyeihtiyacvar.com ve buna bağlı dijital hizmetler Teknonet Yazılım tarafından işletilmektedir. Bu metinde TEKNONET platform işletmecisini, Platform Neye İhtiyaç Var hizmetlerini, Kullanıcı ihtiyaç sahibi kişiyi, İşletme ise bağımsız hizmet sağlayıcıları ifade eder."
       ]},
       { title: "2. Platformun Amacı ve Rolü", paragraphs: [
         "Neye İhtiyaç Var; kullanıcıların ihtiyaçlarını oluşturabildiği, ihtiyaçlarına uygun işletmeleri bulabildiği, teklif ve iletişim süreçlerini yürütebildiği dijital eşleştirme ve aracılık platformudur.",
@@ -78,7 +78,7 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "İşletme profili, teklif verme, hizmet sorumluluğu, değerlendirmeler ve ücretli hizmetler.",
     sections: [
       { title: "1. Kapsam ve Platformun Rolü", paragraphs: [
-        "Neye İhtiyaç Var, TEKNONET Yazılım ve Bilgisayar Atilla ALICI tarafından işletilen dijital eşleştirme ve yönlendirme platformudur. İşletmeler, aksi belirtilmedikçe TEKNONET'in çalışanı, şubesi, acentesi veya temsilcisi değildir."
+        "Neye İhtiyaç Var, Teknonet Yazılım tarafından işletilen dijital eşleştirme ve yönlendirme platformudur. İşletmeler, aksi belirtilmedikçe TEKNONET'in çalışanı, şubesi, acentesi veya temsilcisi değildir."
       ]},
       { title: "2. İşletme Başvurusu ve Bilgilerin Doğruluğu", paragraphs: [
         "İşletme, başvuru ve profil bilgilerinin doğru ve güncel olduğunu kabul eder. Faaliyet için ruhsat, izin, yetki belgesi, diploma, sertifika veya mesleki yeterlilik gerekiyorsa bunların temini ve geçerliliği İşletmenin sorumluluğundadır. Platform gerektiğinde ek bilgi veya belge isteyebilir."
@@ -122,7 +122,7 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "Kişisel verilerin hangi amaçlarla, hangi hukuki sebeplerle işlendiğine ilişkin aydınlatma.",
     sections: [
       { title: "1. Veri Sorumlusu", paragraphs: [
-        "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu TEKNONET Yazılım ve Bilgisayar Atilla ALICI'dır. Bu metin neyeihtiyacvar.com ziyaretçileri, kullanıcıları ve işletme hesapları için hazırlanmıştır."
+        "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu Teknonet Yazılım'dır. Bu metin neyeihtiyacvar.com ziyaretçileri, kullanıcıları ve işletme hesapları için hazırlanmıştır."
       ]},
       { title: "2. İşlenebilecek Kişisel Veriler", paragraphs: [
         "Kullanımınıza göre ad-soyad, e-posta, telefon, hesap bilgileri, il-ilçe, ihtiyaç ve işlem bilgileri, işletme profil bilgileri, değerlendirmeler, destek/iletişim kayıtları ile güvenlik için gerekli teknik ve oturum kayıtları işlenebilir.",
@@ -150,7 +150,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "KVKK'nın 11. maddesi kapsamında kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, amacını öğrenme, aktarılan üçüncü kişileri bilme, yanlış verilerin düzeltilmesini isteme, şartları varsa silme/yok etme talep etme, otomatik analiz sonucuna itiraz etme ve kanuna aykırı işleme nedeniyle zararın giderilmesini isteme haklarına sahipsiniz."
       ]},
       { title: "10. Başvuru Yöntemi", paragraphs: [
-        "Taleplerinizi TEKNONET Yazılım ve Bilgisayar Atilla ALICI'ya, Ahmet Yesevi Mahallesi, 16723 Sokak No:10, Merkez / Osmaniye adresinden iletebilirsiniz. Elektronik KVKK başvuru kanalı Platformun iletişim alanında ayrıca yayımlanacaktır."
+        "Taleplerinizi Teknonet Yazılım'ya, Merkez / OSMANİYE adresinden iletebilirsiniz. Elektronik KVKK başvuru kanalı Platformun iletişim alanında ayrıca yayımlanacaktır."
       ]},
       { title: "11. Aydınlatma ve Açık Rızanın Ayrılığı", paragraphs: [
         "Bu metin bilgilendirme amacı taşıyan bir aydınlatma metnidir. Genel bir kişisel veri işleme rızası yerine, açık rıza gerçekten gereken ayrı bir işlem varsa bu işlem özelinde ayrıca rıza alınır."

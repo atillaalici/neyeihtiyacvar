@@ -291,12 +291,12 @@ export default function AboutPage() {
                 Teknolojinin arkasında gerçek bir işletme var.
               </p>
               <h2 className="mt-4 font-display text-3xl font-black">
-                TEKNONET Yazılım ve Bilgisayar Atilla ALICI
+                Teknonet Yazılım
               </h2>
 
               <p className="mt-5 text-sm leading-7 text-slate-300">
                 Neye İhtiyaç Var, bağımsız ve sahipsiz bir internet projesi
-                değildir. Platform TEKNONET Yazılım ve Bilgisayar Atilla ALICI
+                değildir. Platform Teknonet Yazılım
                 tarafından geliştirilmekte ve işletilmektedir.
               </p>
 

@@ -24,7 +24,7 @@ public static class SearchIntentLibraryEndpoints
                 }
 
                 var suggestions =
-                    await SearchIntentLibrary.SuggestAsync(
+                    await DbSearchIntentLibrary.SuggestAsync(
                         dbContext,
                         clean,
                         Math.Clamp(limit ?? 8, 1, 12),

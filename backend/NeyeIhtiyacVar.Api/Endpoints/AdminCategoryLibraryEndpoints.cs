@@ -75,6 +75,49 @@ public static class AdminCategoryLibraryEndpoints
             item.IsActive=false;item.UpdatedAtUtc=DateTime.UtcNow;await db.SaveChangesAsync();return Results.Ok();
         });
 
+        group.MapPost("/categories", async (
+            CreateCategoryRequest request, AppDbContext dbContext, CancellationToken cancellationToken) =>
+        {
+            var name = (request.Name ?? string.Empty).Trim();
+            if (name.Length < 2 || name.Length > 120)
+                return Results.BadRequest("Ana kategori adı 2-120 karakter olmalıdır.");
+
+            var normalized = Normalize(name);
+            var categories = await dbContext.Categories.ToListAsync(cancellationToken);
+            if (categories.Any(x => x.IsActive && Normalize(x.Name) == normalized))
+                return Results.Conflict("Bu ana kategori zaten mevcut.");
+
+            var slugBase = ToSlug(name);
+            if (string.IsNullOrWhiteSpace(slugBase)) slugBase = "kategori";
+            var slug = slugBase;
+            var n = 2;
+            while (categories.Any(x => x.Slug == slug)) slug = $"{slugBase}-{n++}";
+
+            var entity = new Category {
+                Id = Guid.NewGuid(), Name = name, Slug = slug,
+                SortOrder = categories.Count == 0 ? 1 : categories.Max(x => x.SortOrder) + 1,
+                IsActive = true
+            };
+            dbContext.Categories.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new { entity.Id, entity.Name, entity.Slug });
+        });
+
+        group.MapDelete("/categories/{id:guid}", async (
+            Guid id, AppDbContext dbContext, CancellationToken cancellationToken) =>
+        {
+            var category = await dbContext.Categories.Include(x => x.Services)
+                .FirstOrDefaultAsync(x => x.Id == id && x.IsActive, cancellationToken);
+            if (category is null) return Results.NotFound("Ana kategori bulunamadı.");
+
+            var activeCount = category.Services.Count(x => x.IsActive);
+            if (activeCount > 0)
+                return Results.Conflict($"Bu kategoride {activeCount} aktif hizmet var. Önce hizmetleri silin.");
+
+            category.IsActive = false;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        });
         group.MapPost("/services", async (
             CreateCategoryServiceRequest request,
             AppDbContext dbContext,
@@ -185,9 +228,106 @@ public static class AdminCategoryLibraryEndpoints
             await dbContext.SaveChangesAsync(cancellationToken);
             return Results.Ok(new { entity.Id, entity.Phrase });
         });
+
+        group.MapPost("/services/{serviceId:guid}/phrases/bulk", async (
+            Guid serviceId,
+            BulkServicePhraseRequest request,
+            AppDbContext dbContext,
+            CancellationToken cancellationToken) =>
+        {
+            var service = await dbContext.CategoryServices
+                .FirstOrDefaultAsync(x => x.Id == serviceId && x.IsActive, cancellationToken);
+            if (service is null) return Results.NotFound("Hizmet bulunamadı.");
+
+            var incoming = (request.Phrases ?? [])
+                .Select(x => (x ?? string.Empty).Trim())
+                .Where(x => x.Length >= 2 && x.Length <= 500)
+                .GroupBy(Normalize)
+                .Select(x => x.First())
+                .ToList();
+
+            if (incoming.Count == 0)
+                return Results.BadRequest("Eklenecek geçerli kullanıcı cümlesi bulunamadı.");
+
+            var existingPhrases = await dbContext.CategoryLibraryPhrases
+                .Where(x => x.IsActive)
+                .Include(x => x.Work)
+                .Where(x => x.Work.CategoryServiceId == serviceId)
+                .ToListAsync(cancellationToken);
+
+            var existing = existingPhrases
+                .Select(x => Normalize(x.Phrase))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var toAdd = incoming
+                .Where(x => !existing.Contains(Normalize(x)))
+                .ToList();
+
+            var work = await dbContext.CategoryLibraryWorks
+                .Where(x => x.CategoryServiceId == serviceId && x.IsActive)
+                .OrderBy(x => x.SortOrder)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (work is null && toAdd.Count > 0)
+            {
+                work = new CategoryLibraryWork
+                {
+                    Id = Guid.NewGuid(),
+                    CategoryServiceId = serviceId,
+                    Name = service.Name,
+                    NormalizedName = Normalize(service.Name),
+                    SortOrder = 0,
+                    IsActive = true,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow
+                };
+                dbContext.CategoryLibraryWorks.Add(work);
+            }
+
+            if (work is not null)
+            {
+                foreach (var phrase in toAdd)
+                {
+                    dbContext.CategoryLibraryPhrases.Add(new CategoryLibraryPhrase
+                    {
+                        Id = Guid.NewGuid(),
+                        CategoryLibraryWorkId = work.Id,
+                        Phrase = phrase,
+                        NormalizedPhrase = Normalize(phrase),
+                        IsActive = true,
+                        CreatedAtUtc = DateTime.UtcNow,
+                        UpdatedAtUtc = DateTime.UtcNow
+                    });
+                }
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Results.Ok(new
+            {
+                received = request.Phrases?.Count ?? 0,
+                valid = incoming.Count,
+                added = toAdd.Count,
+                skipped = incoming.Count - toAdd.Count
+            });
+        });
         return app;
     }
 
+    private static string ToSlug(string value)
+    {
+        var replacements = new Dictionary<char,char> {
+            ['ç']='c',['Ç']='c',['ğ']='g',['Ğ']='g',['ı']='i',['İ']='i',
+            ['ö']='o',['Ö']='o',['ş']='s',['Ş']='s',['ü']='u',['Ü']='u'
+        };
+        var sb = new StringBuilder();
+        foreach (var raw in value.Trim()) {
+            var ch = replacements.TryGetValue(raw, out var mapped) ? mapped : char.ToLowerInvariant(raw);
+            if (char.IsLetterOrDigit(ch)) sb.Append(ch);
+            else if (sb.Length > 0 && sb[^1] != '-') sb.Append('-');
+        }
+        return sb.ToString().Trim('-');
+    }
     private static string Normalize(string value)
     {
         var form=value.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
@@ -197,9 +337,12 @@ public static class AdminCategoryLibraryEndpoints
     }
 }
 
+public sealed record CreateCategoryRequest(string Name);
+
 public sealed record CreateCategoryServiceRequest(Guid CategoryId, string Name);
 
 public sealed record CreateWorkRequest(Guid CategoryServiceId,string? Name,int SortOrder=0);
 public sealed record UpdateWorkRequest(string? Name,int SortOrder,bool IsActive);
 public sealed record PhraseRequest(string? Phrase);
 public sealed record CreateServicePhraseRequest(string Phrase);
+public sealed record BulkServicePhraseRequest(List<string>? Phrases);

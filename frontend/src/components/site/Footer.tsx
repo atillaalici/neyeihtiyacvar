@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { BrandLogo } from "@/components/site/BrandLogo";
 
 const groups = [
@@ -15,7 +15,7 @@ export function Footer() {
           <div>
             <BrandLogo />
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
-              İhtiyacını anlat, doğru işletmeyi bul. neyeihtiyacvar.com, TEKNONET Yazılım ve Bilgisayar Atilla ALICI tarafından işletilir.
+              İhtiyacını anlat, doğru işletmeyi bul. neyeihtiyacvar.com, Teknonet Yazılım tarafından işletilir.
             </p>
           </div>
           <div className="grid gap-7 sm:grid-cols-3">
@@ -35,7 +35,7 @@ export function Footer() {
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 neyeihtiyacvar.com. Tüm hakları saklıdır.</p>
-          <p>TEKNONET Yazılım ve Bilgisayar Atilla ALICI · Merkez / Osmaniye</p>
+          <p>Teknonet Yazılım · Merkez / Osmaniye</p>
         </div>
       </div>
     </footer>

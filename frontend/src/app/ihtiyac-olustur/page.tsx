@@ -79,6 +79,17 @@ type Recommendation = {
   reasons: string[];
 };
 
+type SearchIntentSuggestion = {
+  id: string;
+  label: string;
+  keywords: string[];
+  categorySlug: string;
+  serviceSlug: string;
+  intent: string;
+  score: number;
+  reason?: string;
+};
+
 type RecommendationResponse = {
   understanding: {
     originalText: string | null;
@@ -153,8 +164,8 @@ function NeedCreatePageContent() {
   );
   const [recommendationData, setRecommendationData] =
     useState<RecommendationResponse | null>(null);
-  const [liveRecommendationData, setLiveRecommendationData] =
-    useState<RecommendationResponse | null>(null);
+  const [liveIntentSuggestions, setLiveIntentSuggestions] =
+    useState<SearchIntentSuggestion[]>([]);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -195,23 +206,14 @@ function NeedCreatePageContent() {
   const understoodService =
     recommendationData?.understanding.serviceSlug ?? "";
 
-  const liveCategorySlug =
-    liveRecommendationData?.understanding.categorySlug ?? "";
-  const liveServiceSlug =
-    liveRecommendationData?.understanding.serviceSlug ?? "";
-
   const selectedCategoryName =
     recommendationData?.understanding.categoryName ??
-    liveRecommendationData?.understanding.categoryName ??
-    categories.find(
-      (item) => item.slug === (understoodCategory || liveCategorySlug),
-    )?.name ??
-    formatSlug(understoodCategory || liveCategorySlug);
+    categories.find((item) => item.slug === understoodCategory)?.name ??
+    formatSlug(understoodCategory);
 
   const selectedServiceName =
     recommendationData?.understanding.serviceName ??
-    liveRecommendationData?.understanding.serviceName ??
-    formatSlug(understoodService || liveServiceSlug);
+    formatSlug(understoodService);
 
   const recommendations = useMemo(() => {
     return [...(recommendationData?.recommendations ?? [])]
@@ -264,14 +266,9 @@ function NeedCreatePageContent() {
   useEffect(() => {
     const cleanQuery = query.trim();
 
-    if (
-      cleanQuery.length < 3 ||
-      !citySlug ||
-      !districtSlug ||
-      loadingCatalog
-    ) {
+    if (cleanQuery.length < 2 || loadingCatalog) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveRecommendationData(null);
+      setLiveIntentSuggestions([]);
       return;
     }
 
@@ -281,43 +278,41 @@ function NeedCreatePageContent() {
       try {
         const params = new URLSearchParams({
           q: cleanQuery,
-          il: citySlug,
-          ilce: districtSlug,
-          limit: "1",
+          limit: "8",
         });
-        if (manualCategorySlug) params.set("kategori", manualCategorySlug);
-        if (manualServiceSlug) params.set("hizmet", manualServiceSlug);
 
         const response = await fetch(
-          `${apiBaseUrl}/api/recommendations?${params.toString()}`,
+          `${apiBaseUrl}/api/search/intents/suggest?${params.toString()}`,
           {
             cache: "no-store",
             signal: controller.signal,
           },
         );
 
-        if (!response.ok) return;
-
-        const data = (await response.json()) as RecommendationResponse;
-
-        if (!controller.signal.aborted) {
-          setLiveRecommendationData(data);
-        }
-      } catch (error) {
-        if (
-          error instanceof DOMException &&
-          error.name === "AbortError"
-        ) {
+        if (!response.ok) {
+          if (!controller.signal.aborted) setLiveIntentSuggestions([]);
           return;
         }
+
+        const data = (await response.json()) as SearchIntentSuggestion[];
+
+        if (!controller.signal.aborted) {
+          setLiveIntentSuggestions(data);
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        if (!controller.signal.aborted) setLiveIntentSuggestions([]);
       }
-    }, 450);
+    }, 250);
 
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, citySlug, districtSlug, loadingCatalog, manualCategorySlug, manualServiceSlug]);
+  }, [query, loadingCatalog]);
 
   async function runSearch(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -497,23 +492,15 @@ function NeedCreatePageContent() {
                         return;
                       }
 
-                      if (
-                        event.key === " " &&
-                        liveRecommendationData?.understanding?.categorySlug &&
-                        liveRecommendationData?.understanding?.serviceSlug
-                      ) {
-                        const selectedServiceSlug =
-                          liveRecommendationData.understanding.serviceSlug || "";
-
-                        setManualCategorySlug(
-                          liveRecommendationData.understanding.categorySlug,
-                        );
-                        setManualServiceSlug(selectedServiceSlug);
+                      if (event.key === " " && liveIntentSuggestions[0]) {
+                        const selected = liveIntentSuggestions[0];
+                        setManualCategorySlug(selected.categorySlug);
+                        setManualServiceSlug(selected.serviceSlug);
                         window.setTimeout(() => {
-                          setManualServiceSlug(selectedServiceSlug);
+                          setManualServiceSlug(selected.serviceSlug);
                         }, 0);
                         setSuggestionDismissed(true);
-                        setLiveRecommendationData(null);
+                        setLiveIntentSuggestions([]);
                       }
                     }}onChange={(event) => {
                       setQuery(event.target.value);
@@ -534,54 +521,52 @@ function NeedCreatePageContent() {
                   >
                     {searching ? "Aranıyor..." : "İhtiyacı Bul"}
                   </button>
-                  {/* V50C-LIVE-SUGGESTION */}
+                  {/* V86.1: Ana sayfa ile ayni V85.2 intent onerileri */}
                   {!suggestionDismissed &&
                     query.trim().length > 0 &&
-                    liveRecommendationData?.understanding?.categorySlug &&
-                    liveRecommendationData?.understanding?.serviceSlug && (
+                    liveIntentSuggestions.length > 0 && (
                       <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
-                        <button
-                          type="button"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            const understanding =
-                              liveRecommendationData.understanding;
-                            setSuggestionDismissed(true);
+                        {liveIntentSuggestions.map((suggestion) => {
+                          const categoryName =
+                            categories.find(
+                              (item) => item.slug === suggestion.categorySlug,
+                            )?.name ?? formatSlug(suggestion.categorySlug);
 
-                            setQuery(
-                              understanding.originalText?.trim() || query.trim(),
-                            );
-                            const selectedServiceSlug =
-                              understanding.serviceSlug || "";
-
-                            setManualCategorySlug(
-                              understanding.categorySlug || "",
-                            );
-                            setManualServiceSlug(selectedServiceSlug);
-                            window.setTimeout(() => {
-                              setManualServiceSlug(selectedServiceSlug);
-                            }, 0);
-                            setRecommendationData(null);
-                            setLiveRecommendationData(null);
-                            setTrackingSuccess("");
-                          }}
-                          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold">
-                              {liveRecommendationData.understanding.originalText ||
-                                query.trim()}
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                              {liveRecommendationData.understanding.categoryName}
-                              {" → "}
-                              {liveRecommendationData.understanding.serviceName}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-xs font-medium text-primary">
-                            Seç
-                          </span>
-                        </button>
+                          return (
+                            <button
+                              key={suggestion.id}
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => {
+                                setSuggestionDismissed(true);
+                                setQuery(suggestion.label);
+                                setManualCategorySlug(suggestion.categorySlug);
+                                setManualServiceSlug(suggestion.serviceSlug);
+                                window.setTimeout(() => {
+                                  setManualServiceSlug(suggestion.serviceSlug);
+                                }, 0);
+                                setRecommendationData(null);
+                                setLiveIntentSuggestions([]);
+                                setTrackingSuccess("");
+                              }}
+                              className="flex w-full items-center justify-between gap-4 border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-muted"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold">
+                                  {suggestion.label}
+                                </span>
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                  {categoryName}
+                                  {" → "}
+                                  {formatSlug(suggestion.serviceSlug)}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-xs font-medium text-primary">
+                                Seç
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                 </div>
@@ -596,7 +581,7 @@ function NeedCreatePageContent() {
                         setDistrictSlug("");
                         setRecommendationData(null);
                         // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveRecommendationData(null);
+      setLiveIntentSuggestions([]);
                       }}
                       disabled={loadingCatalog}
                     >
@@ -621,7 +606,7 @@ function NeedCreatePageContent() {
                         setDistrictSlug(value);
                         setRecommendationData(null);
                         // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveRecommendationData(null);
+      setLiveIntentSuggestions([]);
                       }}
                       disabled={!citySlug || loadingCatalog}
                     >
@@ -647,7 +632,7 @@ function NeedCreatePageContent() {
                         setManualCategorySlug(next);
                         setManualServiceSlug("");
                         setRecommendationData(null);
-                        setLiveRecommendationData(null);
+                        setLiveIntentSuggestions([]);
                         setTrackingSuccess("");
                       }}
                       disabled={loadingCatalog}
@@ -673,7 +658,7 @@ function NeedCreatePageContent() {
                       onValueChange={(value) => {
                         setManualServiceSlug(value === "auto" ? "" : value);
                         setRecommendationData(null);
-                        setLiveRecommendationData(null);
+                        setLiveIntentSuggestions([]);
                         setTrackingSuccess("");
                       }}
                       disabled={!manualCategorySlug || loadingCatalog}

@@ -17,7 +17,7 @@ export default function LegalHubPage() {
           </h1>
 
           <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-            neyeihtiyacvar.com, TEKNONET Yazılım ve Bilgisayar Atilla ALICI
+            neyeihtiyacvar.com, Teknonet Yazılım
             tarafından işletilen dijital platformdur. Güncel kullanım, gizlilik ve
             kişisel verilerin korunması metinlerine bu sayfadan ulaşabilirsiniz.
           </p>
