@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -28,6 +29,7 @@ function roleLabel(user: AccessUser) {
 }
 
 export default function AdminAccessPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AccessUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export default function AdminAccessPage() {
       const token = getAccessToken();
 
       if (!token) {
-        window.location.href = "/giris";
+        router.push("/giris");
         return;
       }
 
@@ -60,7 +62,7 @@ export default function AdminAccessPage() {
         );
 
         if (response.status === 401 || response.status === 403) {
-          window.location.href = "/admin";
+          router.push("/admin");
           return;
         }
 
@@ -89,7 +91,7 @@ export default function AdminAccessPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [router]);
 
   const filteredUsers = useMemo(() => {
     const clean = query.trim().toLocaleLowerCase("tr-TR");
@@ -111,7 +113,7 @@ export default function AdminAccessPage() {
 
     if (!token) {
       clearAuth();
-      window.location.href = "/giris";
+      router.push("/giris");
       return;
     }
 

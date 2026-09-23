@@ -188,12 +188,14 @@ app.MapProviderPanelEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapMembershipPlanEndpoints();
 app.MapMembershipSelectionEndpoints();
+app.MapBillingInformationEndpoints();
 app.MapPromotionEndpoints();
 app.MapProviderImageEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
 app.MapNotificationEndpoints();
 app.MapAdminAuditLogEndpoints();
+app.MapAdminModerationEndpoints();
 app.MapAdminDirectoryEndpoints();
 
 if (app.Environment.IsDevelopment())

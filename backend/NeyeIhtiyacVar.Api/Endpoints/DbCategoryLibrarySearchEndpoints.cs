@@ -1,102 +1,40 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Infrastructure;
-
 namespace NeyeIhtiyacVar.Api.Endpoints;
-
 public static class DbCategoryLibrarySearchEndpoints
 {
     public static IEndpointRouteBuilder MapDbCategoryLibrarySearchEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/search/intents/db-suggest", async (
-            string? q,
-            int? limit,
-            AppDbContext dbContext,
-            CancellationToken cancellationToken) =>
+        app.MapGet("/api/search/intents/db-suggest", async (string? q,int? limit,AppDbContext db,CancellationToken ct) =>
         {
-            var clean = Normalize(q ?? string.Empty);
-            var take = Math.Clamp(limit ?? 8, 1, 50);
-
-            if (clean.Length < 2)
-            {
-                return Results.Ok(Array.Empty<object>());
-            }
-
-            var rows = await dbContext.CategoryLibraryWorks
-                .AsNoTracking()
-                .Where(x => x.IsActive && x.CategoryService.IsActive && x.CategoryService.Category.IsActive)
-                .Include(x => x.CategoryService)
-                    .ThenInclude(x => x.Category)
-                .Include(x => x.Phrases.Where(p => p.IsActive))
-                .ToListAsync(cancellationToken);
-
-            var matches = rows
-                .Select(work =>
-                {
-                    var workName = Normalize(work.Name);
-                    var phraseMatches = work.Phrases
-                        .Select(p => new { Phrase = p, Clean = Normalize(p.Phrase) })
-                        .Where(x => x.Clean.Contains(clean, StringComparison.Ordinal) ||
-                                    clean.Contains(x.Clean, StringComparison.Ordinal))
-                        .ToArray();
-
-                    var score =
-                        workName == clean ? 1000 :
-                        workName.StartsWith(clean, StringComparison.Ordinal) ? 900 :
-                        workName.Contains(clean, StringComparison.Ordinal) ? 800 :
-                        phraseMatches.Any(x => x.Clean == clean) ? 950 :
-                        phraseMatches.Any() ? 750 : 0;
-
-                    if (score == 0)
-                    {
-                        var tokens = clean.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        var haystack = workName + " " + string.Join(" ", work.Phrases.Select(p => Normalize(p.Phrase)));
-                        var hitCount = tokens.Count(t => haystack.Contains(t, StringComparison.Ordinal));
-                        if (hitCount == tokens.Length && hitCount > 0)
-                        {
-                            score = 600 + (hitCount * 10);
-                        }
-                    }
-
-                    return new
-                    {
-                        Work = work,
-                        Score = score,
-                        PhraseMatches = phraseMatches
-                    };
-                })
-                .Where(x => x.Score > 0)
-                .OrderByDescending(x => x.Score)
-                .ThenBy(x => x.Work.SortOrder)
-                .Take(take)
-                .Select(x => new
-                {
-                    id = $"db:{x.Work.Id}",
-                    label = x.Work.Name,
-                    keywords = x.Work.Phrases.Select(p => p.Phrase).Prepend(x.Work.Name).Distinct().ToArray(),
-                    categorySlug = x.Work.CategoryService.Category.Slug,
-                    serviceSlug = TaxonomyV3Catalog.ToSlug(x.Work.CategoryService.Name),
-                    intent = "need",
-                    score = x.Score,
-                    matchReason = "kategori-kutuphanesi"
-                })
-                .ToArray();
-
-            return Results.Ok(matches);
+            var clean=Normalize(q); if(clean.Length<2) return Results.Ok(Array.Empty<object>());
+            var tokens=Tokens(clean); var take=Math.Clamp(limit??8,1,12);
+            var rows=await db.CategoryLibraryPhrases.AsNoTracking()
+                .Where(p=>p.IsActive && p.Work.IsActive && p.Work.CategoryService.IsActive && p.Work.CategoryService.Category.IsActive)
+                .Select(p=>new { Phrase=p.Phrase, WorkSort=p.Work.SortOrder,
+                    ServiceId=p.Work.CategoryService.Id, ServiceName=p.Work.CategoryService.Name, ServiceSort=p.Work.CategoryService.SortOrder,
+                    CategorySlug=p.Work.CategoryService.Category.Slug, CategoryName=p.Work.CategoryService.Category.Name,
+                    CategorySort=p.Work.CategoryService.Category.SortOrder }).ToListAsync(ct);
+            var result=rows.Select(r=>new{Row=r,Clean=Normalize(r.Phrase)})
+                .Where(x=>tokens.All(t=>x.Clean.Contains(t,StringComparison.Ordinal)))
+                .Select(x=>new{x.Row,Score=x.Clean==clean?1000:x.Clean.StartsWith(clean,StringComparison.Ordinal)?950:x.Clean.Contains(clean,StringComparison.Ordinal)?900:800})
+                .GroupBy(x=>new{x.Row.ServiceId,x.Row.ServiceName,x.Row.ServiceSort,x.Row.CategorySlug,x.Row.CategoryName,x.Row.CategorySort})
+                .Select(g=>new{g.Key,Score=g.Max(x=>x.Score),Keywords=g.OrderByDescending(x=>x.Score).ThenBy(x=>x.Row.WorkSort).Select(x=>x.Row.Phrase).Distinct(StringComparer.OrdinalIgnoreCase).Take(12).ToArray()})
+                .OrderByDescending(x=>x.Score).ThenBy(x=>x.Key.CategorySort).ThenBy(x=>x.Key.ServiceSort).ThenBy(x=>x.Key.ServiceName).Take(take)
+                .Select(x=>new{id=$"service:{x.Key.ServiceId}",label=x.Key.ServiceName,keywords=x.Keywords,categorySlug=x.Key.CategorySlug,
+                    serviceSlug=TaxonomyV3Catalog.ToSlug(x.Key.ServiceName),intent="need",score=x.Score,matchReason="abc-kutuphane-cumlesi"}).ToArray();
+            return Results.Ok(result);
         });
-
         return app;
     }
-
-    private static string Normalize(string value)
+    private static string[] Tokens(string v)=>v.Split(' ',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);
+    private static string Normalize(string? value)
     {
-        return value
-            .Trim()
-            .ToLowerInvariant()
-            .Replace("ç", "c")
-            .Replace("ğ", "g")
-            .Replace("ı", "i")
-            .Replace("ö", "o")
-            .Replace("ş", "s")
-            .Replace("ü", "u");
+        if(string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var v=value.Trim().ToLower(new CultureInfo("tr-TR")).Replace('ı','i').Replace('ğ','g').Replace('ü','u').Replace('ş','s').Replace('ö','o').Replace('ç','c').Normalize(NormalizationForm.FormD);
+        var b=new StringBuilder(); foreach(var ch in v){if(CharUnicodeInfo.GetUnicodeCategory(ch)==UnicodeCategory.NonSpacingMark)continue;b.Append(char.IsLetterOrDigit(ch)?ch:' ');}
+        return string.Join(' ',b.ToString().Split(' ',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries));
     }
 }

@@ -16,8 +16,12 @@ public static class ProviderEndpoints
             string? ilce,
             string? kategori,
             string? hizmet,
-            AppDbContext dbContext) =>
+            AppDbContext dbContext,
+            HttpContext httpContext) =>
         {
+            var canViewContact =
+                httpContext.User.Identity?.IsAuthenticated == true;
+
             var query = dbContext.Providers
                 .AsNoTracking()
                 .Where(x => x.PublicationStatus == PublicationStatus.Published);
@@ -34,15 +38,35 @@ public static class ProviderEndpoints
 
             if (!string.IsNullOrWhiteSpace(hizmet))
             {
-                var service = hizmet.Trim();
+                var requestedService = hizmet.Trim().ToLowerInvariant();
+
+                var compatibleServices = requestedService switch
+                {
+                    "hafriyat-isleri" => new[] { "hafriyat-isleri", "hafriyat" },
+                    "hafriyat" => new[] { "hafriyat", "hafriyat-isleri" },
+                    _ => new[] { requestedService }
+                };
 
                 query = query.Where(x =>
-                    x.ServiceSlug == service ||
-                    x.AdditionalServices.Contains(service));
+                    compatibleServices.Contains(x.ServiceSlug) ||
+                    x.AdditionalServices.Any(additionalService =>
+                        compatibleServices.Contains(additionalService)));
             }
             else if (!string.IsNullOrWhiteSpace(kategori))
             {
-                query = query.Where(x => x.CategorySlug == kategori.Trim());
+                var requestedCategory = kategori.Trim().ToLowerInvariant();
+
+                var compatibleCategories = requestedCategory switch
+                {
+                    "nakliye-ve-hafriyat" => new[] { "nakliye-ve-hafriyat", "nakliye-tasima" },
+                    "nakliye-hafriyat" => new[] { "nakliye-hafriyat", "nakliye-tasima" },
+                    "nakliye-tasima" => new[] { "nakliye-tasima", "nakliye-ve-hafriyat", "nakliye-hafriyat" },
+                    "teknoloji-yazilim" => new[] { "teknoloji-yazilim", "teknoloji" },
+                    "teknoloji" => new[] { "teknoloji", "teknoloji-yazilim" },
+                    _ => new[] { requestedCategory }
+                };
+
+                query = query.Where(x => compatibleCategories.Contains(x.CategorySlug));
             }
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -74,8 +98,11 @@ public static class ProviderEndpoints
                         search) ||
                     (
                         detectedServiceSlugs.Length > 0 &&
-                        detectedServiceSlugs.Contains(
-                            x.ServiceSlug)
+                        (
+                            detectedServiceSlugs.Contains(x.ServiceSlug) ||
+                            x.AdditionalServices.Any(additionalService =>
+                                detectedServiceSlugs.Contains(additionalService))
+                        )
                     ));
             }
 
@@ -92,8 +119,8 @@ public static class ProviderEndpoints
                     x.ServiceSlug,
                     x.CitySlug,
                     x.DistrictSlug,
-                    x.PublicPhone,
-                    x.PublicWhatsapp,
+                    PublicPhone = canViewContact ? x.PublicPhone : null,
+                    PublicWhatsapp = canViewContact ? x.PublicWhatsapp : null,
                     x.Latitude,
                     x.Longitude,
                     isVerifiedBusiness =
@@ -110,8 +137,12 @@ public static class ProviderEndpoints
 
         group.MapGet("/{slug}", async (
             string slug,
-            AppDbContext dbContext) =>
+            AppDbContext dbContext,
+            HttpContext httpContext) =>
         {
+            var canViewContact =
+                httpContext.User.Identity?.IsAuthenticated == true;
+
             var provider = await dbContext.Providers
                 .AsNoTracking()
                 .Where(x =>
@@ -129,8 +160,8 @@ public static class ProviderEndpoints
                     x.AdditionalServices,
                     x.CitySlug,
                     x.DistrictSlug,
-                    x.PublicPhone,
-                    x.PublicWhatsapp,
+                    PublicPhone = canViewContact ? x.PublicPhone : null,
+                    PublicWhatsapp = canViewContact ? x.PublicWhatsapp : null,
                     x.PublicAddress,
                     x.Latitude,
                     x.Longitude,

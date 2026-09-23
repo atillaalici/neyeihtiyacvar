@@ -201,6 +201,19 @@ function NeedCreatePageContent() {
       .replace(/^-+|-+$/g, "");
   }
 
+
+
+  function selectIntentSuggestion(suggestion: SearchIntentSuggestion) {
+    // API'den gelen A ve B degerleri, /api/categories ile birebir ayni.
+    // Dogrudan kontrollu Select state'ine yaz.
+    setManualCategorySlug(suggestion.categorySlug);
+    setManualServiceSlug(suggestion.serviceSlug);
+    setSuggestionDismissed(true);
+    setLiveIntentSuggestions([]);
+    setRecommendationData(null);
+    setTrackingSuccess("");
+  }
+
   const understoodCategory =
     recommendationData?.understanding.categorySlug ?? "";
   const understoodService =
@@ -282,7 +295,7 @@ function NeedCreatePageContent() {
         });
 
         const response = await fetch(
-          `${apiBaseUrl}/api/search/intents/suggest?${params.toString()}`,
+          `${apiBaseUrl}/api/search/intents/db-suggest?${params.toString()}`,
           {
             cache: "no-store",
             signal: controller.signal,
@@ -448,6 +461,15 @@ function NeedCreatePageContent() {
     return `/isletme/${provider.slug}?${params.toString()}`;
   }
 
+  function openProviderContact(provider: Recommendation) {
+    const providerUrl = providerContactHref(provider);
+    if (getAccessToken()) {
+      router.push(providerUrl);
+      return;
+    }
+    router.push(`/giris?returnUrl=${encodeURIComponent(providerUrl)}`);
+  }
+
   const showResults =
     Boolean(recommendationData) && query.trim().length > 0;
 
@@ -492,19 +514,11 @@ function NeedCreatePageContent() {
                         return;
                       }
 
-                      if (event.key === " " && liveIntentSuggestions[0]) {
-                        const selected = liveIntentSuggestions[0];
-                        setManualCategorySlug(selected.categorySlug);
-                        setManualServiceSlug(selected.serviceSlug);
-                        window.setTimeout(() => {
-                          setManualServiceSlug(selected.serviceSlug);
-                        }, 0);
-                        setSuggestionDismissed(true);
-                        setLiveIntentSuggestions([]);
-                      }
                     }}onChange={(event) => {
                       setQuery(event.target.value);
                       setSuggestionDismissed(false);
+                      setManualCategorySlug("");
+                      setManualServiceSlug("");
                       setRecommendationData(null);
                       setTrackingSuccess("");
                     }}placeholder="Örneğin: musluk su akıtıyor"
@@ -527,10 +541,22 @@ function NeedCreatePageContent() {
                     liveIntentSuggestions.length > 0 && (
                       <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
                         {liveIntentSuggestions.map((suggestion) => {
+                          const displayCategoryAliases: Record<string, string> = {
+                            "nakliye-ve-hafriyat": "nakliye-tasima",
+                            "nakliye-hafriyat": "nakliye-tasima",
+                            "hafriyat-nakliyat": "nakliye-tasima",
+                            "hafriyat-ve-nakliyat": "nakliye-tasima",
+                            "insaat-hafriyat": "nakliye-tasima",
+                            "insaat-yapi": "insaat-tadilat",
+                            "teknoloji": "teknoloji-yazilim",
+                          };
+                          const displayCategorySlug =
+                            displayCategoryAliases[suggestion.categorySlug] ??
+                            suggestion.categorySlug;
                           const categoryName =
                             categories.find(
-                              (item) => item.slug === suggestion.categorySlug,
-                            )?.name ?? formatSlug(suggestion.categorySlug);
+                              (item) => item.slug === displayCategorySlug,
+                            )?.name ?? formatSlug(displayCategorySlug);
 
                           return (
                             <button
@@ -538,16 +564,7 @@ function NeedCreatePageContent() {
                               type="button"
                               onMouseDown={(event) => event.preventDefault()}
                               onClick={() => {
-                                setSuggestionDismissed(true);
-                                setQuery(suggestion.label);
-                                setManualCategorySlug(suggestion.categorySlug);
-                                setManualServiceSlug(suggestion.serviceSlug);
-                                window.setTimeout(() => {
-                                  setManualServiceSlug(suggestion.serviceSlug);
-                                }, 0);
-                                setRecommendationData(null);
-                                setLiveIntentSuggestions([]);
-                                setTrackingSuccess("");
+                                selectIntentSuggestion(suggestion);
                               }}
                               className="flex w-full items-center justify-between gap-4 border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-muted"
                             >
@@ -654,6 +671,7 @@ function NeedCreatePageContent() {
                   <label>
                     <span className="mb-2 block text-sm font-medium">Hizmet</span>
                     <Select
+                      key={`${manualCategorySlug}:${manualServiceSlug || "auto"}`}
                       value={manualServiceSlug || "auto"}
                       onValueChange={(value) => {
                         setManualServiceSlug(value === "auto" ? "" : value);
@@ -727,7 +745,9 @@ function NeedCreatePageContent() {
                     <>
                       <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                         {recommendations.map((provider, index) => {
-                          const phone = phoneHref(provider.publicPhone);
+                          const phone = getAccessToken()
+                            ? phoneHref(provider.publicPhone)
+                            : null;
 
                           return (
                             <article
@@ -787,9 +807,13 @@ function NeedCreatePageContent() {
           <Phone className="size-4" /> İletişime Geç
         </a>
       ) : (
-        <Link href={providerContactHref(provider)} className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
-          İletişime Geç <ArrowRight className="size-4" />
-        </Link>
+        <button
+          type="button"
+          onClick={() => openProviderContact(provider)}
+          className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          {getAccessToken() ? "İletişime Geç" : "İletişim İçin Giriş Yap"} <ArrowRight className="size-4" />
+        </button>
       )}
     </div>
   </div>

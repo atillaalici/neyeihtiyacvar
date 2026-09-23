@@ -67,4 +67,9 @@ public sealed class Provider
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public int Version { get; set; }
+
+    public int ModerationViolationCount { get; set; } = 0;
+    public DateTime? LastModerationViolationAtUtc { get; set; }
+    public string? LastModerationViolationReason { get; set; }
+    public bool ModerationTerminated { get; set; } = false;
 }

@@ -67,7 +67,28 @@ export const legalDocuments: LegalDocumentData[] = [
       { title: "16. Ücretli ve Premium Hizmetler", paragraphs: [
         "Platform gelecekte premium üyelik, öne çıkarma, reklam, görünürlük artırma ve benzeri ücretli hizmetler sunabilir. Ücretli hizmet alınmadan önce kapsam, bedel ve koşullar ayrıca gösterilir; bu metin tek başına ödeme yükümlülüğü doğurmaz."
       ]},
-      { title: "17. Güncelleme, Hukuk ve İletişim", paragraphs: [
+      // NIHV-HUKUK-GUNCELLEME-2026-09-23
+      { title: "17. Kullanıcı ile İşletme Arasındaki Hukuki ve Ticari İlişki", paragraphs: [
+        "Platform; Kullanıcı ile İşletmenin birbirini bulmasını, teklif ve iletişim süreçlerini kolaylaştıran dijital bir eşleştirme ve aracılık hizmetidir. Aksi açıkça belirtilmedikçe TEKNONET; Kullanıcı ile İşletme arasında kurulabilecek satış, eser, hizmet, vekalet veya benzeri sözleşmenin tarafı, işveren, yüklenici, alt yüklenici, satıcı, sağlayıcı, temsilci, kefil, garantör veya sigortacısı değildir.",
+        "İşin kapsamı, fiyatı, kapora veya avans, ödeme zamanı ve yöntemi, fatura veya diğer mali belgeler, malzeme seçimi, teslim, iptal, gecikme, ayıp, garanti, iade, işçilik, zarar ve diğer tüm ticari şartlar Kullanıcı ile İşletme tarafından belirlenir. Platform dışında veya doğrudan taraflar arasında gerçekleştirilen ödeme ve para transferleri TEKNONET tarafından tahsil edilmiş veya güvence altına alınmış sayılmaz.",
+        "Kullanıcı; bir İşletmeyle anlaşmadan, ödeme veya kapora yapmadan önce gerekli gördüğü kimlik, yetki, ruhsat, lisans, mesleki yeterlilik, vergi ve iletişim bilgilerini kontrol etmenin kendi sorumluluğunda olduğunu kabul eder. Platformda bir İşletmenin listelenmesi, eşleştirilmesi, doğrulanmış olarak gösterilmesi veya üst sıralarda yer alması, aksi açıkça belirtilmedikçe hizmetin kalitesi, güvenliği, fiyatı, sonucu veya İşletmenin tüm hukuki ve mesleki yeterlilikleri bakımından TEKNONET garantisi anlamına gelmez."
+      ]},
+      { title: "18. Uyuşmazlıklar, Fiziksel Olaylar ve Tarafların Sorumluluğu", paragraphs: [
+        "Kullanıcı ile İşletme arasındaki görüşme, pazarlık, teklif, ödeme, işin yapılması veya yapılmaması, teslim, ayıp, gecikme, iptal, iade ve benzeri uyuşmazlıklar esas olarak ilgili taraflar arasındadır. Taraflar kendi fiil ve ihmallerinden ve kendi aralarındaki sözleşmesel yükümlülüklerinden sorumludur.",
+        "Tarafların telefon, mesajlaşma, çevrim içi iletişim, keşif, iş yeri veya konut ziyareti, yüz yüze görüşme ya da hizmetin ifası sırasında gerçekleştirdiği tehdit, hakaret, taciz, fiziksel müdahale, kavga, hırsızlık, mala zarar verme, kişilik hakkı ihlali veya diğer hukuka aykırı fiiller ilgili fiili gerçekleştiren kişi veya kişilerin sorumluluğundadır. TEKNONET bu fiillerin tarafı veya faili değildir.",
+        "Bu hükümler TEKNONET'in yürürlükteki emredici mevzuat uyarınca sözleşmeyle kaldırılamayan kendi kusur veya yükümlülüklerinden doğabilecek sorumluluğunu ortadan kaldırmaz."
+      ]},
+      { title: "19. Hukuka Uygun Kullanım, Yasaklı ve Kısıtlı Faaliyetler", paragraphs: [
+        "Kullanıcı; Platformu Türkiye Cumhuriyeti mevzuatına, Türk Ceza Kanunu ve ilgili özel kanunlara, kamu düzenine ve genel ahlaka aykırı bir amaçla kullanmayacağını; suç teşkil eden bir mal, madde, ürün veya hizmeti istemeyeceğini, satın almaya veya temin etmeye yönelik talep oluşturmayacağını kabul, beyan ve taahhüt eder.",
+        "Satışı, bulundurulması, temini, aracılığı, reklamı, tanıtımı veya halka arzı yasaklanmış ya da izne, ruhsata, lisansa, reçeteye, yetki belgesine veya başka bir resmi koşula bağlanmış ürün ve hizmetler, ancak yürürlükteki mevzuatın açıkça izin verdiği kapsam ve usulde konu edilebilir. Mevzuatın izin vermediği içerik Platformda yayımlanamaz.",
+        "Uyuşturucu veya uyarıcı maddeler, yasa dışı silah veya mühimmat, kaçak veya sahte ürünler, yasa dışı bahis ve kumar, dolandırıcılık, sahtecilik, insan ticareti veya istismarı, müstehcen ve özellikle çocukların cinsel istismarına ilişkin içerikler ile suçtan kaynaklanan malvarlığı değerleri ve yürürlükteki mevzuata göre hukuka aykırı diğer mal, hizmet ve faaliyetler için Platform kullanılamaz.",
+        "TEKNONET; hukuka aykırı, yasaklı, kısıtlı veya makul biçimde şüpheli gördüğü talep ve içerikleri otomatik veya manuel incelemeye alma, yayımlamama, kaldırma, hesabı geçici olarak kısıtlama ve gerekli hallerde mevzuat çerçevesinde yetkili mercilerle iş birliği yapma hakkını saklı tutar."
+      ]},
+      { title: "20. Beyan, Taahhüt ve İhlalin Sonuçları", paragraphs: [
+        "Kullanıcı, üyelik oluşturmak ve Platformu kullanmakla bu Sözleşmedeki hukuka uygun kullanım kurallarına uyacağını; verdiği bilgi ve belgelerin doğru olacağını; üçüncü kişilerin haklarını ihlal etmeyeceğini kabul, beyan ve taahhüt eder.",
+        "Kullanıcının kendi hukuka aykırı fiili, gerçeğe aykırı beyanı veya Sözleşme ihlali nedeniyle TEKNONET'in idari, adli veya üçüncü kişi talepleriyle karşılaşması halinde tarafların kusuru, illiyet bağı ve yürürlükteki mevzuat çerçevesindeki yasal sorumlulukları saklıdır."
+      ]},
+      { title: "21. Güncelleme, Hukuk ve İletişim", paragraphs: [
         "Koşullar mevzuat, Platform özellikleri veya ticari model değiştikçe güncellenebilir. Türkiye Cumhuriyeti hukuku uygulanır ve tüketicilerin kanunen yetkili mercilere başvuru hakları saklıdır."
       ]}
     ]
@@ -111,7 +132,36 @@ export const legalDocuments: LegalDocumentData[] = [
       { title: "11. Fikri Mülkiyet ve İçerikler", paragraphs: [
         "İşletme Platforma yüklediği logo, fotoğraf, marka ve diğer içerikleri kullanmaya yetkili olduğunu kabul eder. İçeriğin mülkiyeti sırf Platforma yüklenmesi nedeniyle TEKNONET'e geçmez."
       ]},
-      { title: "12. Güncelleme ve Uygulanacak Hukuk", paragraphs: [
+      { title: "12. İşletmenin Bağımsızlığı ve Hizmetten Doğan Sorumluluk", paragraphs: [
+        "İşletme; Kullanıcıyla kuracağı hukuki ve ticari ilişkinin bağımsız tarafıdır. Aksi açıkça belirtilmedikçe TEKNONET; İşletmenin çalışanı, işvereni, ortağı, acentesi, temsilcisi, yüklenicisi, alt yüklenicisi, kefili, garantörü veya sigortacısı değildir ve Kullanıcıya sunulan mal veya hizmetin satıcısı ya da sağlayıcısı sıfatını taşımaz.",
+        "İşletme; verdiği teklif, fiyat, kapora veya avans, tahsilat, fatura ve diğer mali belgeler, işin kapsamı, malzeme, personel, iş sağlığı ve güvenliği, mesleki yeterlilik, hizmet kalitesi, teslim, gecikme, ayıp, garanti, satış sonrası yükümlülükler, iptal ve iadeler dahil Kullanıcıya karşı üstlendiği yükümlülüklerden kendisinin sorumlu olduğunu kabul eder.",
+        "Kullanıcı ile İşletme arasındaki ticari veya kişisel uyuşmazlıklar ile görüşme, keşif veya hizmet ifası sırasında meydana gelebilecek tehdit, hakaret, taciz, fiziksel müdahale, kavga, hırsızlık, mala zarar veya diğer hukuka aykırı fiiller ilgili tarafların ve fiili gerçekleştiren kişilerin sorumluluğundadır. Bu hüküm TEKNONET'in emredici mevzuat uyarınca sözleşmeyle kaldırılamayan kendi sorumluluklarını ortadan kaldırmaz."
+      ]},
+      { title: "13. Ruhsat, İzin, Mesleki Yeterlilik ve Mevzuata Uygunluk", paragraphs: [
+        "İşletme; sunduğu faaliyet için kanunen gerekli her türlü ruhsat, lisans, izin, yetki belgesi, mesleki yeterlilik, oda veya sicil kaydı ve diğer resmi şartları sağlamak ve bunların geçerliliğini korumakla yükümlüdür. TEKNONET'in belge talep etmesi veya bazı belgeleri kontrol etmesi, İşletmenin yasal yükümlülüklerini devraldığı anlamına gelmez.",
+        "İşletme; Türkiye Cumhuriyeti mevzuatına, Türk Ceza Kanunu ve ilgili özel kanunlara aykırı hiçbir mal veya hizmeti sunmayacağını; suç teşkil eden faaliyette bulunmayacağını; satışı, bulundurulması, temini, aracılığı, reklamı veya tanıtımı yasaklanmış ya da izne tabi ürün ve hizmetleri mevzuata aykırı biçimde Platformda yayımlamayacağını kabul, beyan ve taahhüt eder.",
+        "İşletme; uyuşturucu veya uyarıcı madde, yasa dışı silah veya mühimmat, kaçak veya sahte ürün, yasa dışı bahis veya kumar, dolandırıcılık, sahtecilik, insan ticareti veya istismarı, müstehcen ve özellikle çocukların cinsel istismarına ilişkin içerikler, suçtan kaynaklanan malvarlığı değerleri ve yürürlükteki mevzuata göre hukuka aykırı diğer mal, hizmet veya faaliyetleri teklif etmeyeceğini, tanıtmayacağını, temin etmeyeceğini ve bunlara aracılık etmeyeceğini kabul, beyan ve taahhüt eder.",
+        "Reklamı veya tanıtımı kanunla yasaklanan ya da özel kurallara bağlanan mal ve hizmetlerde İşletme ilgili sektörel reklam ve tanıtım mevzuatına uymakla yükümlüdür. Ücretli üyelik veya Platformda bulunma hakkı, hukuka aykırı içerik yayımlama hakkı vermez."
+      ]},
+      { title: "14. Moderasyon, İhlal Sistemi ve Askıya Alma", paragraphs: [
+        "TEKNONET; Platformun güvenliği, mevzuata uyum ve kullanıcıların korunması amacıyla işletme profili, açıklama, teklif, görsel ve diğer içerikleri otomatik veya manuel yöntemlerle inceleyebilir. Şüpheli içerik yönetici incelemesine alınabilir; profil geçici olarak pasife alınabilir veya içerik yayından kaldırılabilir.",
+        "Yasaklı veya kısıtlı içerik ve benzeri ciddi sözleşme ihlallerinde İşletmeye moderasyon ihlali kaydedilebilir. Platformun yürürlükteki moderasyon politikasında üç ihlal eşiğinin uygulanması halinde üçüncü ihlale ulaşan İşletmenin profili pasife alınabilir ve hesabı fesih incelemesine alınabilir. TEKNONET, açıkça suç teşkil eden veya Platform ya da üçüncü kişiler açısından ciddi ve yakın risk oluşturan hallerde üç ihlal eşiğini beklemeksizin içeriği kaldırma, hesabı askıya alma veya mevzuatın izin verdiği ölçüde sözleşmeyi haklı nedenle sona erdirme hakkını saklı tutar.",
+        "Moderasyon kararı İşletmeye Platform içi bildirim, kayıtlı elektronik iletişim kanalı veya uygun başka bir yöntemle bildirilebilir. İşletme, hatalı olduğunu düşündüğü bir moderasyon kararının yeniden incelenmesini Platformun sunduğu itiraz veya destek kanalları üzerinden talep edebilir."
+      ]},
+      { title: "15. Haklı Fesih, Ücretli Üyelik ve İade Sonuçları", paragraphs: [
+        "İşletmenin yasaklı veya kısıtlı faaliyet, hukuka aykırı içerik, sahte veya yanıltıcı bilgi, güvenlik ihlali ya da bu Sözleşmenin ciddi veya tekrarlanan ihlali nedeniyle hesabının haklı sebeple kapatılması veya sözleşmesinin sona erdirilmesi, İşletmenin kendi sözleşmeye aykırı davranışından kaynaklanan bir yaptırım niteliğindedir.",
+        "İşletme, ücretli üyelik veya yıllık paket satın almış olmasının Platform kurallarını ihlal etme ya da profilinin her koşulda yayında tutulmasını isteme hakkı vermediğini kabul eder. Özellikle üç moderasyon ihlaline ulaşılması sonucunda yapılan inceleme ile ihlallerin doğrulanması ve sözleşmenin İşletmenin kusurlu veya sözleşmeye aykırı davranışı nedeniyle haklı sebeple sona erdirilmesi halinde, yürürlükteki emredici mevzuat hükümleri saklı kalmak kaydıyla, kullanılmayan üyelik dönemi veya kalan paket süresi için ücret iadesi, indirim, tazminat, cezai şart veya benzeri ad altında bir bedel talep edilemeyeceğini İşletme kabul, beyan ve taahhüt eder.",
+        "Bu hüküm; TEKNONET'in kendi kusurundan, hiç sunulmayan ücretli Platform hizmetinden veya emredici mevzuat gereği iadesi zorunlu bir bedelden doğabilecek hakları ortadan kaldıracak şekilde yorumlanamaz. Herhangi bir iade veya mahsup yükümlülüğünün emredici mevzuattan doğması halinde ilgili mevzuat uygulanır."
+      ]},
+      { title: "16. İşletmenin Tazmin ve Rücu Sorumluluğu", paragraphs: [
+        "İşletmenin hukuka aykırı faaliyeti, gerçeğe aykırı beyanı, gerekli ruhsat veya izinlere sahip olmaması, üçüncü kişilerin haklarını ihlal etmesi, Kullanıcıya karşı yükümlülüklerini ihlal etmesi veya bu Sözleşmeye aykırı davranması nedeniyle TEKNONET'e yöneltilen talep, idari yaptırım, mahkeme veya hakem kararı ya da üçüncü kişi zararı bakımından; İşletmenin kusuru ve fiili ile zarar arasındaki illiyet bağı ölçüsünde TEKNONET'in kanunen İşletmeye rücu edebileceği zarar, gider ve feriler saklıdır.",
+        "Bu madde TEKNONET'in kendi kusurundan veya kanunen kendisine ait yükümlülüklerden doğan sorumluluğu İşletmeye aktarmak amacıyla yorumlanamaz."
+      ]},
+      { title: "17. Kayıtlar, Bildirimler ve Deliller", paragraphs: [
+        "Platform üzerinde oluşturulan başvuru, profil, teklif, moderasyon, bildirim, işlem zamanı, güvenlik ve benzeri sistem kayıtları; kişisel verilerin korunması ve ilgili usul hukuku hükümleri saklı kalmak üzere, uyuşmazlıkların araştırılması, Platform güvenliği ve hukuki hakların korunması amacıyla saklanabilir ve kanunen izin verilen ölçüde delil olarak ileri sürülebilir.",
+        "İşletme, hesap ve iletişim bilgilerini güncel tutmakla yükümlüdür. Platformda kayıtlı iletişim kanalına gönderilen bildirimlerin ulaştırılabilmesi için gerekli güncellemeleri yapmak İşletmenin sorumluluğundadır."
+      ]},
+      { title: "18. Güncelleme ve Uygulanacak Hukuk", paragraphs: [
         "Bu koşullar mevzuat, ticari model ve Platform özellikleri değiştikçe güncellenebilir. Türkiye Cumhuriyeti hukuku uygulanır; görevli ve yetkili merciler uyuşmazlığın niteliğine göre ilgili mevzuata göre belirlenir."
       ]}
     ]

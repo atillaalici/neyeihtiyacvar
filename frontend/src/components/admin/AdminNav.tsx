@@ -9,6 +9,7 @@ import {
   History,
   LayoutDashboard,
   Store,
+  ShieldAlert,
   TicketPercent,
   Users,
 } from "lucide-react";
@@ -45,6 +46,11 @@ const items = [
     href: "/admin/pasifler",
     label: "Pasifler",
     icon: Archive,
+  },
+  {
+    href: "/admin/moderasyon",
+    label: "Moderasyon",
+    icon: ShieldAlert,
   },
   {
     href: "/admin/promosyonlar",

@@ -43,7 +43,24 @@ export default function BusinessPhotoManager() {
   }
 
   useEffect(() => {
-    void load();
+    let active = true;
+    void (async () => {
+      const token = getAccessToken();
+      if (!token) return;
+      const [providerResponse, photosResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/provider-panel/me`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+        fetch(`${apiBaseUrl}/api/provider-panel/image`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+      ]);
+      if (!active) return;
+      if (providerResponse.ok) setProvider(await providerResponse.json());
+      if (photosResponse.ok && active) {
+        const data = await photosResponse.json();
+        if (!active) return;
+        setPhotos(Array.isArray(data) ? data : []);
+        setLegacyOk(true);
+      }
+    })();
+    return () => { active = false; };
   }, []);
 
   const cover = useMemo(

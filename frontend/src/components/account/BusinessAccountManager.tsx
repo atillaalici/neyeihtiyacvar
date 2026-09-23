@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Building2, LocateFixed, Save } from "lucide-react";
+import { Building2, LocateFixed, MapPin, Save, Tags } from "lucide-react";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 
@@ -13,700 +13,206 @@ const BusinessLocationMap = dynamic(
 
 type District = { id: string; name: string; slug: string };
 type City = { id: string; name: string; slug: string; districts: District[] };
-
+type Category = { id: string; name: string; slug: string; services: string[] };
 type ProviderProfile = {
-  id: string;
-  businessName: string;
-  categoryName?: string | null;
-  serviceName?: string | null;
-  categorySlug?: string | null;
-  serviceSlug?: string | null;
-  description?: string | null;
-  publicPhone?: string | null;
-  publicWhatsapp?: string | null;
-  publicAddress?: string | null;
-  citySlug?: string | null;
-  districtSlug?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  workingHours?: string | null;
-  experienceYears?: number | null;
-  emergencyService?: boolean;
-  onsiteService?: boolean;
+  id: string; businessName: string; description?: string | null;
+  categorySlug?: string | null; serviceSlug?: string | null;
+  additionalServices?: string[]; publicPhone?: string | null;
+  publicWhatsapp?: string | null; publicAddress?: string | null;
+  citySlug?: string | null; districtSlug?: string | null;
+  latitude?: number | null; longitude?: number | null; version: number;
 };
 
-type MapLocation = {
-  latitude: number;
-  longitude: number;
-  address?: string;
-  city?: string;
-  district?: string;
-  districtCandidates?: string[];
-};
-
-function normalizeLocationName(value: string) {
-  return value
-    .trim()
-    .toLocaleLowerCase("tr-TR")
-    .replaceAll("ı", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ş", "s")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c")
-    .replace(/\b(ili|ilcesi|ilçe|merkez ilce|merkez ilçesi)\b/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+function slugify(v: string) {
+  return v.trim().toLocaleLowerCase("tr-TR")
+    .replaceAll("ı","i").replaceAll("ğ","g").replaceAll("ü","u")
+    .replaceAll("ş","s").replaceAll("ö","o").replaceAll("ç","c")
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
-
-function namesMatch(left?: string | null, right?: string | null) {
-  if (!left || !right) return false;
-  const a = normalizeLocationName(left);
-  const b = normalizeLocationName(right);
-  return a === b || a.includes(b) || b.includes(a);
+function categoryAlias(v?: string | null) {
+  return ["nakliye-tasima","nakliye-hafriyat","hafriyat-nakliyat","hafriyat-ve-nakliyat","insaat-hafriyat"].includes(v ?? "")
+    ? "nakliye-ve-hafriyat" : (v ?? "");
 }
-
-async function reverseGeocode(latitude: number, longitude: number) {
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=tr`,
-      { headers: { Accept: "application/json" } },
-    );
-    if (!response.ok) return undefined;
-
-    const data = (await response.json()) as {
-      display_name?: string;
-      address?: {
-        province?: string;
-        state?: string;
-        city?: string;
-        town?: string;
-        county?: string;
-        municipality?: string;
-        city_district?: string;
-        district?: string;
-      };
-    };
-
-    const details = data.address;
-    return {
-      address: data.display_name,
-      city: details?.province ?? details?.state ?? details?.city,
-      district:
-        details?.county ??
-        details?.city_district ??
-        details?.municipality ??
-        details?.district ??
-        details?.town,
-      districtCandidates: [
-        details?.county,
-        details?.city_district,
-        details?.municipality,
-        details?.district,
-        details?.town,
-        details?.city,
-      ].filter((value): value is string => Boolean(value)),
-    };
-  } catch {
-    return undefined;
-  }
-}
+function serviceAlias(v?: string | null) { return v === "hafriyat" ? "hafriyat-isleri" : (v ?? ""); }
 
 export default function BusinessAccountManager() {
-  const [profile, setProfile] = useState<ProviderProfile | null>(null);
-  const [cities, setCities] = useState<City[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [editingBusiness, setEditingBusiness] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [description, setDescription] = useState("");
-  const [publicPhone, setPublicPhone] = useState("");
-  const [publicWhatsapp, setPublicWhatsapp] = useState("");
-  const [publicAddress, setPublicAddress] = useState("");
-  const [citySlug, setCitySlug] = useState("");
-  const [districtSlug, setDistrictSlug] = useState("");
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+  const [profile,setProfile]=useState<ProviderProfile|null>(null);
+  const [cities,setCities]=useState<City[]>([]);
+  const [categories,setCategories]=useState<Category[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState("");
+  const [locating,setLocating]=useState(false);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
 
-  const selectedCity = useMemo(
-    () => cities.find((city) => city.slug === citySlug) ?? null,
-    [cities, citySlug],
-  );
+  const [businessName,setBusinessName]=useState("");
+  const [description,setDescription]=useState("");
+  const [publicPhone,setPublicPhone]=useState("");
+  const [publicWhatsapp,setPublicWhatsapp]=useState("");
+  const [categorySlug,setCategorySlug]=useState("");
+  const [serviceSlug,setServiceSlug]=useState("");
+  const [secondCategorySlug,setSecondCategorySlug]=useState("");
+  const [secondServiceSlug,setSecondServiceSlug]=useState("");
+  const [publicAddress,setPublicAddress]=useState("");
+  const [citySlug,setCitySlug]=useState("");
+  const [districtSlug,setDistrictSlug]=useState("");
+  const [latitude,setLatitude]=useState<number|null>(null);
+  const [longitude,setLongitude]=useState<number|null>(null);
 
-  const selectedDistrict = useMemo(
-    () =>
-      selectedCity?.districts.find((district) => district.slug === districtSlug) ??
-      null,
-    [selectedCity, districtSlug],
-  );
+  const selectedCity=useMemo(()=>cities.find(x=>x.slug===citySlug)??null,[cities,citySlug]);
+  const selectedCategory=useMemo(()=>categories.find(x=>x.slug===categorySlug)??null,[categories,categorySlug]);
+  const selectedSecondCategory=useMemo(()=>categories.find(x=>x.slug===secondCategorySlug)??null,[categories,secondCategorySlug]);
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      const token = getAccessToken();
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const [providerResponse, locationsResponse] = await Promise.all([
-          fetch(`${apiBaseUrl}/api/provider-panel/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-            cache: "no-store",
-          }),
-          fetch(`${apiBaseUrl}/api/locations`, { cache: "no-store" }),
+  useEffect(()=>{
+    let active=true;
+    async function load(){
+      const token=getAccessToken();
+      if(!token){setLoading(false);return;}
+      try{
+        const [pr,lr,cr]=await Promise.all([
+          fetch(`${apiBaseUrl}/api/provider-panel/me`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"}),
+          fetch(`${apiBaseUrl}/api/locations`,{cache:"no-store"}),
+          fetch(`${apiBaseUrl}/api/categories`,{cache:"no-store"})
         ]);
-
-        if (!providerResponse.ok) {
-          throw new Error("İşletme bilgileri alınamadı.");
+        if(!pr.ok||!lr.ok||!cr.ok) throw new Error("Hesap bilgileri yüklenemedi.");
+        const p=await pr.json() as ProviderProfile;
+        const l=await lr.json() as City[];
+        const c=await cr.json() as Category[];
+        if(!active)return;
+        setProfile(p);setCities(l);setCategories(c);
+        setBusinessName(p.businessName??"");setDescription(p.description??"");
+        setPublicPhone(p.publicPhone??"");setPublicWhatsapp(p.publicWhatsapp??"");
+        setPublicAddress(p.publicAddress??"");setCitySlug(p.citySlug??"");
+        setDistrictSlug(p.districtSlug??"");setLatitude(p.latitude??null);setLongitude(p.longitude??null);
+        setCategorySlug(categoryAlias(p.categorySlug));setServiceSlug(serviceAlias(p.serviceSlug));
+        const second=p.additionalServices?.[0]??"";
+        if(second){
+          const owner=c.find(cat=>cat.services.some(name=>slugify(name)===second));
+          setSecondCategorySlug(owner?.slug??"");setSecondServiceSlug(second);
         }
+      }catch(e){if(active)setError(e instanceof Error?e.message:"Bilgiler yüklenemedi.");}
+      finally{if(active)setLoading(false);}
+    }
+    void load(); return()=>{active=false;};
+  },[]);
 
-        const data = (await providerResponse.json()) as ProviderProfile;
-        const locationData = locationsResponse.ok
-          ? ((await locationsResponse.json()) as City[])
-          : [];
-
-        if (!active) return;
-
-        setProfile(data);
-        setCities(locationData);
-        setBusinessName(data.businessName ?? "");
-        setDescription(data.description ?? "");
-        setPublicPhone(data.publicPhone ?? "");
-        setPublicWhatsapp(data.publicWhatsapp ?? "");
-        setPublicAddress(data.publicAddress ?? "");
-        setCitySlug(data.citySlug ?? "");
-        setDistrictSlug(data.districtSlug ?? "");
-        setLatitude(data.latitude ?? null);
-        setLongitude(data.longitude ?? null);
-      } catch (e) {
-        if (active) {
-          setError(
-            e instanceof Error ? e.message : "İşletme bilgileri yüklenemedi.",
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
+  async function put(path:string,body:object,key:string){
+    const token=getAccessToken(); if(!token)throw new Error("Oturum bilgisi bulunamadı.");
+    setSaving(key);setError("");setMessage("");
+    try{
+      const r=await fetch(`${apiBaseUrl}${path}`,{method:"PUT",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const d=await r.json().catch(()=>null);
+      if(!r.ok){
+        const detail = d?.message ?? (d?.errors ? Object.values(d.errors).flat().join(" ") : null) ?? `Değişiklik kaydedilemedi. HTTP ${r.status}`;
+        throw new Error(String(detail));
       }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  function applyAdministrativeArea(
-    city?: string,
-    district?: string,
-    districtCandidates: string[] = [],
-  ) {
-    if (!city && !district && districtCandidates.length === 0) return;
-
-    const matchedCity =
-      cities.find(
-        (candidate) =>
-          namesMatch(candidate.name, city) || namesMatch(candidate.slug, city),
-      ) ??
-      cities.find((candidate) =>
-        [district, ...districtCandidates].some((value) =>
-          candidate.districts.some(
-            (item) =>
-              namesMatch(item.name, value) || namesMatch(item.slug, value),
-          ),
-        ),
-      );
-
-    if (!matchedCity) return;
-
-    setCitySlug(matchedCity.slug);
-
-    const candidates = [district, ...districtCandidates].filter(
-      (value): value is string => Boolean(value),
-    );
-
-    const matchedDistrict = matchedCity.districts.find((item) =>
-      candidates.some(
-        (value) =>
-          namesMatch(item.name, value) || namesMatch(item.slug, value),
-      ),
-    );
-
-    setDistrictSlug(matchedDistrict?.slug ?? "");
+      if(typeof d?.version==="number")setProfile(o=>o?{...o,version:d.version}:o);
+      setMessage(String(d?.message??"Değişiklikler kaydedildi."));return d;
+    }finally{setSaving("");}
   }
 
-  function applyMapLocation(value: MapLocation) {
-    setLatitude(value.latitude);
-    setLongitude(value.longitude);
-    if (value.address) setPublicAddress(value.address);
-    applyAdministrativeArea(
-      value.city,
-      value.district,
-      value.districtCandidates ?? [],
-    );
+  async function saveBusiness(){
+    if(!profile)return;
+    try{
+      const d=await put("/api/provider-panel/me/business",{expectedVersion:profile.version,businessName:businessName.trim(),description:description.trim()||null,publicPhone:publicPhone.trim()||null,publicWhatsapp:publicWhatsapp.trim()||null},"business");
+      setProfile(o=>o?{...o,businessName:d.businessName??businessName.trim(),description:d.description??null,publicPhone:d.publicPhone??null,publicWhatsapp:d.publicWhatsapp??null,version:d.version??o.version}:o);
+    }catch(e){setError(e instanceof Error?e.message:"İşletme bilgileri kaydedilemedi.");}
   }
 
-  function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setError("Tarayıcınız konum özelliğini desteklemiyor.");
-      return;
-    }
+  async function saveCatalog(){
+    if(!profile)return;
+    if(!categorySlug||!serviceSlug){setError("Ana kategori ve ana hizmet seçilmelidir.");return;}
+    try{
+      const d=await put("/api/provider-panel/me/catalog",{expectedVersion:profile.version,categorySlug,serviceSlug,additionalCategorySlug:secondCategorySlug||null,additionalServiceSlug:secondServiceSlug||null},"catalog");
+      setProfile(o=>o?{...o,categorySlug:d.categorySlug??categorySlug,serviceSlug:d.serviceSlug??serviceSlug,additionalServices:d.additionalServices??[],version:d.version??o.version}:o);
+    }catch(e){setError(e instanceof Error?e.message:"Kategori ve hizmetler kaydedilemedi.");}
+  }
 
+  async function saveLocation(){
+    if(!profile)return;
+    if(!citySlug||!districtSlug){setError("İl ve ilçe seçilmelidir.");return;}
+    if(latitude===null||longitude===null){setError("Haritadan işletme konumunu seçin.");return;}
+    try{await put("/api/provider-panel/me/location",{citySlug,districtSlug,publicAddress:publicAddress.trim()||null,latitude,longitude},"location");}
+    catch(e){setError(e instanceof Error?e.message:"Adres ve konum kaydedilemedi.");}
+  }
+
+  function useCurrentLocation(){
+    if(!navigator.geolocation){setError("Tarayıcınız konum özelliğini desteklemiyor.");return;}
     setLocating(true);
-    setError("");
-    setMessage("");
-
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const nextLatitude = position.coords.latitude;
-        const nextLongitude = position.coords.longitude;
-
-        setLatitude(nextLatitude);
-        setLongitude(nextLongitude);
-
-        const location = await reverseGeocode(nextLatitude, nextLongitude);
-
-        if (location?.address) setPublicAddress(location.address);
-        applyAdministrativeArea(
-          location?.city,
-          location?.district,
-          location?.districtCandidates ?? [],
-        );
-
-        setLocating(false);
-        setMessage(
-          "Konum alındı. İl, ilçe ve adresi kontrol edip Değişiklikleri Kaydet butonuna basın.",
-        );
-      },
-      () => {
-        setLocating(false);
-        setError("Konum alınamadı. Tarayıcı konum iznini kontrol edin.");
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
+      p=>{setLatitude(p.coords.latitude);setLongitude(p.coords.longitude);setLocating(false);},
+      ()=>{setError("Konum alınamadı. Haritadan seçebilirsiniz.");setLocating(false);},
+      {enableHighAccuracy:true,timeout:12000}
     );
   }
 
-  async function saveLocation() {
-    const token = getAccessToken();
-    if (!token || !profile) {
-      setError("Oturum bilgisi bulunamadı.");
-      return;
-    }
+  if(loading)return <div className="rounded-2xl border bg-white p-6">İşletme bilgileri yükleniyor...</div>;
+  if(!profile)return <div className="rounded-2xl border bg-white p-6">İşletme profili bulunamadı.</div>;
 
-    if (!citySlug || !districtSlug) {
-      setError("Lütfen il ve ilçe seçin.");
-      return;
-    }
+  const card="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
+  const selectClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100";
 
-    if (latitude === null || longitude === null) {
-      setError("Lütfen haritadan işletme konumunu seçin.");
-      return;
-    }
+  return <div className="space-y-4">
+    {message&&<div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</div>}
+    {error&&<div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/provider-panel/me/location`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          citySlug,
-          districtSlug,
-          publicAddress: publicAddress.trim() || null,
-          latitude,
-          longitude,
-        }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          String(data?.message ?? "Konum ve adres kaydedilemedi."),
-        );
-      }
-
-      setProfile((old) =>
-        old
-          ? {
-              ...old,
-              citySlug: data?.citySlug ?? citySlug,
-              districtSlug: data?.districtSlug ?? districtSlug,
-              publicAddress: data?.publicAddress ?? (publicAddress.trim() || null),
-              latitude: data?.latitude ?? latitude,
-              longitude: data?.longitude ?? longitude,
-            }
-          : old,
-      );
-
-      setMessage(data?.message ?? "Konum ve adres kaydedildi.");
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Sunucuya bağlanılamadı.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-  async function saveProvider() {
-    const token = getAccessToken();
-    if (!token || !profile) return;
-
-    if (!citySlug || !districtSlug) {
-      setError("Lütfen il ve ilçe seçin.");
-      return;
-    }
-
-    if (latitude === null || longitude === null) {
-      setError("Lütfen haritadan işletme konumunu seçin.");
-      return;
-    }
-
-    setSaving(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/provider-panel/me`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          businessName: businessName.trim(),
-          description: description.trim() || null,
-          publicPhone: publicPhone.trim() || null,
-          publicWhatsapp: publicWhatsapp.trim() || null,
-          publicAddress: publicAddress.trim() || null,
-          citySlug,
-          districtSlug,
-          latitude,
-          longitude,
-          categorySlug: profile.categorySlug ?? null,
-          serviceSlug: profile.serviceSlug ?? null,
-          workingHours: profile.workingHours ?? null,
-          experienceYears: profile.experienceYears ?? null,
-          emergencyService: profile.emergencyService ?? false,
-          onsiteService: profile.onsiteService ?? false,
-        }),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        const firstError =
-          data?.errors &&
-          Object.values(data.errors).flat().find((item) => Boolean(item));
-        throw new Error(
-          String(
-            firstError ??
-              data?.message ??
-              "İşletme bilgileri kaydedilemedi.",
-          ),
-        );
-      }
-
-      setProfile((old) =>
-        old
-          ? {
-              ...old,
-              businessName: businessName.trim(),
-              description: description.trim() || null,
-              publicPhone: publicPhone.trim() || null,
-              publicWhatsapp: publicWhatsapp.trim() || null,
-              publicAddress: publicAddress.trim() || null,
-              citySlug,
-              districtSlug,
-              latitude,
-              longitude,
-            }
-          : old,
-      );
-
-      setEditingBusiness(false);
-      setMessage(data?.message ?? "İşletme bilgileri ve konum kaydedildi.");
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Sunucuya bağlanılamadı.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="h-80 animate-pulse rounded-2xl border border-slate-200 bg-white" />
-    );
-  }
-
-  if (!profile) return null;
-
-  return (
-    <div className="space-y-3">
-      {message && (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      <section
-        id="isletme-bilgileri"
-        className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
-              <Building2 className="size-5" />
-            </span>
-            <div>
-              <h2 className="text-2xl font-black text-slate-950">
-                İşletme Bilgileri
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                İşletmenizin müşterilere görünen temel bilgileri.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setEditingBusiness((value) => !value)}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-50"
-          >
-            {editingBusiness ? "Vazgeç" : "Düzenle"}
-          </button>
-        </div>
-
-        {!editingBusiness ? (
-          <div className="mt-6 grid gap-x-8 gap-y-5 md:grid-cols-3">
-            <Info label="İşletme Adı" value={profile.businessName || "-"} />
-            <Info label="Telefon" value={profile.publicPhone || "-"} />
-            <Info label="WhatsApp" value={profile.publicWhatsapp || "-"} />
-            <Info
-              label="Kategori"
-              value={profile.categoryName || profile.categorySlug || "-"}
-            />
-            <Info
-              label="Alt Hizmet"
-              value={profile.serviceName || profile.serviceSlug || "-"}
-            />
-            <Info label="Açıklama" value={profile.description || "-"} />
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <Field
-              label="İşletme Adı"
-              value={businessName}
-              onChange={setBusinessName}
-            />
-            <Field
-              label="Telefon"
-              value={publicPhone}
-              onChange={setPublicPhone}
-            />
-            <Field
-              label="WhatsApp"
-              value={publicWhatsapp}
-              onChange={setPublicWhatsapp}
-            />
-            <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-semibold text-slate-700">
-                Açıklama
-              </span>
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={4}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-              />
-            </label>
-          </div>
-        )}
-      </section>
-
-      <section
-        id="konum-adres"
-        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-      >
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-slate-900">Konum ve Adres</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            İl ve ilçeyi elle seçebilir veya haritadan otomatik
-            belirleyebilirsiniz.
-          </p>
-        </div>
-
-        <div className="grid items-stretch gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(440px,1.35fr)]">
-          <div className="min-w-0">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-slate-700">İl</span>
-                <select
-                  value={citySlug}
-                  onChange={(event) => {
-                    setCitySlug(event.target.value);
-                    setDistrictSlug("");
-                  }}
-                  className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                >
-                  <option value="">İl seçin</option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.slug}>
-                      {city.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold text-slate-700">
-                  İlçe
-                </span>
-                <select
-                  value={districtSlug}
-                  onChange={(event) => setDistrictSlug(event.target.value)}
-                  disabled={!selectedCity}
-                  className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                >
-                  <option value="">İlçe seçin</option>
-                  {(selectedCity?.districts ?? []).map((district) => (
-                    <option key={district.id} value={district.slug}>
-                      {district.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Seçili konum:{" "}
-              <strong className="text-slate-900">
-                {selectedCity?.name ?? "-"} / {selectedDistrict?.name ?? "-"}
-              </strong>
-            </div>
-
-            <label className="mt-4 grid gap-2">
-              <span className="text-sm font-semibold text-slate-700">
-                Adres
-              </span>
-              <textarea
-                value={publicAddress}
-                onChange={(event) => setPublicAddress(event.target.value)}
-                rows={3}
-                maxLength={500}
-                placeholder="Mahalle, cadde, sokak, bina no..."
-                className="min-h-[94px] resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-              />
-              <span className="text-right text-xs text-slate-400">
-                {publicAddress.length}/500
-              </span>
-            </label>
-
-            <button
-              type="button"
-              onClick={useCurrentLocation}
-              disabled={locating}
-              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60"
-            >
-              <LocateFixed className="size-4" />
-              {locating
-                ? "Konum alınıyor..."
-                : latitude !== null && longitude !== null
-                  ? "Mevcut Konumla Güncelle"
-                  : "Mevcut Konumumu Kullan"}
-            </button>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <InfoBox
-                label="Enlem (Latitude)"
-                value={latitude !== null ? latitude.toFixed(6) : "-"}
-              />
-              <InfoBox
-                label="Boylam (Longitude)"
-                value={longitude !== null ? longitude.toFixed(6) : "-"}
-              />
-            </div>
-          </div>
-
-          <div className="min-h-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <BusinessLocationMap
-              latitude={latitude}
-              longitude={longitude}
-              onChange={applyMapLocation}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={() => void saveLocation()}
-            disabled={saving}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-orange-600 px-6 text-sm font-bold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Save className="size-4" />
-            {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-1 break-words font-semibold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-orange-200"
-      />
-    </label>
-  );
-}
-
-function InfoBox({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="mb-2 text-sm font-semibold text-slate-600">{label}</p>
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-medium text-slate-700">
-        {value}
+    <section className={card}>
+      <Header icon={Building2} title="İşletme Bilgileri" text="Müşterilere görünen temel bilgiler."/>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <Field label="İşletme Adı" value={businessName} onChange={setBusinessName}/>
+        <Field label="Telefon" value={publicPhone} onChange={setPublicPhone}/>
+        <Field label="WhatsApp" value={publicWhatsapp} onChange={setPublicWhatsapp}/>
+        <label className="grid gap-1.5 md:col-span-2"><span className="text-sm font-semibold text-slate-700">Açıklama</span>
+          <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"/>
+        </label>
       </div>
-    </div>
-  );
+      <SaveButton busy={saving==="business"} onClick={saveBusiness} text="İşletme Bilgilerini Kaydet"/>
+    </section>
+
+    <section className={card}>
+      <Header icon={Tags} title="Kategori ve Hizmetler" text="Hizmet alanlarınızı buradan değiştirebilirsiniz."/>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <Select label="Ana Kategori" value={categorySlug} className={selectClass} onChange={v=>{setCategorySlug(v);setServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
+        <Select label="Ana Hizmet" value={serviceSlug} className={selectClass} disabled={!selectedCategory} onChange={setServiceSlug} options={(selectedCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
+        <Select label="2. Kategori (isteğe bağlı)" value={secondCategorySlug} className={selectClass} allowEmpty onChange={v=>{setSecondCategorySlug(v);setSecondServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
+        <Select label="2. Hizmet (isteğe bağlı)" value={secondServiceSlug} className={selectClass} allowEmpty disabled={!selectedSecondCategory} onChange={setSecondServiceSlug} options={(selectedSecondCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
+      </div>
+      <SaveButton busy={saving==="catalog"} onClick={saveCatalog} text="Kategori ve Hizmetleri Kaydet"/>
+    </section>
+
+    <section className={card}>
+      <Header icon={MapPin} title="Adres ve Konum" text="Adresinizi ve harita konumunuzu güncelleyin."/>
+      <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Select label="İl" value={citySlug} className={selectClass} onChange={v=>{setCitySlug(v);setDistrictSlug("");}} options={cities.map(x=>({value:x.slug,label:x.name}))}/>
+            <Select label="İlçe" value={districtSlug} className={selectClass} disabled={!selectedCity} onChange={setDistrictSlug} options={(selectedCity?.districts??[]).map(x=>({value:x.slug,label:x.name}))}/>
+          </div>
+          <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-700">Açık Adres</span>
+            <textarea value={publicAddress} onChange={e=>setPublicAddress(e.target.value)} rows={3} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"/>
+          </label>
+          <button type="button" onClick={useCurrentLocation} disabled={locating} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 text-sm font-bold text-orange-700 hover:bg-orange-100">
+            <LocateFixed className="size-4"/>{locating?"Konum alınıyor...":"Mevcut Konumumu Kullan"}
+          </button>
+        </div>
+        <div className="min-h-[280px] overflow-hidden rounded-xl border border-slate-200">
+          <BusinessLocationMap latitude={latitude} longitude={longitude} onChange={loc=>{setLatitude(loc.latitude);setLongitude(loc.longitude);if(loc.address)setPublicAddress(loc.address);}}/>
+        </div>
+      </div>
+      <SaveButton busy={saving==="location"} onClick={saveLocation} text="Adres ve Konumu Kaydet"/>
+    </section>
+  </div>;
 }
 
+function Header({icon:Icon,title,text}:{icon:typeof Building2;title:string;text:string}){
+  return <div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-full bg-orange-50 text-orange-600"><Icon className="size-5"/></span><div><h2 className="text-xl font-black text-slate-950">{title}</h2><p className="text-sm text-slate-500">{text}</p></div></div>;
+}
+function Field({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}){
+  return <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><input value={value} onChange={e=>onChange(e.target.value)} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"/></label>;
+}
+function Select({label,value,onChange,options,disabled,allowEmpty,className}:{label:string;value:string;onChange:(v:string)=>void;options:{value:string;label:string}[];disabled?:boolean;allowEmpty?:boolean;className?:string}){
+  return <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-700">{label}</span><select value={value} disabled={disabled} onChange={e=>onChange(e.target.value)} className={className}><option value="">{allowEmpty?"Seçim yok":"Seçin"}</option>{options.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></label>;
+}
+function SaveButton({busy,onClick,text}:{busy:boolean;onClick:()=>void|Promise<void>;text:string}){
+  return <div className="mt-4 flex justify-end"><button type="button" disabled={busy} onClick={()=>void onClick()} className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange-600 px-5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50"><Save className="size-4"/>{busy?"Kaydediliyor...":text}</button></div>;
+}

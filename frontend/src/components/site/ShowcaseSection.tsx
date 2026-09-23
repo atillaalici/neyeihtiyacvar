@@ -18,7 +18,7 @@ const categories = [
   { title: "Usta & Tamir", image: "/vitrin/usta-tamir.png", href: "/kategoriler/usta-tamir" },
   { title: "Ev & Yaşam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
   { title: "Nakliye & Taşıma", image: "/vitrin/nakliye-tasima.png", href: "/kategoriler/nakliye-tasima" },
-  { title: "Teknoloji", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji" },
+  { title: "Teknoloji", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji-yazilim" },
   { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
   { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
   { title: "Organizasyon", image: "/vitrin/organizasyon.png", href: "/kategoriler/organizasyon" },

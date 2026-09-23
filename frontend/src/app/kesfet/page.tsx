@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -326,8 +327,12 @@ function ExplorePageContent() {
             ? `${apiBaseUrl}/api/providers?${providerQueryString}`
             : `${apiBaseUrl}/api/providers`;
 
+          const token = getAccessToken();
           const response = await fetch(url, {
             cache: "no-store",
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : undefined,
           });
 
           if (!response.ok) {
@@ -476,6 +481,19 @@ function ExplorePageContent() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          try {
+            localStorage.setItem(
+              "niv_current_location",
+              JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                updatedAt: Date.now(),
+              }),
+            );
+            localStorage.setItem("niv_location_preference", "allowed");
+          } catch {}
+
           const params = new URLSearchParams({
             lat: String(position.coords.latitude),
             lon: String(position.coords.longitude),
@@ -562,6 +580,53 @@ function ExplorePageContent() {
     nearbyAutoTriggeredRef.current = true;
 
     const timer = window.setTimeout(() => {
+      try {
+        const stored = localStorage.getItem("niv_current_location");
+        if (stored) {
+          const parsed = JSON.parse(stored) as {
+            latitude?: number;
+            longitude?: number;
+          };
+
+          if (
+            typeof parsed.latitude === "number" &&
+            typeof parsed.longitude === "number"
+          ) {
+            setLocating(true);
+            const locationParams = new URLSearchParams({
+              lat: String(parsed.latitude),
+              lon: String(parsed.longitude),
+            });
+
+            void fetch(
+              `${apiBaseUrl}/api/recommendations/location?${locationParams.toString()}`,
+              { cache: "no-store" },
+            )
+              .then(async (response) => {
+                if (!response.ok) throw new Error();
+                return (await response.json()) as {
+                  found: boolean;
+                  citySlug: string | null;
+                  districtSlug: string | null;
+                };
+              })
+              .then((data) => {
+                if (data.found && data.citySlug && data.districtSlug) {
+                  applyLocation({
+                    city: data.citySlug,
+                    district: data.districtSlug,
+                  });
+                  return;
+                }
+                requestDeviceLocation();
+              })
+              .catch(() => requestDeviceLocation())
+              .finally(() => setLocating(false));
+            return;
+          }
+        }
+      } catch {}
+
       requestDeviceLocation();
     }, 0);
 

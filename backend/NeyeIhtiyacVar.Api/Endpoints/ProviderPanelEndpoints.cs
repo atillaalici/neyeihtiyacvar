@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Notifications;
+
+using NeyeIhtiyacVar.Api.Infrastructure.Email;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
@@ -82,9 +84,11 @@ public static class ProviderPanelEndpoints
             var errors = ValidateOwnUpdate(request);
 
             var categorySlug =
-                request.CategorySlug?.Trim() ?? string.Empty;
+                NormalizeProviderCategorySlug(
+                    request.CategorySlug?.Trim() ?? string.Empty);
             var serviceSlug =
-                request.ServiceSlug?.Trim() ?? string.Empty;
+                NormalizeProviderServiceSlug(
+                    request.ServiceSlug?.Trim() ?? string.Empty);
 
             var category = await dbContext.Categories
                 .AsNoTracking()
@@ -115,7 +119,7 @@ public static class ProviderPanelEndpoints
                     ["Ana hizmet seÃ§ilen kategoriye ait olmalÄ±dÄ±r."];
             }
             var normalizedAdditionalServices =
-                request.AdditionalServices
+                (request.AdditionalServices ?? [])
                     .Select(x =>
                         x?.Trim().ToLowerInvariant()
                         ?? string.Empty)
@@ -191,6 +195,13 @@ public static class ProviderPanelEndpoints
                 });
             }
 
+            var moderation = ProviderContentModeration.Check(
+                provider.BusinessName,
+                provider.ShortDescription,
+                request.Description,
+                request.PublicAddress,
+                request.WorkingHours);
+
             var previousAdditionalServices =
                 provider.AdditionalServices
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -210,6 +221,14 @@ public static class ProviderPanelEndpoints
             provider.ExperienceYears = request.ExperienceYears;
             provider.EmergencyService = request.EmergencyService;
             provider.OnsiteService = request.OnsiteService;
+
+            if (moderation.RequiresReview &&
+                provider.PublicationStatus == PublicationStatus.Published)
+            {
+                provider.PublicationStatus = PublicationStatus.Unpublished;
+                provider.PublishedAtUtc = null;
+            }
+
             provider.UpdatedAtUtc = DateTime.UtcNow;
             provider.Version++;
 
@@ -235,6 +254,191 @@ public static class ProviderPanelEndpoints
                     x.TargetProviderId == provider.Id);
 
             return Results.Ok(ToPanelProfile(provider, matchedNeedCount));
+        });
+
+        group.MapPut("/me/business", async (
+            UpdateOwnProviderBusinessRequest request,
+            ClaimsPrincipal principal,
+            IEmailSender emailSender,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+                return Results.Unauthorized();
+
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "Bu hesaba bağlı işletme bulunamadı." });
+
+            if (request.ExpectedVersion != provider.Version)
+                return Results.Conflict(new
+                {
+                    message = "İşletme bilgileri başka bir işlemde değişti. Sayfayı yenileyip tekrar deneyin.",
+                    currentVersion = provider.Version
+                });
+
+            var businessName = request.BusinessName?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(businessName))
+                return Results.BadRequest(new { message = "İşletme adı zorunludur." });
+            if (businessName.Length > 200)
+                return Results.BadRequest(new { message = "İşletme adı en fazla 200 karakter olabilir." });
+            if (request.Description?.Trim().Length > 4000)
+                return Results.BadRequest(new { message = "Açıklama en fazla 4000 karakter olabilir." });
+            if (request.PublicPhone?.Trim().Length > 30)
+                return Results.BadRequest(new { message = "Telefon en fazla 30 karakter olabilir." });
+            if (request.PublicWhatsapp?.Trim().Length > 30)
+                return Results.BadRequest(new { message = "WhatsApp numarası en fazla 30 karakter olabilir." });
+
+            var moderation = ProviderContentModeration.Check(businessName, request.Description);
+
+            provider.BusinessName = businessName;
+            provider.Description = Optional(request.Description);
+            provider.PublicPhone = Optional(request.PublicPhone);
+            provider.PublicWhatsapp = Optional(request.PublicWhatsapp);
+            if (moderation.RequiresReview)
+            {
+                provider.ModerationViolationCount++;
+                if (provider.OwnerUserId is Guid moderationOwnerUserId)
+                {
+                    var moderationOwner = await dbContext.Users.AsNoTracking()
+                        .Where(x => x.Id == moderationOwnerUserId)
+                        .Select(x => new { x.Email, x.DisplayName }).FirstOrDefaultAsync();
+                    if (moderationOwner is not null && !string.IsNullOrWhiteSpace(moderationOwner.Email))
+                    {
+                        _ = await emailSender.SendModerationNoticeAsync(
+                            moderationOwner.Email,
+                            moderationOwner.DisplayName ?? provider.BusinessName,
+                            provider.BusinessName,
+                            provider.LastModerationViolationReason ?? "Yasaklı veya kısıtlı içerik tespit edildi.",
+                            provider.ModerationViolationCount,
+                            provider.ModerationTerminated);
+                    }
+                }
+
+                provider.LastModerationViolationAtUtc = DateTime.UtcNow;
+                provider.LastModerationViolationReason =
+                    $"[{moderation.Code}] {moderation.Reason} | Dayanak: {moderation.LegalBasis}";
+                provider.PublicationStatus = PublicationStatus.Unpublished;
+                provider.PublishedAtUtc = null;
+
+                // 3. tespitte otomatik kalıcı silme YOK: hesap fesih/pasif durumuna alınır.
+                // Yanlış pozitiflerde verinin geri döndürülebilmesi için kayıt korunur.
+                if (provider.ModerationViolationCount >= 3)
+                {
+                    provider.IsActive = false;
+                    provider.ModerationTerminated = true;
+                }
+
+                if (provider.SourceApplicationId is Guid applicationId)
+                {
+                    var application = await dbContext.ProviderApplications
+                        .FirstOrDefaultAsync(x => x.Id == applicationId);
+                    if (application is not null)
+                    {
+                        application.Status = ProviderApplicationStatus.Pending;
+                        application.ReviewNote =
+                            $"[OTOMATİK MODERASYON] İhlal {provider.ModerationViolationCount}/3. " +
+                            $"{moderation.Reason} Dayanak: {moderation.LegalBasis}";
+                        application.ReviewedAtUtc = null;
+                        application.UpdatedAtUtc = DateTime.UtcNow;
+                        application.Version++;
+                    }
+                }
+
+                // İşletme sahibinin panel bildirim kaydı.
+                if (provider.OwnerUserId is Guid ownerId)
+                {
+                    dbContext.Notifications.Add(new Notification
+                    {
+                        UserId = ownerId,
+                        EventType = "provider.moderation-violation",
+                        Title = provider.ModerationTerminated
+                            ? "İşletme hesabınız fesih durumuna alındı"
+                            : "İşletmeniz moderasyon nedeniyle pasife alındı",
+                        Message = provider.ModerationTerminated
+                            ? $"Yasaklı/kısıtlı içerik politikası kapsamında 3. ihlal tespit edildi. İşletme hesabınız pasife alınarak fesih incelemesine alındı. Neden: {moderation.Reason}"
+                            : $"Yasaklı/kısıtlı içerik politikası kapsamında {provider.ModerationViolationCount}/3 ihlal tespit edildi. İşletmeniz pasife alındı. Neden: {moderation.Reason}",
+                        Link = "/hesabim",
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                }
+            }
+
+            provider.UpdatedAtUtc = DateTime.UtcNow;
+            provider.Version++;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                message = moderation.RequiresReview ? provider.ModerationTerminated
+                    ? "3. moderasyon ihlali tespit edildi. İşletme hesabı pasife alınarak fesih incelemesine alındı."
+                    : $"Yasaklı/kısıtlı içerik tespit edildi. İşletme pasife alındı ve yönetici incelemesine gönderildi. İhlal: {provider.ModerationViolationCount}/3." : "İşletme bilgileri kaydedildi.",
+                provider.BusinessName,
+                provider.Description,
+                provider.PublicPhone,
+                provider.PublicWhatsapp,
+                provider.Version
+            });
+        });
+
+        group.MapPut("/me/catalog", async (
+            UpdateOwnProviderCatalogRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId)) return Results.Unauthorized();
+            var provider = await dbContext.Providers.FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+            if (provider is null) return Results.NotFound(new { message = "Bu hesaba bağlı işletme bulunamadı." });
+            if (request.ExpectedVersion != provider.Version)
+                return Results.Conflict(new { message = "İşletme profili başka bir işlemde değişti. Sayfayı yenileyip tekrar deneyin.", currentVersion = provider.Version });
+
+            var categorySlug = NormalizeProviderCategorySlug(request.CategorySlug ?? "");
+            var serviceSlug = NormalizeProviderServiceSlug(request.ServiceSlug ?? "");
+            var category = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
+                .FirstOrDefaultAsync(x => x.IsActive && x.Slug == categorySlug);
+            if (category is null) return Results.BadRequest(new { message = "Geçerli bir ana kategori seçin." });
+
+            var serviceSlugs = category.Services.Where(x => x.IsActive).Select(x => ToSlug(x.Name))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!serviceSlugs.Contains(serviceSlug))
+                return Results.BadRequest(new { message = "Ana hizmet seçilen kategoriye ait olmalıdır." });
+
+            var secondCategorySlug = request.AdditionalCategorySlug?.Trim().ToLowerInvariant() ?? "";
+            var secondServiceSlug = request.AdditionalServiceSlug?.Trim().ToLowerInvariant() ?? "";
+            if (string.IsNullOrWhiteSpace(secondCategorySlug) != string.IsNullOrWhiteSpace(secondServiceSlug))
+                return Results.BadRequest(new { message = "2. hizmet için kategori ve hizmet birlikte seçilmelidir." });
+
+            if (!string.IsNullOrWhiteSpace(secondServiceSlug))
+            {
+                var secondCategory = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
+                    .FirstOrDefaultAsync(x => x.IsActive && x.Slug == secondCategorySlug);
+                if (secondCategory is null) return Results.BadRequest(new { message = "Geçerli bir 2. kategori seçin." });
+                var secondSlugs = secondCategory.Services.Where(x => x.IsActive).Select(x => ToSlug(x.Name))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (!secondSlugs.Contains(secondServiceSlug))
+                    return Results.BadRequest(new { message = "2. hizmet seçilen kategoriye ait olmalıdır." });
+                if (string.Equals(serviceSlug, secondServiceSlug, StringComparison.OrdinalIgnoreCase))
+                    return Results.BadRequest(new { message = "1. hizmet ile 2. hizmet aynı olamaz." });
+            }
+
+            var previous = provider.AdditionalServices.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            provider.CategorySlug = categorySlug;
+            provider.ServiceSlug = serviceSlug;
+            provider.AdditionalServices = string.IsNullOrWhiteSpace(secondServiceSlug) ? [] : [secondServiceSlug];
+            provider.UpdatedAtUtc = DateTime.UtcNow;
+            provider.Version++;
+
+            var newlyAdded = provider.AdditionalServices.Where(x => !previous.Contains(x)).ToArray();
+            if (newlyAdded.Length > 0)
+                await TrackedNeedMatchNotifier.NotifyForProviderAsync(dbContext, provider, newlyAdded);
+
+            await dbContext.SaveChangesAsync();
+            return Results.Ok(new {
+                message = "Kategori ve hizmetler kaydedildi.",
+                provider.CategorySlug, provider.ServiceSlug, provider.AdditionalServices, provider.Version
+            });
         });
 
         group.MapPut("/me/location", async (
@@ -612,13 +816,15 @@ public static class ProviderPanelEndpoints
                 ["Deneyim yÄ±lÄ± 0 ile 100 arasÄ±nda olmalÄ±dÄ±r."];
         }
 
-        if (request.AdditionalServices.Count > 1)
+        var additionalServices = request.AdditionalServices ?? [];
+
+        if (additionalServices.Count > 1)
         {
             errors["additionalServices"] =
                 ["En fazla 1 ek hizmet seÃ§ebilirsiniz."];
         }
 
-        if (request.AdditionalServices.Any(x =>
+        if (additionalServices.Any(x =>
             x is not null && x.Trim().Length > 150))
         {
             errors["additionalServices"] =
@@ -640,6 +846,24 @@ public static class ProviderPanelEndpoints
         var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(value, out userId);
     }
+
+    private static string NormalizeProviderCategorySlug(string value)
+        => value.Trim().ToLowerInvariant() switch
+        {
+            "nakliye-tasima" => "nakliye-ve-hafriyat",
+            "nakliye-hafriyat" => "nakliye-ve-hafriyat",
+            "hafriyat-nakliyat" => "nakliye-ve-hafriyat",
+            "hafriyat-ve-nakliyat" => "nakliye-ve-hafriyat",
+            "insaat-hafriyat" => "nakliye-ve-hafriyat",
+            var slug => slug
+        };
+
+    private static string NormalizeProviderServiceSlug(string value)
+        => value.Trim().ToLowerInvariant() switch
+        {
+            "hafriyat" => "hafriyat-isleri",
+            var slug => slug
+        };
 
     private static string ToSlug(string value)
     {
@@ -715,3 +939,11 @@ public sealed record UpdateProviderNotificationPreferences(
 
 
 
+
+public sealed record UpdateOwnProviderBusinessRequest(
+    int ExpectedVersion, string BusinessName, string? Description,
+    string? PublicPhone, string? PublicWhatsapp);
+
+public sealed record UpdateOwnProviderCatalogRequest(
+    int ExpectedVersion, string CategorySlug, string ServiceSlug,
+    string? AdditionalCategorySlug, string? AdditionalServiceSlug);

@@ -247,14 +247,6 @@ export default function HomeProvidersMapClient() {
     );
   }
 
-  if (mappedProviders.length === 0) {
-    return (
-      <div className="flex h-[360px] items-center justify-center rounded-2xl border bg-[#fffdf9] text-sm text-muted-foreground">
-        Harita konumu kayıtlı işletme bulunamadı.
-      </div>
-    );
-  }
-
   return (
     <>
       <style jsx global>{`

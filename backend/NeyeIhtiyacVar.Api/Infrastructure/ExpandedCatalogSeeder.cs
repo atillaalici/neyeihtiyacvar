@@ -292,6 +292,16 @@ public static class ExpandedCatalogSeeder
             ])
     ];
 
+    public static string? GetCanonicalCategorySlugForService(string serviceName)
+        => Catalog
+            .FirstOrDefault(category =>
+                category.Services.Any(service =>
+                    string.Equals(
+                        service,
+                        serviceName,
+                        StringComparison.OrdinalIgnoreCase)))
+            ?.Slug;
+
     public static string? GetPublicCategoryName(string slug)
         => Catalog
             .FirstOrDefault(x =>

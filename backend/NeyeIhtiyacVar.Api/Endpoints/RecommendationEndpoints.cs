@@ -609,10 +609,12 @@ public static class RecommendationEndpoints
                     x.IsActive &&
                     x.PublicationStatus == PublicationStatus.Published);
 
-            if (citySlug is not null)
-            {
-                baseQuery = baseQuery.Where(x => x.CitySlug == citySlug);
-            }
+            // MHRS tipi cografi genisletme:
+            // Ilce yalnizca siralama onceligidir. Il filtresi ilk havuzu belirler.
+            // Istek yapilan ilde tam hizmet eslesmesi bulunamazsa, ayni hizmet icin
+            // Turkiye genelindeki yayinlanmis isletmeler ikinci havuz olarak taranir.
+            var requestedCitySlug = citySlug;
+            var requestedDistrictSlug = districtSlug;
 
             if (searchText is not null && serviceSlug is null)
             {
@@ -625,11 +627,22 @@ public static class RecommendationEndpoints
             // Boylece hizmet bulunamadiginda fallback sadece ayni kategoriden gelir.
             if (categorySlug is not null)
             {
+                var compatibleCategorySlugs =
+                    categorySlug switch
+                    {
+                        "nakliye-ve-hafriyat" or "nakliye-hafriyat" or
+                        "hafriyat-nakliyat" or "hafriyat-ve-nakliyat" =>
+                            new[] { "nakliye-tasima", categorySlug },
+                        "teknoloji" =>
+                            new[] { "teknoloji-yazilim", "teknoloji" },
+                        _ => new[] { categorySlug }
+                    };
+
                 baseQuery = baseQuery.Where(
-                    x => x.CategorySlug == categorySlug);
+                    x => compatibleCategorySlugs.Contains(x.CategorySlug));
             }
 
-            var categoryProviders = await baseQuery
+            var allCategoryProviders = await baseQuery
                 .Select(x => new
                 {
                     x.Id,
@@ -648,13 +661,45 @@ public static class RecommendationEndpoints
                 })
                 .ToListAsync();
 
+            var categoryProviders = requestedCitySlug is null
+                ? allCategoryProviders
+                : allCategoryProviders
+                    .Where(x => x.CitySlug == requestedCitySlug)
+                    .ToList();
+
             var exactProviders = serviceSlug is null
                 ? categoryProviders
                 : categoryProviders
                     .Where(x =>
-                        x.ServiceSlug == serviceSlug ||
-                        x.AdditionalServices.Contains(serviceSlug))
+                        ServiceSlugsAreCompatible(x.ServiceSlug, serviceSlug) ||
+                        x.AdditionalServices.Any(additional =>
+                            ServiceSlugsAreCompatible(additional, serviceSlug)))
                     .ToList();
+
+            var geographicExpansionUsed = false;
+            var geographicExpansionLevel = "requested-area";
+
+            // Once kullanicinin ili taranir. O ilde tam hizmet yoksa ayni hizmeti
+            // veren diger illerdeki isletmeler devreye girer. Boylece kategori
+            // benzerligi, gercek hizmet eslesmesinin onune gecmez.
+            if (serviceSlug is not null &&
+                requestedCitySlug is not null &&
+                exactProviders.Count == 0)
+            {
+                var expandedExactProviders = allCategoryProviders
+                    .Where(x =>
+                        ServiceSlugsAreCompatible(x.ServiceSlug, serviceSlug) ||
+                        x.AdditionalServices.Any(additional =>
+                            ServiceSlugsAreCompatible(additional, serviceSlug)))
+                    .ToList();
+
+                if (expandedExactProviders.Count > 0)
+                {
+                    exactProviders = expandedExactProviders;
+                    geographicExpansionUsed = true;
+                    geographicExpansionLevel = "other-cities";
+                }
+            }
 
             // Once tam hizmet eslesmesini kullan. Tam eslesme yoksa ayni kategori ve
             // ayni ildeki yayinlanmis isletmeleri yakin alternatif olarak getir.
@@ -710,13 +755,18 @@ public static class RecommendationEndpoints
 
                     if (serviceSlug is not null)
                     {
-                        if (provider.ServiceSlug == serviceSlug)
+                        if (ServiceSlugsAreCompatible(
+                                provider.ServiceSlug,
+                                serviceSlug))
                         {
                             score += 60;
                             matchLevel = "main-service";
                             reasons.Add("Aradığın hizmet işletmenin ana hizmeti");
                         }
-                        else if (provider.AdditionalServices.Contains(serviceSlug))
+                        else if (provider.AdditionalServices.Any(additional =>
+                                     ServiceSlugsAreCompatible(
+                                         additional,
+                                         serviceSlug)))
                         {
                             score += 50;
                             matchLevel = "additional-service";
@@ -736,25 +786,32 @@ public static class RecommendationEndpoints
                         reasons.Add("İhtiyacınla aynı hizmet kategorisinde");
                     }
 
-                    if (districtSlug is not null)
+                    if (requestedDistrictSlug is not null)
                     {
-                        if (provider.DistrictSlug == districtSlug)
+                        if (provider.DistrictSlug == requestedDistrictSlug)
                         {
                             score += 32;
                             reasons.Add("Aradığın ilçede hizmet veriyor");
                         }
-                        else if (citySlug is not null &&
-                                 provider.CitySlug == citySlug)
+                        else if (requestedCitySlug is not null &&
+                                 provider.CitySlug == requestedCitySlug)
                         {
                             score += 6;
                             reasons.Add("Aynı ilde hizmet veriyor");
                         }
                     }
-                    else if (citySlug is not null &&
-                             provider.CitySlug == citySlug)
+                    else if (requestedCitySlug is not null &&
+                             provider.CitySlug == requestedCitySlug)
                     {
                         score += 12;
                         reasons.Add("Aradığın ilde hizmet veriyor");
+                    }
+
+                    if (geographicExpansionUsed &&
+                        requestedCitySlug is not null &&
+                        provider.CitySlug != requestedCitySlug)
+                    {
+                        reasons.Add("Yakın bölgede tam hizmet eşleşmesi");
                     }
 
                     if (normalizedSearch is not null)
@@ -865,6 +922,13 @@ public static class RecommendationEndpoints
                 {
                     citySlug,
                     districtSlug
+                },
+                geographicExpansion = new
+                {
+                    used = geographicExpansionUsed,
+                    level = geographicExpansionLevel,
+                    requestedCitySlug,
+                    requestedDistrictSlug
                 },
                 matching = new
                 {
@@ -1152,4 +1216,33 @@ public static class RecommendationEndpoints
         string ServiceSlug,
         string ServiceName,
         double Score);
+
+    private static bool ServiceSlugsAreCompatible(
+        string? providerServiceSlug,
+        string? requestedServiceSlug)
+    {
+        var left = NormalizeSlug(providerServiceSlug);
+        var right = NormalizeSlug(requestedServiceSlug);
+        if (left is null || right is null) return false;
+        if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        static HashSet<string> CoreTokens(string value)
+        {
+            var generic = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "is", "isi", "isleri", "hizmet", "hizmeti", "hizmetleri",
+                "servis", "servisi", "servisleri", "usta", "ustasi", "ve"
+            };
+            return value.Split('-', StringSplitOptions.RemoveEmptyEntries)
+                .Where(token => !generic.Contains(token))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var a = CoreTokens(left);
+        var b = CoreTokens(right);
+        return a.Count > 0 && b.Count > 0 &&
+               (a.IsSubsetOf(b) || b.IsSubsetOf(a));
+    }
+
 }

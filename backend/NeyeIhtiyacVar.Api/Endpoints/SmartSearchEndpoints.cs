@@ -101,21 +101,19 @@ public static class SmartSearchEndpoints
                         x.PublicationStatus ==
                             PublicationStatus.Published);
 
-            if (!string.IsNullOrWhiteSpace(il))
-            {
-                providersQuery =
-                    providersQuery.Where(x =>
-                        x.CitySlug ==
-                            il.Trim());
-            }
+            var requestedCitySlug =
+                string.IsNullOrWhiteSpace(il)
+                    ? null
+                    : il.Trim();
 
-            if (!string.IsNullOrWhiteSpace(ilce))
-            {
-                providersQuery =
-                    providersQuery.Where(x =>
-                        x.DistrictSlug ==
-                            ilce.Trim());
-            }
+            var requestedDistrictSlug =
+                string.IsNullOrWhiteSpace(ilce)
+                    ? null
+                    : ilce.Trim();
+
+            // MHRS tipi arama icin havuzu il/ilce ile burada daraltmiyoruz.
+            // Once tam hizmet eslesmelerini buluyor, sonra cografi kapsam
+            // onceligini ilce -> il -> diger iller olarak uyguluyoruz.
 
             var published =
                 await providersQuery
@@ -146,7 +144,7 @@ public static class SmartSearchEndpoints
                 SmartSearchService.Normalize(
                     queryText);
 
-            var candidates =
+            var allCandidates =
                 published
                     .Select(provider =>
                     {
@@ -156,17 +154,20 @@ public static class SmartSearchEndpoints
 
                         if (!string.IsNullOrWhiteSpace(
                                 intent.ServiceSlug) &&
-                            string.Equals(
+                            ServiceSlugsAreCompatible(
                                 provider.ServiceSlug,
-                                intent.ServiceSlug,
-                                StringComparison.OrdinalIgnoreCase))
+                                intent.ServiceSlug))
                         {
                             score += 110;
                             matchLevel =
                                 "main-service";
                         }
-                        else if (related.Contains(
-                            provider.ServiceSlug))
+                        else if (
+                            related.Contains(provider.ServiceSlug) ||
+                            related.Any(relatedSlug =>
+                                ServiceSlugsAreCompatible(
+                                    provider.ServiceSlug,
+                                    relatedSlug)))
                         {
                             score += 88;
                             matchLevel =
@@ -177,11 +178,14 @@ public static class SmartSearchEndpoints
                                 x =>
                                     (!string.IsNullOrWhiteSpace(
                                         intent.ServiceSlug) &&
-                                     string.Equals(
+                                     ServiceSlugsAreCompatible(
                                          x,
-                                         intent.ServiceSlug,
-                                         StringComparison.OrdinalIgnoreCase)) ||
-                                    related.Contains(x)))
+                                         intent.ServiceSlug)) ||
+                                    related.Contains(x) ||
+                                    related.Any(relatedSlug =>
+                                        ServiceSlugsAreCompatible(
+                                            x,
+                                            relatedSlug))))
                         {
                             score += 82;
                             matchLevel =
@@ -265,6 +269,85 @@ public static class SmartSearchEndpoints
                                     normalizedQuery,
                                     StringComparison.Ordinal)
                         ))
+                    .ToList();
+
+            var exactMatches =
+                allCandidates
+                    .Where(x =>
+                        x.matchLevel == "main-service" ||
+                        x.matchLevel == "additional-service")
+                    .ToList();
+
+            var exactInDistrict =
+                requestedDistrictSlug is null
+                    ? []
+                    : exactMatches
+                        .Where(x =>
+                            string.Equals(
+                                x.DistrictSlug,
+                                requestedDistrictSlug,
+                                StringComparison.OrdinalIgnoreCase) &&
+                            (requestedCitySlug is null ||
+                             string.Equals(
+                                 x.CitySlug,
+                                 requestedCitySlug,
+                                 StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+
+            var exactInCity =
+                requestedCitySlug is null
+                    ? []
+                    : exactMatches
+                        .Where(x =>
+                            string.Equals(
+                                x.CitySlug,
+                                requestedCitySlug,
+                                StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+            var exactOutsideCity =
+                requestedCitySlug is null
+                    ? []
+                    : exactMatches
+                        .Where(x =>
+                            !string.Equals(
+                                x.CitySlug,
+                                requestedCitySlug,
+                                StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+            var geographicExpansionLevel =
+                exactInDistrict.Count > 0
+                    ? "district"
+                    : exactInCity.Count > 0
+                        ? "city"
+                        : exactOutsideCity.Count > 0
+                            ? "other-cities"
+                            : "none";
+
+            var geographicExpansionUsed =
+                geographicExpansionLevel == "city" ||
+                geographicExpansionLevel == "other-cities";
+
+            var selectedCandidates =
+                geographicExpansionLevel switch
+                {
+                    "district" => exactInDistrict,
+                    "city" => exactInCity,
+                    "other-cities" => exactOutsideCity,
+                    _ => requestedCitySlug is null
+                        ? allCandidates
+                        : allCandidates
+                            .Where(x =>
+                                string.Equals(
+                                    x.CitySlug,
+                                    requestedCitySlug,
+                                    StringComparison.OrdinalIgnoreCase))
+                            .ToList()
+                };
+
+            var candidates =
+                selectedCandidates
                     .OrderByDescending(x =>
                         x.score)
                     .ThenBy(x =>
@@ -274,8 +357,8 @@ public static class SmartSearchEndpoints
 
             var exactCandidateCount =
                 candidates.Count(x =>
-                    x.matchLevel ==
-                        "main-service");
+                    x.matchLevel == "main-service" ||
+                    x.matchLevel == "additional-service");
 
             var categoryCandidateCount =
                 candidates.Count(x =>
@@ -316,9 +399,16 @@ public static class SmartSearchEndpoints
                     location = new
                     {
                         citySlug =
-                            il?.Trim() ?? "",
+                            requestedCitySlug ?? "",
                         districtSlug =
-                            ilce?.Trim() ?? ""
+                            requestedDistrictSlug ?? ""
+                    },
+                    geographicExpansion = new
+                    {
+                        used = geographicExpansionUsed,
+                        level = geographicExpansionLevel,
+                        requestedCitySlug = requestedCitySlug ?? "",
+                        requestedDistrictSlug = requestedDistrictSlug ?? ""
                     },
                     matching = new
                     {
@@ -338,6 +428,81 @@ public static class SmartSearchEndpoints
         });
 
         return app;
+    }
+
+    private static bool ServiceSlugsAreCompatible(
+        string? providerSlug,
+        string? requestedSlug)
+    {
+        if (string.IsNullOrWhiteSpace(providerSlug) ||
+            string.IsNullOrWhiteSpace(requestedSlug))
+        {
+            return false;
+        }
+
+        if (string.Equals(
+            providerSlug,
+            requestedSlug,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        static string[] MeaningfulTokens(string value)
+        {
+            var genericTokens = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase)
+            {
+                "is", "isi", "isleri",
+                "hizmet", "hizmeti", "hizmetleri",
+                "servis", "servisi", "servisleri",
+                "usta", "ustasi", "ve"
+            };
+
+            return value
+                .Trim()
+                .ToLowerInvariant()
+                .Replace('ı', 'i')
+                .Replace('ğ', 'g')
+                .Replace('ü', 'u')
+                .Replace('ş', 's')
+                .Replace('ö', 'o')
+                .Replace('ç', 'c')
+                .Split(
+                    new[] { '-', '_', ' ', '/', '&' },
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                .Where(token =>
+                    token.Length >= 3 &&
+                    !genericTokens.Contains(token))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        var providerTokens = MeaningfulTokens(providerSlug);
+        var requestedTokens = MeaningfulTokens(requestedSlug);
+
+        if (providerTokens.Length == 0 ||
+            requestedTokens.Length == 0)
+        {
+            return false;
+        }
+
+        var common = providerTokens.Intersect(
+            requestedTokens,
+            StringComparer.OrdinalIgnoreCase).Count();
+
+        if (providerTokens.Length == 1 ||
+            requestedTokens.Length == 1)
+        {
+            return common == 1;
+        }
+
+        var smaller = Math.Min(
+            providerTokens.Length,
+            requestedTokens.Length);
+
+        return common >= 2 || common == smaller;
     }
 
     private static async Task<object[]> BuildAlternativesAsync(

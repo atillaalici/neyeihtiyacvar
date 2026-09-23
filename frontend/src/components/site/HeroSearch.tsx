@@ -34,6 +34,15 @@ type SmartSuggestion = {
   score?: number;
 };
 
+type PopularSearchApiItem = {
+  term: string | null;
+  count: number;
+};
+
+type WeightedPopularSuggestion = SmartSuggestion & {
+  popularity: number;
+};
+
 const smartSuggestions: SmartSuggestion[] = [
   {
     id: "priz-ariza",
@@ -183,7 +192,7 @@ const smartSuggestions: SmartSuggestion[] = [
     id: "ev-tasima",
     label: "Evden eve nakliyat arıyorum",
     keywords: ["ev taşı", "nakliye", "eşya taşı", "evden eve"],
-    categorySlug: "nakliye-hafriyat",
+    categorySlug: "nakliye-tasima",
     serviceSlug: "evden-eve-nakliyat",
     intent: "service",
   },
@@ -191,7 +200,7 @@ const smartSuggestions: SmartSuggestion[] = [
     id: "hafriyat",
     label: "Hafriyat / kazı işi yaptırmak istiyorum",
     keywords: ["hafriyat", "kazı", "kepçe", "ekskavatör", "moloz"],
-    categorySlug: "nakliye-hafriyat",
+    categorySlug: "nakliye-tasima",
     serviceSlug: "hafriyat",
     intent: "service",
   },
@@ -245,6 +254,9 @@ export function HeroSearch() {
 
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const [popularSearches, setPopularSearches] = useState<
+    WeightedPopularSuggestion[]
+  >([]);
 
   const suggestions = useMemo(() => {
     const clean = normalize(query);
@@ -334,7 +346,61 @@ export function HeroSearch() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, searchApiBaseUrl]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPopularSearches() {
+      try {
+        const response = await fetch(
+          `${searchApiBaseUrl}/api/analytics/popular-searches`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) return;
+
+        const rows = (await response.json()) as PopularSearchApiItem[];
+        const sourceRows = rows
+          .filter((row) => (row.term?.trim().length ?? 0) >= 2 && row.count > 0)
+          .slice(0, 20);
+
+        const resolved = await Promise.all(
+          sourceRows.map(async (row) => {
+            const term = row.term?.trim() ?? "";
+            const r = await fetch(
+              `${searchApiBaseUrl}/api/search/intents/db-suggest?q=${encodeURIComponent(term)}&limit=3`,
+              { cache: "no-store" },
+            );
+            if (!r.ok) return null;
+            const suggestions = (await r.json()) as SmartSuggestion[];
+            const suggestion = suggestions[0];
+            if (!suggestion?.categorySlug || !suggestion?.serviceSlug) return null;
+            return { ...suggestion, popularity: row.count } as WeightedPopularSuggestion;
+          }),
+        );
+
+        const grouped = new Map<string, WeightedPopularSuggestion>();
+        for (const item of resolved) {
+          if (!item) continue;
+          const key = `${item.categorySlug}|${item.serviceSlug}`;
+          const current = grouped.get(key);
+          if (current) current.popularity += item.popularity;
+          else grouped.set(key, { ...item });
+        }
+
+        const next = Array.from(grouped.values())
+          .sort((a, b) => b.popularity - a.popularity)
+          .slice(0, 5);
+
+        if (active && next.length > 0) setPopularSearches(next);
+      } catch {
+        // Veri yoksa varsayilan populer hizmetler kullanilir.
+      }
+    }
+
+    void loadPopularSearches();
+    return () => { active = false; };
+  }, [searchApiBaseUrl]);
 
   const librarySuggestions =
     query.trim().length >= 2 &&
@@ -361,7 +427,7 @@ export function HeroSearch() {
       .slice(0, 8);
   }, [librarySuggestions]);
 
-  function goToSearch(
+  async function goToSearch(
     value: string,
     suggestion?: SmartSuggestion,
     source: "enter" | "button" | "typing" = "button",
@@ -379,19 +445,44 @@ export function HeroSearch() {
       source,
     });
 
+    let resolvedSuggestion = suggestion;
+
+    if (suggestion) {
+      try {
+        const response = await fetch(
+          `${searchApiBaseUrl}/api/search/intents/db-suggest?q=${encodeURIComponent(suggestion.label)}&limit=4`,
+          { cache: "no-store" },
+        );
+
+        if (response.ok) {
+          const matches = (await response.json()) as SmartSuggestion[];
+          const exact =
+            matches.find(
+              (item) => normalize(item.label) === normalize(suggestion.label),
+            ) ?? matches[0];
+
+          if (exact?.categorySlug && exact?.serviceSlug) {
+            resolvedSuggestion = exact;
+          }
+        }
+      } catch {
+        // API gecici olarak erisilemezse mevcut oneriyle devam et.
+      }
+    }
+
     const params = new URLSearchParams();
     params.set("q", clean);
 
-    if (suggestion?.categorySlug) {
-      params.set("kategori", suggestion.categorySlug);
+    if (resolvedSuggestion?.categorySlug) {
+      params.set("kategori", resolvedSuggestion.categorySlug);
     }
 
-    if (suggestion?.serviceSlug) {
-      params.set("hizmet", suggestion.serviceSlug);
+    if (resolvedSuggestion?.serviceSlug) {
+      params.set("hizmet", resolvedSuggestion.serviceSlug);
     }
 
-    if (suggestion?.intent) {
-      params.set("niyet", suggestion.intent);
+    if (resolvedSuggestion?.intent) {
+      params.set("niyet", resolvedSuggestion.intent);
     }
 
     router.push(`/kesfet?${params.toString()}`);
@@ -434,6 +525,17 @@ export function HeroSearch() {
     focused &&
     query.trim().length >= 2 &&
     visibleSuggestions.length > 0;
+
+  const displayedPopularSearches: WeightedPopularSuggestion[] =
+    popularSearches.length > 0
+      ? popularSearches
+      : [
+          { id: "p-elektrik", label: "Elektrikçi", keywords: ["Elektrikçi"], categorySlug: "usta-tamir", serviceSlug: "elektrikci", intent: "service", score: 100, popularity: 0 },
+          { id: "p-su", label: "Su tesisatçısı", keywords: ["Su tesisatçısı"], categorySlug: "usta-tamir", serviceSlug: "su-tesisatcisi", intent: "service", score: 100, popularity: 0 },
+          { id: "p-nakliye", label: "Evden eve nakliyat", keywords: ["Evden eve nakliyat"], categorySlug: "nakliye-tasima", serviceSlug: "evden-eve-nakliyat", intent: "service", score: 100, popularity: 0 },
+          { id: "p-klima", label: "Klima servisi", keywords: ["Klima servisi"], categorySlug: "usta-tamir", serviceSlug: "klima-servisi", intent: "service", score: 100, popularity: 0 },
+          { id: "p-bilgisayar", label: "Bilgisayar servisi", keywords: ["Bilgisayar servisi"], categorySlug: "teknoloji-yazilim", serviceSlug: "bilgisayar-servisi", intent: "service", score: 100, popularity: 0 },
+        ];
 
   return (
     <section className="relative overflow-visible border-b border-border bg-cream">
@@ -529,7 +631,7 @@ export function HeroSearch() {
                 <div className="border-b border-border bg-muted/30 px-5 py-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <Sparkles className="size-4 text-primary" aria-hidden="true" />
-                    Ne yapmak istediğini seç
+                    İhtiyacına uygun seçeneği seç
                   </div>
                 </div>
 
@@ -575,21 +677,19 @@ export function HeroSearch() {
               Popüler aramalar:
             </span>
 
-            {["Elektrikçi", "Su tesisatçısı", "Evden eve nakliyat", "Klima servisi", "Bilgisayar servisi"].map(
-              (item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => {
-                    setQuery(item);
-                    goToSearch(item, undefined, "button");
-                  }}
-                  className="rounded-full border border-border bg-background px-6 py-2.5 text-[16px] text-muted-foreground shadow-sm transition hover:border-primary/30 hover:text-primary sm:text-[17px]"
-                >
-                  {item}
-                </button>
-              ),
-            )}
+            {displayedPopularSearches.map((item) => (
+              <button
+                key={`${item.categorySlug}-${item.serviceSlug}`}
+                type="button"
+                onClick={() => {
+                  setQuery(item.label);
+                  void goToSearch(item.label, item, "button");
+                }}
+                className="rounded-full border border-border bg-background px-6 py-2.5 text-[16px] text-muted-foreground shadow-sm transition hover:border-primary/30 hover:text-primary sm:text-[17px]"
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-﻿import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   Wrench,
   Home,
@@ -25,7 +25,7 @@ const categoryIcons: Record<string, LucideIcon> = {
   "usta-tamir": Wrench,
   "ev-yasam": Home,
   "nakliye-tasima": Truck,
-  teknoloji: Laptop,
+  "teknoloji-yazilim": Laptop,
   otomotiv: Car,
   egitim: GraduationCap,
   organizasyon: PartyPopper,

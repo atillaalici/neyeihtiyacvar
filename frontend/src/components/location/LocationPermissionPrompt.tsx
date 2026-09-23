@@ -1,13 +1,13 @@
-﻿"use client";
+"use client";
 import {useEffect,useState} from "react";
 const KEY="niv_location_preference";
 export function LocationPermissionPrompt(){
  const [show,setShow]=useState(false),[busy,setBusy]=useState(false);
- useEffect(()=>{try{if(!localStorage.getItem(KEY))setShow(true)}catch{}},[]);
+ useEffect(()=>{const timer=window.setTimeout(()=>{try{if(!localStorage.getItem(KEY))setShow(true)}catch{}},0);return()=>window.clearTimeout(timer)},[]);
  const later=()=>{localStorage.setItem(KEY,"later");setShow(false)};
  const allow=()=>{if(!navigator.geolocation){localStorage.setItem(KEY,"unsupported");setShow(false);return}
  setBusy(true);navigator.geolocation.getCurrentPosition(p=>{
-   sessionStorage.setItem("niv_current_location",JSON.stringify({latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy}));
+   localStorage.setItem("niv_current_location",JSON.stringify({latitude:p.coords.latitude,longitude:p.coords.longitude,accuracy:p.coords.accuracy,updatedAt:Date.now()}));
    localStorage.setItem(KEY,"allowed");setBusy(false);setShow(false);
  },()=>{localStorage.setItem(KEY,"denied");setBusy(false);setShow(false)},{enableHighAccuracy:true,timeout:12000,maximumAge:60000})};
  if(!show)return null;

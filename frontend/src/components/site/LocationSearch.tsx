@@ -97,18 +97,15 @@ export function LocationSearch({
 
   useEffect(() => {
     if (city && cities.length > 0 && !cities.some((item) => item.slug === city)) {
-      setCity("");
-      setDistrict("");
+      const timer = window.setTimeout(() => { setCity(""); setDistrict(""); }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [cities, city]);
 
   useEffect(() => {
-    if (
-      district &&
-      selectedCity &&
-      !selectedCity.districts.some((item) => item.slug === district)
-    ) {
-      setDistrict("");
+    if (district && selectedCity && !selectedCity.districts.some((item) => item.slug === district)) {
+      const timer = window.setTimeout(() => setDistrict(""), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [district, selectedCity]);
 

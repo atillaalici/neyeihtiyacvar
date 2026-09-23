@@ -172,6 +172,32 @@ public static class AnalyticsEndpoints
             });
         });
 
+
+        publicGroup.MapGet("/popular-searches", async (AppDbContext dbContext) =>
+        {
+            var since = DateTime.UtcNow.AddDays(-30);
+            var searchEventTypes = new[] { "search", "search_results", "search_submit" };
+
+            var rows = await dbContext.AnalyticsEvents
+                .AsNoTracking()
+                .Where(x => x.CreatedAtUtc >= since
+                    && searchEventTypes.Contains(x.EventType)
+                    && x.SearchTerm != null
+                    && x.SearchTerm != "")
+                .GroupBy(x => x.SearchTerm)
+                .Select(group => new
+                {
+                    term = group.Key,
+                    count = group.Count()
+                })
+                .OrderByDescending(x => x.count)
+                .ThenBy(x => x.term)
+                .Take(8)
+                .ToListAsync();
+
+            return Results.Ok(rows);
+        });
+
         return app;
     }
 

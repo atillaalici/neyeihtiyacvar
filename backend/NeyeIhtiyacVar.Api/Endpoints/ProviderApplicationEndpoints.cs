@@ -30,6 +30,12 @@ public static class ProviderApplicationEndpoints
                 });
             }
 
+            var moderation = ProviderContentModeration.Check(
+                request.BusinessName,
+                request.ShortDescription,
+                request.PublicAddress,
+                request.Note);
+
             var application = new ProviderApplication
             {
                 BusinessName = request.BusinessName.Trim(),
@@ -45,7 +51,10 @@ public static class ProviderApplicationEndpoints
                 Phone = request.Phone.Trim(),
                 Whatsapp = Optional(request.Whatsapp),
                 Note = Optional(request.Note),
-                Status = ProviderApplicationStatus.Pending
+                Status = ProviderApplicationStatus.Pending,
+                ReviewNote = moderation.RequiresReview
+                    ? "Otomatik içerik kontrolü: şüpheli içerik tespit edildi. Yönetici incelemesi zorunludur."
+                    : null
             };
 
             dbContext.ProviderApplications.Add(application);
@@ -516,6 +525,22 @@ public static class ProviderApplicationEndpoints
                         message = "Ä°ÅŸletme yayÄ±na alÄ±nmadan Ã¶nce hesap sahibinin e-posta ve telefon doÄŸrulamasÄ±nÄ± tamamlamasÄ± gerekir."
                     });
                 }
+            }
+
+            var moderation = ProviderContentModeration.Check(
+                provider.BusinessName,
+                provider.ShortDescription,
+                provider.Description,
+                provider.PublicAddress,
+                provider.WorkingHours);
+
+            if (moderation.RequiresReview)
+            {
+                return Results.BadRequest(new
+                {
+                    code = "provider_content_review_required",
+                    message = "İşletme profilinde yönetici incelemesi gerektiren içerik bulundu. İçerik düzeltilmeden yayınlanamaz."
+                });
             }
 
             var publishedAtUtc = DateTime.UtcNow;

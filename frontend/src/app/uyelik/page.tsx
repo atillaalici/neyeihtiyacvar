@@ -102,8 +102,8 @@ function fallbackPlans(): MembershipPlan[] {
     {
       id: "kobi",
       code: "kobi",
-      name: "KOBİ",
-      description: "Esnaf, usta ve küçük işletmeler için ideal başlangıç paketi.",
+      name: "1+1 Paket",
+      description: "1 ana hizmet + 1 ek hizmet ile işletmenizi görünür hale getirin.",
       annualPrice: 1200,
       monthlyEquivalent: 100,
       serviceLimit: 2,
@@ -122,8 +122,8 @@ function fallbackPlans(): MembershipPlan[] {
     {
       id: "avantaj",
       code: "avantaj",
-      name: "Avantaj",
-      description: "Daha fazla hizmet alanında görünmek isteyen işletmeler için önerilen paket.",
+      name: "1+4 Paket",
+      description: "1 ana hizmet + 4 ek hizmet ile daha fazla aramada müşterilere ulaşın.",
       annualPrice: 2400,
       monthlyEquivalent: 200,
       serviceLimit: 5,
@@ -142,8 +142,8 @@ function fallbackPlans(): MembershipPlan[] {
     {
       id: "profesyonel",
       code: "profesyonel",
-      name: "Profesyonel",
-      description: "Geniş hizmet ağı bulunan işletmeler ve ekipler için gelişmiş paket.",
+      name: "12 Kategorili Paket",
+      description: "12 hizmet/kategori hakkı ile geniş hizmet ağı bulunan işletmeler için.",
       annualPrice: 5000,
       monthlyEquivalent: 416.67,
       serviceLimit: 12,

@@ -27,19 +27,19 @@ const plans: Record<
   }
 > = {
   kobi: {
-    name: "KOBİ",
+    name: "1+1 Paket",
     annualPrice: 1200,
     serviceLimit: 2,
     description: "Esnaf, usta ve küçük işletmeler için ideal başlangıç paketi.",
   },
   avantaj: {
-    name: "Avantaj",
+    name: "1+4 Paket",
     annualPrice: 2400,
     serviceLimit: 5,
     description: "Daha fazla hizmet alanında görünmek isteyen işletmeler için.",
   },
   profesyonel: {
-    name: "Profesyonel",
+    name: "12 Kategorili Paket",
     annualPrice: 5000,
     serviceLimit: 12,
     description: "Geniş hizmet ağı bulunan işletmeler ve ekipler için.",
@@ -65,6 +65,20 @@ function MembershipPaymentContent() {
   const [promoError, setPromoError] = useState("");
   const [completingRegistration, setCompletingRegistration] =
     useState(false);
+  const [billingOpen, setBillingOpen] = useState(false);
+  const [billingSaving, setBillingSaving] = useState(false);
+  const [billingError, setBillingError] = useState("");
+  const [billing, setBilling] = useState({
+    billingType: "individual",
+    nameOrTitle: "",
+    taxOffice: "",
+    taxOrIdentityNumber: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    district: "",
+  });
 
   const planCode = useMemo<PlanCode>(() => {
     const fromUrl = searchParams.get("paket")?.trim().toLowerCase();
@@ -254,10 +268,51 @@ function MembershipPaymentContent() {
     }
   }
 
-  function continueToPayment() {
-    setPromoError(
-      "Ödeme gerektiren işlemler ödeme sağlayıcısı entegrasyonu bağlandığında ödeme ekranına yönlendirilecek.",
-    );
+  async function continueToPayment() {
+    if (!billingOpen) {
+      setPromoError("");
+      setBillingError("");
+      setBillingOpen(true);
+      return;
+    }
+
+    const token = getAccessToken();
+
+    if (!token) {
+      router.replace("/giris");
+      return;
+    }
+
+    setBillingSaving(true);
+    setBillingError("");
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/billing-information`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(billing),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setBillingError(data?.message ?? "Fatura bilgileri kaydedilemedi.");
+        return;
+      }
+
+      setPromoError(
+        "Fatura bilgileriniz kaydedildi. Ödeme sağlayıcısı entegrasyonu bağlandığında güvenli ödeme ekranına yönlendirileceksiniz.",
+      );
+    } catch {
+      setBillingError(
+        "Fatura bilgileri kaydedilirken sunucuya bağlanılamadı.",
+      );
+    } finally {
+      setBillingSaving(false);
+    }
   }
   return (
     <SiteLayout>
@@ -435,6 +490,122 @@ function MembershipPaymentContent() {
               ) : null}
             </div>
 
+            {billingOpen && promoResult?.finalPrice !== 0 ? (
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="mb-3">
+                  <div className="text-sm font-bold">Fatura Bilgileri</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ödemeye devam etmeden önce fatura bilgilerinizi doldurun.
+                  </p>
+                </div>
+
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBilling((current) => ({
+                        ...current,
+                        billingType: "individual",
+                        taxOffice: "",
+                      }))
+                    }
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                      billing.billingType === "individual"
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-border"
+                    }`}
+                  >
+                    Bireysel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBilling((current) => ({
+                        ...current,
+                        billingType: "corporate",
+                      }))
+                    }
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                      billing.billingType === "corporate"
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-border"
+                    }`}
+                  >
+                    Kurumsal
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    placeholder={billing.billingType === "corporate" ? "Firma unvanı" : "Ad soyad"}
+                    value={billing.nameOrTitle}
+                    onChange={(event) => setBilling((current) => ({ ...current, nameOrTitle: event.target.value }))}
+                  />
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    inputMode="numeric"
+                    placeholder={billing.billingType === "corporate" ? "Vergi numarası (10 hane)" : "T.C. kimlik no (11 hane)"}
+                    value={billing.taxOrIdentityNumber}
+                    onChange={(event) =>
+                      setBilling((current) => ({
+                        ...current,
+                        taxOrIdentityNumber: event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, billing.billingType === "corporate" ? 10 : 11),
+                      }))
+                    }
+                  />
+                  {billing.billingType === "corporate" ? (
+                    <input
+                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                      placeholder="Vergi dairesi"
+                      value={billing.taxOffice}
+                      onChange={(event) => setBilling((current) => ({ ...current, taxOffice: event.target.value }))}
+                    />
+                  ) : null}
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    type="email"
+                    placeholder="E-posta"
+                    value={billing.email}
+                    onChange={(event) => setBilling((current) => ({ ...current, email: event.target.value }))}
+                  />
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    type="tel"
+                    placeholder="Telefon"
+                    value={billing.phone}
+                    onChange={(event) => setBilling((current) => ({ ...current, phone: event.target.value }))}
+                  />
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    placeholder="İl"
+                    value={billing.city}
+                    onChange={(event) => setBilling((current) => ({ ...current, city: event.target.value }))}
+                  />
+                  <input
+                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                    placeholder="İlçe"
+                    value={billing.district}
+                    onChange={(event) => setBilling((current) => ({ ...current, district: event.target.value }))}
+                  />
+                  <textarea
+                    className="min-h-20 rounded-xl border border-input bg-background px-3 py-2 text-sm sm:col-span-2"
+                    placeholder="Fatura adresi"
+                    value={billing.address}
+                    onChange={(event) => setBilling((current) => ({ ...current, address: event.target.value }))}
+                  />
+                </div>
+
+                {billingError ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {billingError}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
               <button
                 type="button"
@@ -458,10 +629,15 @@ function MembershipPaymentContent() {
               ) : (
                 <button
                   type="button"
-                  onClick={continueToPayment}
-                  className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700"
+                  onClick={() => void continueToPayment()}
+                  disabled={billingSaving}
+                  className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Ödemeye Geç
+                  {billingSaving
+                    ? "Kaydediliyor..."
+                    : billingOpen
+                      ? "Fatura Bilgilerini Kaydet ve Ödemeye Geç"
+                      : "Ödemeye Geç"}
                 </button>
               )}
             </div>

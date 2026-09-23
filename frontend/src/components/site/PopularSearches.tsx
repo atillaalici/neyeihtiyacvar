@@ -1,12 +1,16 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 
 import { apiBaseUrl } from "@/lib/api";
-import type { CategoryDto } from "@/lib/categories";
 
 type PopularSearchesProps = {
   onSelect?: (term: string) => void;
+};
+
+type PopularSearchItem = {
+  term: string | null;
+  count: number;
 };
 
 const defaultTerms = [
@@ -17,9 +21,7 @@ const defaultTerms = [
   "Bilgisayar Servisi",
 ];
 
-export function PopularSearches({
-  onSelect,
-}: PopularSearchesProps) {
+export function PopularSearches({ onSelect }: PopularSearchesProps) {
   const [terms, setTerms] = useState<string[]>(defaultTerms);
 
   useEffect(() => {
@@ -27,47 +29,21 @@ export function PopularSearches({
 
     async function loadPopularTerms() {
       try {
-        const response = await fetch(`${apiBaseUrl}/api/categories`, {
+        const response = await fetch(`${apiBaseUrl}/api/analytics/popular-searches`, {
           cache: "no-store",
         });
 
-        if (!response.ok) {
-          return;
+        if (!response.ok) return;
+
+        const items = (await response.json()) as PopularSearchItem[];
+        const dynamicTerms = items
+          .map((item) => item.term?.trim() ?? "")
+          .filter((term) => term.length >= 2)
+          .slice(0, 8);
+
+        if (active && dynamicTerms.length > 0) {
+          setTerms(dynamicTerms);
         }
-
-        const categories = (await response.json()) as CategoryDto[];
-
-        const rawTerms: Array<string | undefined> = [
-          categories
-            .find((category) => category.slug === "usta-tamir")
-            ?.services.find((service) => service === "Elektrikçi"),
-
-          categories
-            .find((category) => category.slug === "usta-tamir")
-            ?.services.find((service) => service === "Su tesisatçısı"),
-
-          categories
-            .find((category) => category.slug === "nakliye-tasima")
-            ?.services.find((service) => service === "Evden eve nakliyat"),
-
-          categories
-            .find((category) => category.slug === "usta-tamir")
-            ?.services.find((service) => service === "Klima servisi"),
-
-          categories
-            .find((category) => category.slug === "teknoloji")
-            ?.services.find((service) => service === "Bilgisayar servisi"),
-        ];
-
-        const preferredTerms = rawTerms.filter(
-          (term): term is string => typeof term === "string",
-        );
-
-        if (!active || preferredTerms.length === 0) {
-          return;
-        }
-
-        setTerms(preferredTerms);
       } catch {
         // API erişilemezse varsayılan terimler kullanılmaya devam eder.
       }
@@ -82,10 +58,7 @@ export function PopularSearches({
 
   return (
     <div className="rise mt-5 flex flex-wrap items-center justify-center gap-2">
-      <span className="mr-1 text-sm text-muted-foreground">
-        Popüler aramalar:
-      </span>
-
+      <span className="mr-1 text-sm text-muted-foreground">Popüler aramalar:</span>
       {terms.map((term) => (
         <button
           key={term}

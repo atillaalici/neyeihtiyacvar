@@ -115,7 +115,7 @@ export function ProviderCard({
                     className="size-4"
                     aria-hidden="true"
                   />
-                  Ara
+                  Giriş Yaparak Ara
                 </button>
               )
             ) : (
@@ -156,7 +156,7 @@ export function ProviderCard({
                       className="size-4"
                       aria-hidden="true"
                     />
-                    WhatsApp
+                    Giriş Yaparak WhatsApp
                   </button>
                 )}
               </div>

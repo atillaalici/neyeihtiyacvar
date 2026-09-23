@@ -13,6 +13,16 @@ public interface IEmailSender
     Task<EmailSendResult> SendPasswordResetCodeAsync(
         string toEmail, string displayName, string code,
         CancellationToken cancellationToken = default);
+
+    Task<EmailSendResult> SendModerationNoticeAsync(
+        string toEmail, string displayName, string businessName,
+        string reason, int violationCount, bool terminated,
+        CancellationToken cancellationToken = default);
+
+    Task<EmailSendResult> SendOperationalMessageAsync(
+        string toEmail, string displayName, string subject,
+        string heading, string message,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record EmailSendResult(
@@ -61,6 +71,89 @@ public sealed class ResendEmailSender : IEmailSender
             "Neye İhtiyaç Var? hesabınız için şifre yenileme kodunuz:",
             code,
             cancellationToken);
+
+    public async Task<EmailSendResult> SendModerationNoticeAsync(
+        string toEmail, string displayName, string businessName,
+        string reason, int violationCount, bool terminated,
+        CancellationToken cancellationToken = default)
+    {
+        var apiKey = _configuration["Email:ResendApiKey"];
+        var fromAddress = _configuration["Email:FromAddress"];
+        var fromName = _configuration["Email:FromName"] ?? "Neye İhtiyaç Var?";
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(fromAddress))
+            return new EmailSendResult(false, ErrorMessage: "Resend e-posta ayarları eksik.");
+
+        var name = string.IsNullOrWhiteSpace(displayName) ? "Değerli kullanıcımız" : displayName.Trim();
+        var business = string.IsNullOrWhiteSpace(businessName) ? "İşletmeniz" : businessName.Trim();
+        var subject = terminated ? "İşletme hesabınız hakkında önemli bildirim" : "İşletme profiliniz moderasyon nedeniyle pasife alındı";
+        var status = terminated
+            ? "İşletmeniz üçüncü moderasyon ihlali nedeniyle pasif ve fesih durumuna alınmıştır."
+            : "İşletme profilinizde yasaklı veya kısıtlı olabilecek içerik tespit edildiği için profiliniz geçici olarak yayından kaldırılmış ve yönetici incelemesine alınmıştır.";
+        var safeName = HtmlEncoder.Default.Encode(name);
+        var safeBusiness = HtmlEncoder.Default.Encode(business);
+        var safeReason = HtmlEncoder.Default.Encode(reason);
+        var safeStatus = HtmlEncoder.Default.Encode(status);
+        var html = $"<html><body style='font-family:Arial,sans-serif'><h2>Neye İhtiyaç Var?</h2><p>Merhaba {safeName},</p><p><strong>{safeBusiness}</strong> için bir moderasyon bildirimi oluşturuldu.</p><p>{safeStatus}</p><p><strong>Tespit nedeni:</strong> {safeReason}</p><p><strong>İhlal sayısı:</strong> {violationCount} / 3</p><p>Bu işlem yönetici incelemesine tabidir.</p></body></html>";
+        var text = $"Merhaba {name},\n\n{business} için bir moderasyon bildirimi oluşturuldu.\n\n{status}\n\nTespit nedeni: {reason}\nİhlal sayısı: {violationCount} / 3\n\nBu işlem yönetici incelemesine tabidir.";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "emails");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Content = JsonContent.Create(new { from = $"{fromName} <{fromAddress}>", to = new[] { toEmail }, subject, html, text });
+        try
+        {
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Moderasyon e-postası gönderilemedi. HTTP {Status}. Response: {Response}", (int)response.StatusCode, payload);
+                return new EmailSendResult(false, ErrorMessage: $"Resend HTTP {(int)response.StatusCode}");
+            }
+            string? id = null;
+            try { using var doc = System.Text.Json.JsonDocument.Parse(payload); if (doc.RootElement.TryGetProperty("id", out var e)) id=e.GetString(); }
+            catch (System.Text.Json.JsonException) { }
+            return new EmailSendResult(true,id);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogError(ex,"Moderasyon e-posta isteği başarısız.");
+            return new EmailSendResult(false,ErrorMessage:ex.Message);
+        }
+    }
+
+
+    public async Task<EmailSendResult> SendOperationalMessageAsync(
+        string toEmail, string displayName, string subject,
+        string heading, string message,
+        CancellationToken cancellationToken = default)
+    {
+        var apiKey = _configuration["Email:ResendApiKey"];
+        var fromAddress = _configuration["Email:FromAddress"];
+        var fromName = _configuration["Email:FromName"] ?? "Neye İhtiyaç Var?";
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(fromAddress))
+            return new EmailSendResult(false, ErrorMessage: "Resend e-posta ayarları eksik.");
+        var safeName = HtmlEncoder.Default.Encode(string.IsNullOrWhiteSpace(displayName) ? "Değerli kullanıcımız" : displayName.Trim());
+        var safeHeading = HtmlEncoder.Default.Encode(heading);
+        var safeMessage = HtmlEncoder.Default.Encode(message);
+        var html = $"<html><body style='font-family:Arial'><h2>Neye İhtiyaç Var?</h2><h1>{safeHeading}</h1><p>Merhaba {safeName},</p><p>{safeMessage}</p><p>Bu e-posta hesabınızla ilgili operasyonel bir bilgilendirmedir.</p></body></html>";
+        using var request = new HttpRequestMessage(HttpMethod.Post, "emails");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Content = JsonContent.Create(new { from = $"{fromName} <{fromAddress}>", to = new[] { toEmail }, subject, html, text = $"Merhaba {displayName}\\n\\n{message}\\n\\nNeye İhtiyaç Var?" });
+        try
+        {
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Resend operasyonel e-posta başarısız. HTTP {Status}. Response: {Response}", (int)response.StatusCode, payload);
+                return new EmailSendResult(false, ErrorMessage: $"Resend HTTP {(int)response.StatusCode}");
+            }
+            return new EmailSendResult(true);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            _logger.LogError(ex, "Resend operasyonel e-posta isteği başarısız.");
+            return new EmailSendResult(false, ErrorMessage: ex.Message);
+        }
+    }
 
     private async Task<EmailSendResult> SendCodeAsync(
         string toEmail,

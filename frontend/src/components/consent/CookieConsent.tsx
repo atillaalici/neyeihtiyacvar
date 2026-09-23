@@ -1,12 +1,13 @@
-﻿"use client";
+"use client";
 import {useEffect,useState} from "react";
 import Link from "next/link";
 const KEY="niv_cookie_consent", EVENT="niv-cookie-consent-change";
 export function CookieConsent(){
  const [show,setShow]=useState(false),[manage,setManage]=useState(false),[analytics,setAnalytics]=useState(false);
- useEffect(()=>{try{const r=localStorage.getItem(KEY);if(!r)setShow(true);else setAnalytics(JSON.parse(r).analytics===true)}catch{setShow(true)}
- const open=()=>{try{const r=localStorage.getItem(KEY);if(r)setAnalytics(JSON.parse(r).analytics===true)}catch{}setManage(true);setShow(true)};
- window.addEventListener("niv-open-cookie-settings",open);return()=>window.removeEventListener("niv-open-cookie-settings",open)},[]);
+ useEffect(()=>{
+  const timer=window.setTimeout(()=>{try{const r=localStorage.getItem(KEY);if(!r)setShow(true);else setAnalytics(JSON.parse(r).analytics===true)}catch{setShow(true)}},0);
+  const open=()=>{try{const r=localStorage.getItem(KEY);if(r)setAnalytics(JSON.parse(r).analytics===true)}catch{}setManage(true);setShow(true)};
+  window.addEventListener("niv-open-cookie-settings",open);return()=>{window.clearTimeout(timer);window.removeEventListener("niv-open-cookie-settings",open)}},[]);
  const save=(a:boolean)=>{localStorage.setItem(KEY,JSON.stringify({necessary:true,analytics:a,updatedAt:new Date().toISOString()}));window.dispatchEvent(new Event(EVENT));setShow(false);setManage(false)};
  if(!show)return null;
  return <div className="fixed inset-x-0 bottom-0 z-[100] p-3 sm:p-5"><div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:p-7">

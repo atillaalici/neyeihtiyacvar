@@ -37,6 +37,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProviderApplication> ProviderApplications => Set<ProviderApplication>();
 
+    public DbSet<BillingInformation> BillingInformations => Set<BillingInformation>();
+
     public DbSet<AppUser> Users => Set<AppUser>();
 
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
@@ -143,6 +145,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
         modelBuilder.Entity<Provider>(entity =>
         {
+            entity.Property(x => x.LastModerationViolationReason)
+                .HasMaxLength(1000);
+
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.HasIndex(x => x.SourceApplicationId).IsUnique();
             entity.HasIndex(x => x.OwnerUserId).IsUnique();
@@ -276,6 +281,24 @@ entity.HasIndex(x => x.CreatedAtUtc);
 
             entity.Property(x => x.Version)
                 .IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<BillingInformation>(entity =>
+        {
+            entity.HasIndex(x => x.UserId).IsUnique();
+            entity.Property(x => x.BillingType).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.NameOrTitle).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.TaxOffice).HasMaxLength(150);
+            entity.Property(x => x.TaxOrIdentityNumber).HasMaxLength(11).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(254).IsRequired();
+            entity.Property(x => x.Phone).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Address).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.City).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.District).HasMaxLength(100).IsRequired();
+            entity.HasOne(x => x.User)
+                .WithOne()
+                .HasForeignKey<BillingInformation>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AdminAuditLog>(entity =>

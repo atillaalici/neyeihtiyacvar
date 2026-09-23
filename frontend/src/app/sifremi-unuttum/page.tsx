@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -16,6 +17,8 @@ export default function ForgotPasswordPage() {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordAgain, setNewPasswordAgain] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showNewPasswordAgain, setShowNewPasswordAgain] = useState(false);
   const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -180,30 +183,66 @@ export default function ForgotPasswordPage() {
                 <label htmlFor="newPassword" className="mb-2 block text-sm font-medium">
                   Yeni Şifre
                 </label>
-                <input
-                  id="newPassword"
-                  type="password"
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                />
+                <div className="relative">
+                  <input
+                    id="newPassword"
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="h-11 w-full rounded-xl border border-input bg-background px-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/15"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Şifreyi basılı tutarak göster"
+                    title="Basılı tutarak şifreyi göster"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      setShowNewPassword(true);
+                    }}
+                    onPointerUp={() => setShowNewPassword(false)}
+                    onPointerCancel={() => setShowNewPassword(false)}
+                    onPointerLeave={() => setShowNewPassword(false)}
+                    onBlur={() => setShowNewPassword(false)}
+                    className="absolute inset-y-0 right-0 flex w-11 touch-none select-none items-center justify-center text-muted-foreground transition hover:text-foreground"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label htmlFor="newPasswordAgain" className="mb-2 block text-sm font-medium">
                   Yeni Şifre Tekrar
                 </label>
-                <input
-                  id="newPasswordAgain"
-                  type="password"
-                  value={newPasswordAgain}
-                  onChange={(event) => setNewPasswordAgain(event.target.value)}
-                  required
-                  autoComplete="new-password"
-                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                />
+                <div className="relative">
+                  <input
+                    id="newPasswordAgain"
+                    type={showNewPasswordAgain ? "text" : "password"}
+                    value={newPasswordAgain}
+                    onChange={(event) => setNewPasswordAgain(event.target.value)}
+                    required
+                    autoComplete="new-password"
+                    className="h-11 w-full rounded-xl border border-input bg-background px-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-primary/15"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Şifre tekrarını basılı tutarak göster"
+                    title="Basılı tutarak şifreyi göster"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      setShowNewPasswordAgain(true);
+                    }}
+                    onPointerUp={() => setShowNewPasswordAgain(false)}
+                    onPointerCancel={() => setShowNewPasswordAgain(false)}
+                    onPointerLeave={() => setShowNewPasswordAgain(false)}
+                    onBlur={() => setShowNewPasswordAgain(false)}
+                    className="absolute inset-y-0 right-0 flex w-11 touch-none select-none items-center justify-center text-muted-foreground transition hover:text-foreground"
+                  >
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
 
               <Button type="submit" className="w-full" size="lg" disabled={loading}>

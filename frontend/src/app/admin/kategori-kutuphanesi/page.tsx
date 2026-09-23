@@ -30,7 +30,17 @@ export default function CategoryLibraryPage(){
   if(!r.ok){setMessage(`Kütüphane yüklenemedi (${r.status})`);return;}
   setData(await r.json());
  }
- useEffect(()=>{void load();},[]);
+ useEffect(() => {
+  let active = true;
+  void (async () => {
+   const r = await fetch(`${apiBaseUrl}/api/admin/category-library`, { headers, cache: "no-store" });
+   if (!active) return;
+   if (!r.ok) { setMessage(`Kütüphane yüklenemedi (${r.status})`); return; }
+   setData(await r.json());
+  })();
+  return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[]);
  const sortedCategories=useMemo(()=>[...data].sort((a,b)=>a.name.localeCompare(b.name,"tr-TR",{sensitivity:"base"})),[data]);
  const category=useMemo(()=>data.find(x=>x.id===categoryId),[data,categoryId]);
  const service=useMemo(()=>category?.services.find(x=>x.id===serviceId),[category,serviceId]);

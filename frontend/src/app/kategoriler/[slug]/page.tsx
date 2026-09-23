@@ -165,7 +165,7 @@ export default async function CategoryDetailPage({
           <section className="mt-5 rounded-[28px] border border-orange-100 bg-orange-50/50 p-6 sm:p-8">
             <h1 className="font-display text-2xl font-bold">Kategori bilgisi yüklenemedi</h1>
             <p className="mt-2 text-muted-foreground">
-              Backend çalışmıyor olabilir. Backend'i başlatıp sayfayı yenile.
+              Backend çalışmıyor olabilir. Backend&apos;i başlatıp sayfayı yenile.
             </p>
           </section>
         </main>

@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Building2, ChevronLeft, ChevronRight, Clock3, ExternalLink, Heart,
@@ -11,6 +11,7 @@ import {
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
 
 const DetailMap = dynamic(
   () => import("@/components/location/ProviderDetailMap"),
@@ -61,6 +62,7 @@ function absoluteImageUrl(url: string) {
 
 export default function ProviderDetailPage() {
   const params = useParams<{ slug: string }>();
+  const router = useRouter();
   const slug = params.slug;
 
   const [provider, setProvider] = useState<Provider | null>(null);
@@ -76,9 +78,15 @@ export default function ProviderDetailPage() {
     async function load() {
       setLoading(true);
       try {
+        const token = getAccessToken();
         const response = await fetch(
           `${apiBaseUrl}/api/providers/${encodeURIComponent(slug)}`,
-          { cache: "no-store" },
+          {
+            cache: "no-store",
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : undefined,
+          },
         );
 
         if (!response.ok) {
@@ -121,12 +129,18 @@ export default function ProviderDetailPage() {
     return ordered.slice(0, 5).map((item) => absoluteImageUrl(item.imageUrl));
   }, [gallery]);
 
-  useEffect(() => {
-    if (photo >= photos.length) setPhoto(0);
-  }, [photo, photos.length]);
+  const currentPhoto = photos.length > 0 ? Math.min(photo, photos.length - 1) : 0;
 
-  const phone = digits(provider?.publicPhone);
-  const whatsapp = digits(provider?.publicWhatsapp || provider?.publicPhone);
+  const isAuthenticated = Boolean(getAccessToken());
+  const phone = isAuthenticated ? digits(provider?.publicPhone) : "";
+  const whatsapp = isAuthenticated
+    ? digits(provider?.publicWhatsapp || provider?.publicPhone)
+    : "";
+
+  function requireAuthForContact() {
+    const returnUrl = `/isletme/${slug}?contact=1`;
+    router.push(`/giris?returnUrl=${encodeURIComponent(returnUrl)}`);
+  }
   const hasMap =
     provider?.latitude != null &&
     provider?.longitude != null &&
@@ -181,7 +195,7 @@ export default function ProviderDetailPage() {
               {photos.length ? (
                 <img
                   onClick={() => setLightbox(true)}
-                  src={photos[photo]}
+                  src={photos[currentPhoto]}
                   alt={provider.businessName}
                   className="h-full w-full cursor-zoom-in object-cover"
                 />
@@ -214,7 +228,7 @@ export default function ProviderDetailPage() {
 
               {!!photos.length && (
                 <span className="absolute bottom-3 right-3 rounded-lg bg-black/70 px-2 py-1 text-xs font-bold text-white">
-                  {photo + 1}/{photos.length}
+                  {currentPhoto + 1}/{photos.length}
                 </span>
               )}
             </div>
@@ -276,26 +290,30 @@ export default function ProviderDetailPage() {
                 </button>
               </div>
 
-              {phone && (
-                <a
-                  href={`tel:+${phone}`}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 font-bold text-white"
+              {!isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={requireAuthForContact}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 font-bold text-white"
                 >
                   <Phone size={19} />
-                  {provider.publicPhone}
-                </a>
-              )}
-
-              {whatsapp && (
-                <a
-                  target="_blank"
-                  rel="noreferrer"
-                  href={`https://wa.me/${whatsapp}`}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3.5 font-bold text-white"
-                >
-                  <MessageCircle size={20} />
-                  WhatsApp&apos;tan Yaz
-                </a>
+                  İletişim İçin Giriş Yap
+                </button>
+              ) : (
+                <>
+                  {phone && (
+                    <a href={`tel:+${phone}`} className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 font-bold text-white">
+                      <Phone size={19} />
+                      {provider.publicPhone}
+                    </a>
+                  )}
+                  {whatsapp && (
+                    <a target="_blank" rel="noreferrer" href={`https://wa.me/${whatsapp}`} className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3.5 font-bold text-white">
+                      <MessageCircle size={20} />
+                      WhatsApp&apos;tan Yaz
+                    </a>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -577,7 +595,7 @@ export default function ProviderDetailPage() {
             </button>
             <img
               onClick={(event) => event.stopPropagation()}
-              src={photos[photo]}
+              src={photos[currentPhoto]}
               alt=""
               className="max-h-[90vh] max-w-[90vw] object-contain"
             />
