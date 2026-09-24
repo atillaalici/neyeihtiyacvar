@@ -24,7 +24,7 @@ export type CategoryViewModel = CategoryDto & {
 const categoryIcons: Record<string, LucideIcon> = {
   "usta-tamir": Wrench,
   "ev-yasam": Home,
-  "nakliye-tasima": Truck,
+  "nakliye-ve-hafriyat": Truck,
   "teknoloji-yazilim": Laptop,
   otomotiv: Car,
   egitim: GraduationCap,

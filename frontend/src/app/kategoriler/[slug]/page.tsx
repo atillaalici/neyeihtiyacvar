@@ -39,8 +39,8 @@ const presentation: Record<string, CategoryPresentation> = {
     image: "/vitrin/otomotiv.png",
     description: "Aracın için bakım, tamir ve teknik servis hizmetlerini keşfet.",
   },
-  "nakliye-tasima": {
-    image: "/vitrin/nakliye-tasima.png",
+  "nakliye-ve-hafriyat": {
+    image: "/vitrin/nakliye-hafriyat-v2.png",
     description: "Nakliye, taşıma ve hafriyat ihtiyaçların için uygun hizmeti bul.",
   },
   "teknoloji-yazilim": {
@@ -102,7 +102,7 @@ const presentation: Record<string, CategoryPresentation> = {
 };
 
 function toServiceSlug(value: string) {
-  return value
+  const normalized = value
     .toLocaleLowerCase("tr-TR")
     .replaceAll("ı", "i")
     .replaceAll("ğ", "g")
@@ -112,6 +112,12 @@ function toServiceSlug(value: string) {
     .replaceAll("ç", "c")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+
+  const aliases: Record<string, string> = {
+    "hafriyat-isleri": "hafriyat",
+  };
+
+  return aliases[normalized] ?? normalized;
 }
 
 export default async function CategoryDetailPage({

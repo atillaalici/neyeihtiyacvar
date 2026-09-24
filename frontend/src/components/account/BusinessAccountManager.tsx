@@ -30,7 +30,7 @@ function slugify(v: string) {
     .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
 function categoryAlias(v?: string | null) {
-  return ["nakliye-tasima","nakliye-hafriyat","hafriyat-nakliyat","hafriyat-ve-nakliyat","insaat-hafriyat"].includes(v ?? "")
+  return ["nakliye-ve-hafriyat","nakliye-hafriyat","hafriyat-nakliyat","hafriyat-ve-nakliyat","insaat-hafriyat"].includes(v ?? "")
     ? "nakliye-ve-hafriyat" : (v ?? "");
 }
 function serviceAlias(v?: string | null) { return v === "hafriyat" ? "hafriyat-isleri" : (v ?? ""); }

@@ -192,7 +192,7 @@ const smartSuggestions: SmartSuggestion[] = [
     id: "ev-tasima",
     label: "Evden eve nakliyat arıyorum",
     keywords: ["ev taşı", "nakliye", "eşya taşı", "evden eve"],
-    categorySlug: "nakliye-tasima",
+    categorySlug: "nakliye-ve-hafriyat",
     serviceSlug: "evden-eve-nakliyat",
     intent: "service",
   },
@@ -200,7 +200,7 @@ const smartSuggestions: SmartSuggestion[] = [
     id: "hafriyat",
     label: "Hafriyat / kazı işi yaptırmak istiyorum",
     keywords: ["hafriyat", "kazı", "kepçe", "ekskavatör", "moloz"],
-    categorySlug: "nakliye-tasima",
+    categorySlug: "nakliye-ve-hafriyat",
     serviceSlug: "hafriyat",
     intent: "service",
   },
@@ -532,7 +532,7 @@ export function HeroSearch() {
       : [
           { id: "p-elektrik", label: "Elektrikçi", keywords: ["Elektrikçi"], categorySlug: "usta-tamir", serviceSlug: "elektrikci", intent: "service", score: 100, popularity: 0 },
           { id: "p-su", label: "Su tesisatçısı", keywords: ["Su tesisatçısı"], categorySlug: "usta-tamir", serviceSlug: "su-tesisatcisi", intent: "service", score: 100, popularity: 0 },
-          { id: "p-nakliye", label: "Evden eve nakliyat", keywords: ["Evden eve nakliyat"], categorySlug: "nakliye-tasima", serviceSlug: "evden-eve-nakliyat", intent: "service", score: 100, popularity: 0 },
+          { id: "p-nakliye", label: "Evden eve nakliyat", keywords: ["Evden eve nakliyat"], categorySlug: "nakliye-ve-hafriyat", serviceSlug: "evden-eve-nakliyat", intent: "service", score: 100, popularity: 0 },
           { id: "p-klima", label: "Klima servisi", keywords: ["Klima servisi"], categorySlug: "usta-tamir", serviceSlug: "klima-servisi", intent: "service", score: 100, popularity: 0 },
           { id: "p-bilgisayar", label: "Bilgisayar servisi", keywords: ["Bilgisayar servisi"], categorySlug: "teknoloji-yazilim", serviceSlug: "bilgisayar-servisi", intent: "service", score: 100, popularity: 0 },
         ];

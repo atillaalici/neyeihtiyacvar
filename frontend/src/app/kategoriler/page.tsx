@@ -7,7 +7,7 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 const categories = [
   { title: "Usta & Tamir", image: "/vitrin/usta-tamir.png", href: "/kategoriler/usta-tamir" },
   { title: "Ev & Yaşam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
-  { title: "Nakliye & Hafriyat", image: "/vitrin/nakliye-tasima.png", href: "/kategoriler/nakliye-tasima" },
+  { title: "Nakliye & Hafriyat", image: "/vitrin/nakliye-hafriyat-v2.png", href: "/kategoriler/nakliye-ve-hafriyat" },
   { title: "Teknoloji & Yazılım", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji-yazilim" },
   { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
   { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },

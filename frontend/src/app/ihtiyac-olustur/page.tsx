@@ -542,11 +542,11 @@ function NeedCreatePageContent() {
                       <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-background shadow-lg">
                         {liveIntentSuggestions.map((suggestion) => {
                           const displayCategoryAliases: Record<string, string> = {
-                            "nakliye-ve-hafriyat": "nakliye-tasima",
-                            "nakliye-hafriyat": "nakliye-tasima",
-                            "hafriyat-nakliyat": "nakliye-tasima",
-                            "hafriyat-ve-nakliyat": "nakliye-tasima",
-                            "insaat-hafriyat": "nakliye-tasima",
+                            "nakliye-ve-hafriyat": "nakliye-ve-hafriyat",
+                            "nakliye-hafriyat": "nakliye-ve-hafriyat",
+                            "hafriyat-nakliyat": "nakliye-ve-hafriyat",
+                            "hafriyat-ve-nakliyat": "nakliye-ve-hafriyat",
+                            "insaat-hafriyat": "nakliye-ve-hafriyat",
                             "insaat-yapi": "insaat-tadilat",
                             "teknoloji": "teknoloji-yazilim",
                           };
