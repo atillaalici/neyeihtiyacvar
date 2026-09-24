@@ -647,8 +647,12 @@ export function HeroSearch() {
                         onClick={() => chooseSuggestion(suggestion)}
                         className="flex w-full items-center gap-4 rounded-xl px-4 py-3 text-left transition hover:bg-muted"
                       >
-                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          <Icon className="size-5" aria-hidden="true" />
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white">
+                          <Icon
+                            className="block size-5 shrink-0 text-white"
+                            strokeWidth={2.25}
+                            aria-hidden="true"
+                          />
                         </span>
 
                         <span className="min-w-0 flex-1">

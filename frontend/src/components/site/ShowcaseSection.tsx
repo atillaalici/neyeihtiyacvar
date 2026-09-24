@@ -49,9 +49,6 @@ type FeaturedProvidersResponse = {
   providers: FeaturedProvider[];
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ??
-  "http://localhost:5155";
 
 function humanizeSlug(value: string) {
   if (!value) return "";
@@ -76,7 +73,7 @@ export function ShowcaseSection() {
         setLoadingProviders(true);
         setProviderError(null);
 
-        const response = await fetch(`${API_BASE}/api/featured-providers`, {
+        const response = await fetch(`${apiBaseUrl}/api/featured-providers`, {
           signal: controller.signal,
           cache: "no-store",
         });

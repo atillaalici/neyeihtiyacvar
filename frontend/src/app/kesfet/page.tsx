@@ -1114,7 +1114,7 @@ function ExplorePageContent() {
                             </div>
 
                             <div className="p-4">
-                              <div className="text-xs font-medium text-primary">
+                              <div className="flex w-full items-center justify-center text-center text-xs font-medium text-white">
                                 {serviceMatchLabel(
                                   provider.matchLevel,
                                 )}

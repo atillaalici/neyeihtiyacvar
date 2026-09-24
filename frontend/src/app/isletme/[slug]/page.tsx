@@ -328,15 +328,18 @@ export default function ProviderDetailPage() {
               <Star size={17} className="text-amber-500" />
               Değerlendirmeler
             </a>
-            <a
-              href="#konum"
-              className="flex items-center gap-2 border-b-2 border-orange-500 px-1 py-3 text-sm font-bold text-orange-600"
-            >
-              <MapPin size={17} />
-              Konum
-            </a>
+            {isAuthenticated ? (
+              <a
+                href="#konum"
+                className="flex items-center gap-2 border-b-2 border-orange-500 px-1 py-3 text-sm font-bold text-orange-600"
+              >
+                <MapPin size={17} />
+                Konum
+              </a>
+            ) : null}
           </div>
 
+          {isAuthenticated ? (
           <section
             id="konum"
             className="scroll-mt-20 grid overflow-hidden rounded-2xl border bg-white shadow-sm lg:grid-cols-[420px_1fr]"
@@ -466,6 +469,8 @@ export default function ProviderDetailPage() {
               )}
             </div>
           </section>
+
+          ) : null}
 
           <section
             id="fotograflar"
