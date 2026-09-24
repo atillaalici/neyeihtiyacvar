@@ -5,12 +5,10 @@ type Props = {
 };
 
 const steps = [
-  "Tür",
-  "Bilgiler",
-  "Hizmet",
-  "Güvenlik",
+  "İşletme Bilgileri",
+  "Hizmet Bilgileri",
   "Doğrulama",
-  "Paket",
+  "Faturalama",
 ];
 
 export function RegistrationProgress({ current }: Props) {
@@ -47,7 +45,7 @@ export function RegistrationProgress({ current }: Props) {
                 ].join(" ")}
                 aria-current={active ? "step" : undefined}
               >
-                {completed ? (
+                {completed || active ? (
                   <svg
                     viewBox="0 0 24 24"
                     className="size-4"

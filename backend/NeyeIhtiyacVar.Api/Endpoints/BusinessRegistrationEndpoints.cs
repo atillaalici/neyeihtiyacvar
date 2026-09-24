@@ -1,3 +1,4 @@
+using System.Data;
 using System.Globalization;
 using System.Net.Mail;
 using System.Security.Claims;
@@ -235,6 +236,152 @@ public static class BusinessRegistrationEndpoints
                         "Hesabın oluşturuldu. İşletme başvurun ödeme tamamlandıktan sonra oluşturulacak."
                 });
         });
+
+        group.MapPost("/complete-free", async (
+            CompleteFreeBusinessRegistrationRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            var userIdText = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdText, out var userId)) return Results.Unauthorized();
+
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+            var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId && x.IsActive);
+            if (user is null) return Results.Unauthorized();
+
+            if (!await dbContext.Set<BillingInformation>().AsNoTracking().AnyAsync(x => x.UserId == userId))
+                return Results.BadRequest(new { message = "Önce fatura bilgilerini kaydetmelisin." });
+
+            if (await dbContext.Providers.AsNoTracking().AnyAsync(x => x.OwnerUserId == userId) ||
+                await dbContext.ProviderMemberships.AsNoTracking().AnyAsync(x => x.UserId == userId && x.IsActive))
+                return Results.Conflict(new { message = "Bu hesap zaten bir işletmeye bağlı." });
+
+            if (string.IsNullOrWhiteSpace(request.BusinessName) || string.IsNullOrWhiteSpace(request.ApplicantName) ||
+                string.IsNullOrWhiteSpace(request.PhoneNumber) || string.IsNullOrWhiteSpace(request.CitySlug) ||
+                string.IsNullOrWhiteSpace(request.DistrictSlug) || string.IsNullOrWhiteSpace(request.CategorySlug) ||
+                string.IsNullOrWhiteSpace(request.ServiceSlug))
+                return Results.BadRequest(new { message = "İşletme kayıt bilgileri eksik." });
+
+            if (NormalizePhone(request.PhoneNumber) is null)
+                return Results.BadRequest(new { message = "Telefon +90 5XX XXX XX XX formatında olmalıdır." });
+
+            var planCode = request.PlanCode.Trim().ToLowerInvariant();
+            var plan = await dbContext.MembershipPlans.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Code == planCode && x.IsActive);
+            if (plan is null) return Results.BadRequest(new { message = "Geçerli bir üyelik paketi seçin." });
+
+            var code = Regex.Replace(request.PromotionCode.Trim().ToUpperInvariant(), @"\s+", string.Empty);
+            var promo = await dbContext.PromotionCodes.FirstOrDefaultAsync(x => x.Code == code);
+            if (promo is null) return Results.NotFound(new { message = "Promosyon kodu bulunamadı." });
+
+            var now = DateTime.UtcNow;
+            if (promo.UsedCount > 0 || promo.UsedAtUtc.HasValue)
+                return Results.Conflict(new { message = "Bu promosyon kodu daha önce kullanılmış." });
+            if (!promo.IsActive) return Results.BadRequest(new { message = "Bu promosyon kodu aktif değil." });
+            if (promo.StartsAtUtc.HasValue && promo.StartsAtUtc.Value > now)
+                return Results.BadRequest(new { message = "Bu promosyon henüz başlamadı." });
+            if (promo.ExpiresAtUtc.HasValue && promo.ExpiresAtUtc.Value < now)
+                return Results.BadRequest(new { message = "Bu promosyon kodunun süresi dolmuş." });
+            if (!string.IsNullOrWhiteSpace(promo.PlanCode) &&
+                !string.Equals(promo.PlanCode, planCode, StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new { message = "Bu promosyon kodu seçilen pakette geçerli değil." });
+
+            Guid? organizationId = null;
+            if (promo.CampaignId.HasValue)
+            {
+                var campaign = await dbContext.PromotionCampaigns.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == promo.CampaignId.Value);
+                if (campaign is null || !campaign.IsActive)
+                    return Results.BadRequest(new { message = "Bu promosyon kampanyası aktif değil." });
+                organizationId = campaign.OrganizationId;
+                var organization = await dbContext.PromotionOrganizations.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == campaign.OrganizationId);
+                if (organization is null || !organization.IsActive)
+                    return Results.BadRequest(new { message = "Bu promosyonun bağlı olduğu kurum aktif değil." });
+            }
+
+            decimal discountAmount = promo.DiscountType == "percentage"
+                ? decimal.Round(plan.AnnualPrice * promo.DiscountValue / 100m, 2, MidpointRounding.AwayFromZero)
+                : promo.DiscountValue;
+            discountAmount = Math.Clamp(discountAmount, 0m, plan.AnnualPrice);
+            var finalPrice = plan.AnnualPrice - discountAmount;
+            if (finalPrice != 0m)
+                return Results.BadRequest(new { message = "Bu işlem yalnızca son tutarı 0 TL olan promosyonlarda kullanılabilir.", finalPrice });
+
+            var category = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
+                .FirstOrDefaultAsync(x => x.Slug == request.CategorySlug.Trim() && x.IsActive);
+            if (category is null || !category.Services.Where(x => x.IsActive).Select(x => ToSlug(x.Name))
+                    .Contains(request.ServiceSlug.Trim(), StringComparer.OrdinalIgnoreCase))
+                return Results.BadRequest(new { message = "Kategori veya hizmet bilgisi geçerli değil." });
+
+            var city = await dbContext.Cities.AsNoTracking().Include(x => x.Districts)
+                .FirstOrDefaultAsync(x => x.Slug == request.CitySlug.Trim() && x.IsActive);
+            if (city is null || !city.Districts.Any(x => x.Slug == request.DistrictSlug.Trim() && x.IsActive))
+                return Results.BadRequest(new { message = "İl veya ilçe bilgisi geçerli değil." });
+
+            var application = new ProviderApplication
+            {
+                OwnerUserId = userId, BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
+                CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
+                CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
+                ApplicantName = request.ApplicantName.Trim(), Phone = request.PhoneNumber.Trim(),
+                Whatsapp = request.PhoneNumber.Trim(), Status = ProviderApplicationStatus.Pending,
+                CreatedAtUtc = now, UpdatedAtUtc = now
+            };
+            dbContext.ProviderApplications.Add(application);
+
+            var provider = new Provider
+            {
+                SourceApplicationId = application.Id, OwnerUserId = userId,
+                Slug = $"{ToSlug(request.BusinessName)}-{Guid.NewGuid().ToString("N")[..8]}",
+                BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
+                CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
+                AdditionalServices = string.IsNullOrWhiteSpace(request.AdditionalServiceSlug) ? [] : [request.AdditionalServiceSlug.Trim()],
+                CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
+                PublicPhone = request.PhoneNumber.Trim(), PublicWhatsapp = request.PhoneNumber.Trim(),
+                PublicationStatus = PublicationStatus.Draft, IsActive = true,
+                CreatedAtUtc = now, UpdatedAtUtc = now
+            };
+            dbContext.Providers.Add(provider);
+
+            var membership = new ProviderMembership
+            {
+                ProviderId = provider.Id, UserId = userId, PlanId = plan.Id,
+                AnnualPriceSnapshot = plan.AnnualPrice, ServiceLimitSnapshot = plan.ServiceLimit,
+                StartsAtUtc = now, ExpiresAtUtc = null, IsActive = true,
+                CreatedAtUtc = now, UpdatedAtUtc = now
+            };
+            dbContext.ProviderMemberships.Add(membership);
+
+            promo.UsedCount = 1; promo.UsedAtUtc = now; promo.UsedByUserId = userId;
+            promo.IsActive = false; promo.UpdatedAtUtc = now;
+
+            var usage = new PromotionUsage
+            {
+                PromotionCodeId = promo.Id, CampaignId = promo.CampaignId, OrganizationId = organizationId,
+                UserId = userId, UserDisplayName = user.DisplayName, UserEmail = user.Email,
+                PlanCode = plan.Code, OriginalPrice = plan.AnnualPrice, DiscountAmount = discountAmount,
+                FinalPrice = finalPrice, PaymentStatus = "free_completed", UsedAtUtc = now,
+                CreatedAtUtc = now, UpdatedAtUtc = now
+            };
+            dbContext.PromotionUsages.Add(usage);
+
+            user.Role = UserRole.Provider;
+            user.UpdatedAtUtc = now;
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Results.Ok(new
+            {
+                completed = true, applicationId = application.Id, providerId = provider.Id,
+                providerSlug = provider.Slug, membershipId = membership.Id, promotionUsageId = usage.Id,
+                planCode = plan.Code, originalPrice = plan.AnnualPrice, discountAmount, finalPrice,
+                applicationStatus = "pending", publicationStatus = "draft",
+                message = "İşletme kaydın tamamlandı. İşletmen yönetim panelinde hazır; yayınlanması yönetici onayından sonra gerçekleşecek."
+            });
+        }).RequireAuthorization();
 
         return app;
     }
@@ -616,6 +763,19 @@ public static class BusinessRegistrationEndpoints
         return ascii.Trim('-');
     }
 }
+
+public sealed record CompleteFreeBusinessRegistrationRequest(
+    string PromotionCode,
+    string PlanCode,
+    string BusinessName,
+    string ApplicantName,
+    string PhoneNumber,
+    string CitySlug,
+    string DistrictSlug,
+    string CategorySlug,
+    string ServiceSlug,
+    string? AdditionalCategorySlug,
+    string? AdditionalServiceSlug);
 
 public sealed record BusinessRegisterRequest(
     string BusinessName,

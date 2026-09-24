@@ -16,6 +16,7 @@ public static class BillingInformationEndpoints
             if (!Guid.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
                 return Results.Unauthorized();
 
+            var now = DateTime.UtcNow;
             var item = await db.BillingInformations.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
 
@@ -31,25 +32,16 @@ public static class BillingInformationEndpoints
             if (type is not ("individual" or "corporate"))
                 return Results.BadRequest(new { message = "Geçerli bir fatura tipi seçin." });
 
-            var number = new string(request.TaxOrIdentityNumber.Where(char.IsDigit).ToArray());
             var taxOffice = string.IsNullOrWhiteSpace(request.TaxOffice) ? null : request.TaxOffice.Trim();
+            var taxOrIdentityNumber = new string((request.TaxOrIdentityNumber ?? string.Empty).Where(char.IsDigit).ToArray());
 
             if (string.IsNullOrWhiteSpace(request.NameOrTitle) ||
-                string.IsNullOrWhiteSpace(request.Email) ||
                 string.IsNullOrWhiteSpace(request.Phone) ||
-                string.IsNullOrWhiteSpace(request.Address) ||
-                string.IsNullOrWhiteSpace(request.City) ||
-                string.IsNullOrWhiteSpace(request.District))
-                return Results.BadRequest(new { message = "Fatura bilgilerini eksiksiz doldurun." });
+                string.IsNullOrWhiteSpace(taxOffice))
+                return Results.BadRequest(new { message = "İsim Soyisim / Unvan, T.C. / Vergi No, telefon ve vergi dairesi zorunludur." });
 
-            if (type == "individual" && number.Length != 11)
-                return Results.BadRequest(new { message = "T.C. kimlik numarası 11 haneli olmalıdır." });
-
-            if (type == "corporate" && number.Length != 10)
-                return Results.BadRequest(new { message = "Vergi numarası 10 haneli olmalıdır." });
-
-            if (type == "corporate" && string.IsNullOrWhiteSpace(taxOffice))
-                return Results.BadRequest(new { message = "Kurumsal fatura için vergi dairesini girin." });
+            if (taxOrIdentityNumber.Length != 11)
+                return Results.BadRequest(new { message = "T.C. / Vergi No 11 haneli olmalıdır." });
 
             var now = DateTime.UtcNow;
             var item = await db.BillingInformations.FirstOrDefaultAsync(x => x.UserId == userId);
@@ -63,7 +55,7 @@ public static class BillingInformationEndpoints
             item.BillingType = type;
             item.NameOrTitle = request.NameOrTitle.Trim();
             item.TaxOffice = taxOffice;
-            item.TaxOrIdentityNumber = number;
+            item.TaxOrIdentityNumber = taxOrIdentityNumber;
             item.Email = request.Email.Trim();
             item.Phone = request.Phone.Trim();
             item.Address = request.Address.Trim();

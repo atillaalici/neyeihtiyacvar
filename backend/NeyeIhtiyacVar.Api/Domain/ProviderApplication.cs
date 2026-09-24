@@ -4,6 +4,10 @@ public sealed class ProviderApplication
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    public Guid? OwnerUserId { get; set; }
+
+    public AppUser? OwnerUser { get; set; }
+
     public string BusinessName { get; set; } = string.Empty;
 
     public string ShortDescription { get; set; } = string.Empty;

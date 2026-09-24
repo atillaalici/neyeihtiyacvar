@@ -548,16 +548,16 @@ export function HeroSearch() {
         }}
       />
 
-      <div className="section-shell relative py-14 sm:py-20">
+      <div className="section-shell relative py-8 sm:py-20">
         <div className="mx-auto max-w-[1120px]">
           <div className="flex justify-center">
-            <span className="inline-flex items-center rounded-full border border-border bg-background/95 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.02em] text-primary shadow-sm sm:text-xs">
+            <span className="inline-flex items-center rounded-full border border-border bg-background/95 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.02em] text-primary shadow-sm sm:px-5 sm:py-2 sm:text-xs">
               Türkiye&apos;nin yerel ihtiyaç platformu
             </span>
           </div>
 
-          <div className="mx-auto mt-3 flex max-w-[1120px] items-center justify-center gap-4 sm:gap-6">
-            <div className="relative h-[126px] w-[126px] shrink-0 sm:h-[148px] sm:w-[148px]">
+          <div className="mx-auto mt-2 flex max-w-[1120px] items-center justify-center gap-2 sm:mt-3 sm:gap-6">
+            <div className="relative h-[68px] w-[68px] shrink-0 sm:h-[148px] sm:w-[148px]">
               <Image
                 src="/brand/neyeihtiyacvar-logo.png"
                 alt="neyeihtiyacvar.com"
@@ -568,27 +568,27 @@ export function HeroSearch() {
               />
             </div>
 
-            <h1 className="whitespace-nowrap font-display text-[68px] font-bold leading-none tracking-[-0.05em] text-foreground sm:text-[80px]">
+            <h1 className="whitespace-nowrap font-display text-[34px] font-bold leading-none tracking-[-0.05em] text-foreground sm:text-[80px]">
               Neye <span className="text-primary">ihtiyaç</span> var?
             </h1>
           </div>
 
-          <p className="mx-auto mt-4 max-w-[920px] text-center text-[20px] leading-8 text-muted-foreground sm:text-[22px]">
+          <p className="mx-auto mt-2 max-w-[920px] px-2 text-center text-[14px] leading-5 text-muted-foreground sm:mt-4 sm:px-0 sm:text-[22px] sm:leading-8">
             İhtiyacını anlat, sana en uygun kişi, işletme veya hizmeti bulalım.
           </p>
 
           <form
             role="search"
             onSubmit={submit}
-            className="relative mx-auto mt-10 max-w-[1120px]"
+            className="relative mx-auto mt-5 max-w-[1120px] sm:mt-10"
           >
             <label htmlFor="ihtiyac-arama" className="sr-only">
               İhtiyacını yaz
             </label>
 
-            <div className="flex items-center rounded-[24px] border border-border bg-background px-3 py-2.5 shadow-lg ring-1 ring-black/[0.02]">
+            <div className="flex min-w-0 items-center rounded-[18px] border border-border bg-background px-2 py-1.5 shadow-lg ring-1 ring-black/[0.02] sm:rounded-[24px] sm:px-3 sm:py-2.5">
               <Sparkles
-                className="ml-3 size-7 shrink-0 text-primary"
+                className="ml-1 size-5 shrink-0 text-primary sm:ml-3 sm:size-7"
                 aria-hidden="true"
               />
 
@@ -608,7 +608,7 @@ export function HeroSearch() {
                 }}
                 autoComplete="off"
                 placeholder="Örneğin: Bilgisayarım açılmıyor..."
-                className="h-14 min-w-0 flex-1 bg-transparent px-4 text-[19px] outline-none placeholder:text-muted-foreground sm:text-[21px]"
+                className="h-11 min-w-0 flex-1 bg-transparent px-2 text-[14px] outline-none placeholder:text-muted-foreground sm:h-14 sm:px-4 sm:text-[21px]"
               />
 
               <button
@@ -616,7 +616,7 @@ export function HeroSearch() {
                 onClick={() => {
                   searchSourceRef.current = "button";
                 }}
-                className="inline-flex h-14 shrink-0 items-center justify-center rounded-[18px] bg-primary px-9 text-[18px] font-semibold text-primary-foreground transition hover:bg-primary/90 sm:px-11 sm:text-[20px]"
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-[14px] bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition hover:bg-primary/90 sm:h-14 sm:rounded-[18px] sm:px-11 sm:text-[20px]"
               >
                 İhtiyacımı Bul
               </button>
@@ -667,13 +667,13 @@ export function HeroSearch() {
             ) : null}
           </form>
 
-          <p className="mx-auto mt-6 flex max-w-[900px] items-center justify-center gap-2 text-center text-[17px] text-muted-foreground sm:text-[18px]">
-            <Sparkles className="size-5 text-primary" aria-hidden="true" />
+          <p className="mx-auto mt-3 flex max-w-[900px] items-center justify-center gap-1.5 px-1 text-center text-[12px] text-muted-foreground sm:mt-6 sm:gap-2 sm:px-0 sm:text-[18px]">
+            <Sparkles className="size-4 shrink-0 text-primary sm:size-5" aria-hidden="true" />
             Nasıl anlatacağını düşünme, ihtiyacını kendi cümlenle yaz.
           </p>
 
-          <div className="mx-auto mt-8 flex max-w-[1220px] flex-wrap items-center justify-center gap-4">
-            <span className="text-[17px] text-muted-foreground sm:text-[18px]">
+          <div className="mx-auto mt-4 flex max-w-full flex-nowrap items-center justify-start gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mt-8 sm:max-w-[1220px] sm:flex-wrap sm:justify-center sm:gap-4 sm:overflow-visible sm:whitespace-normal sm:pb-0">
+            <span className="shrink-0 text-[11px] text-muted-foreground sm:text-[18px]">
               Popüler aramalar:
             </span>
 
@@ -685,7 +685,7 @@ export function HeroSearch() {
                   setQuery(item.label);
                   void goToSearch(item.label, item, "button");
                 }}
-                className="rounded-full border border-border bg-background px-6 py-2.5 text-[16px] text-muted-foreground shadow-sm transition hover:border-primary/30 hover:text-primary sm:text-[17px]"
+                className="shrink-0 rounded-full border border-border bg-background px-2.5 py-1.5 text-[11px] text-muted-foreground shadow-sm transition hover:border-primary/30 hover:text-primary sm:px-6 sm:py-2.5 sm:text-[17px]"
               >
                 {item.label}
               </button>

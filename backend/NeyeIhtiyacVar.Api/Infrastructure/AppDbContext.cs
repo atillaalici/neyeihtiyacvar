@@ -232,7 +232,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 modelBuilder.Entity<ProviderApplication>(entity =>
         {
             entity.HasIndex(x => x.Status);
-entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.OwnerUserId);
+
+            entity.HasOne(x => x.OwnerUser)
+                .WithMany()
+                .HasForeignKey(x => x.OwnerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.Property(x => x.BusinessName)
                 .HasMaxLength(200)

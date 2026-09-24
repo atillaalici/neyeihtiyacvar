@@ -28,13 +28,43 @@ export function Navbar() {
           </Link>
         </div>
 
-        <button
-          type="button"
-          className="grid size-10 place-items-center rounded-lg border border-border md:hidden"
-          aria-label="Menü"
-        >
-          <Menu className="size-5" />
-        </button>
+        <details className="group relative md:hidden">
+          <summary
+            className="grid size-10 cursor-pointer list-none place-items-center rounded-lg border border-border [&::-webkit-details-marker]:hidden"
+            aria-label="Menü"
+          >
+            <Menu className="size-5" />
+          </summary>
+
+          <div className="absolute right-0 top-12 z-[60] w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-border bg-background p-2 shadow-xl">
+            <nav className="grid text-sm font-medium">
+              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/">
+                Ana Sayfa
+              </Link>
+              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/kesfet">
+                Keşfet
+              </Link>
+              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/kategoriler">
+                Kategoriler
+              </Link>
+              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/nasil-calisir">
+                Nasıl Çalışır
+              </Link>
+            </nav>
+
+            <div className="mt-2 border-t border-border pt-2">
+              <div className="px-2 py-1">
+                <AuthMenu />
+              </div>
+              <Link
+                href="/ihtiyac-olustur"
+                className="mt-2 block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                İhtiyaç Oluştur
+              </Link>
+            </div>
+          </div>
+        </details>
       </div>
     </header>
   );

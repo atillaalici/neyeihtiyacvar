@@ -206,6 +206,7 @@ public static class ProviderApplicationEndpoints
                 provider = new Provider
                 {
                     SourceApplicationId = application.Id,
+                    OwnerUserId = application.OwnerUserId,
                     Slug = slug,
                     BusinessName = application.BusinessName,
                     ShortDescription = application.ShortDescription,

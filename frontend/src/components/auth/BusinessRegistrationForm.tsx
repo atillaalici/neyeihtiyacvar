@@ -50,6 +50,8 @@ type BusinessRegistrationDraft = {
   categorySlug?: string;
   serviceSlug?: string;
   additionalServiceSlug?: string | null;
+  additionalCategorySlug?: string | null;
+  additionalServiceSelections?: Array<{ categorySlug: string; serviceSlug: string }>;
 };
 type BusinessRegisterResponse = AuthResponse & {
   applicationId: string | null;
@@ -219,6 +221,28 @@ export function BusinessRegistrationForm({
         draft?.additionalServiceSlug?.trim() ||
         "",
       );
+
+      const savedAdditionalSelections =
+        draft?.additionalServiceSelections ?? [];
+      const firstSavedAdditional = savedAdditionalSelections[0];
+
+      setAdditionalCategorySlug((current) =>
+        current ||
+        draft?.additionalCategorySlug?.trim() ||
+        firstSavedAdditional?.categorySlug?.trim() ||
+        "",
+      );
+      setAdditionalServiceSlug((current) =>
+        current ||
+        draft?.additionalServiceSlug?.trim() ||
+        firstSavedAdditional?.serviceSlug?.trim() ||
+        "",
+      );
+      setExtraServices((current) =>
+        current.length > 0
+          ? current
+          : savedAdditionalSelections.slice(1),
+      );
     }, 0);
 
     return () => {
@@ -233,7 +257,7 @@ export function BusinessRegistrationForm({
   const [registered, setRegistered] =
     useState<BusinessRegisterResponse | null>(null);
   useEffect(() => {
-    onStepChange?.(registered ? 5 : wizardStep);
+    onStepChange?.(registered ? 3 : wizardStep);
   }, [onStepChange, registered, wizardStep]);
 function chooseProviderKind(kind: ProviderKind) {
     setProviderKind(kind);
@@ -676,7 +700,7 @@ function chooseProviderKind(kind: ProviderKind) {
       setSubmitting(false);
     }
   }
-  async function verifyNow() {
+  async function verifyNow(channel: "email" | "phone") {
     if (!registered) {
       return;
     }
@@ -694,7 +718,7 @@ function chooseProviderKind(kind: ProviderKind) {
           },
           body: JSON.stringify({
             userId: registered.user.id,
-            channel: "email",
+            channel,
           }),
         },
       );
@@ -704,16 +728,27 @@ function chooseProviderKind(kind: ProviderKind) {
       if (!response.ok) {
         setError(
           data?.message ??
-            "E-posta doğrulama kodu gönderilemedi.",
+            (channel === "email"
+              ? "E-posta doğrulama kodu gönderilemedi."
+              : "Telefon doğrulama kodu gönderilemedi."),
         );
         return;
       }
 
       if (data?.developmentCode) {
+        let currentCodes: Record<string, string> = {};
+        try {
+          currentCodes = JSON.parse(
+            sessionStorage.getItem("neyeihtiyacvar.devVerificationCodes") ?? "{}",
+          );
+        } catch {
+          currentCodes = {};
+        }
         sessionStorage.setItem(
           "neyeihtiyacvar.devVerificationCodes",
           JSON.stringify({
-            email: String(data.developmentCode),
+            ...currentCodes,
+            [channel]: String(data.developmentCode),
           }),
         );
       }
@@ -722,7 +757,7 @@ function chooseProviderKind(kind: ProviderKind) {
         userId: registered.user.id,
         email: registered.user.email,
         phone: registered.user.phoneNumber ?? "",
-        channel: "email",
+        channel,
         returnUrl: "/uyelik/odeme",
       });
 
@@ -735,61 +770,99 @@ function chooseProviderKind(kind: ProviderKind) {
   }
 
   if (registered) {
+    const selectedPlan = sessionStorage
+      .getItem("neyeihtiyacvar.selectedPlanCode")
+      ?.trim()
+      .toLowerCase();
+
+    const paymentTarget =
+      selectedPlan === "kobi" ||
+      selectedPlan === "avantaj" ||
+      selectedPlan === "profesyonel"
+        ? `/uyelik/odeme?paket=${encodeURIComponent(selectedPlan)}`
+        : "/uyelik/odeme";
+
     return (
-      <div className="mt-5">
-        <div className="rounded-2xl border border-green-200 bg-card p-6 shadow-soft">
-
-<p className="text-sm font-semibold text-primary">
-          Hesap oluşturuldu
-        </p>
-
-        <h2 className="mt-2 font-display text-2xl font-bold">
-          Ödeme öncesi hesabın hazır
-        </h2>
-
-        <p className="mt-3 leading-7 text-muted-foreground">
-          İşletme başvurun henüz oluşturulmadı. İstersen şimdi hesabını
-          doğrula veya paket ve ödeme adımına devam et. İşletme başvurusu
-          ödeme başarıyla tamamlandıktan sonra oluşturulacak.
-        </p>
-
-        {error && (
-          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                        <Button
-                type="button"
-                onClick={() => void verifyNow()}
-                disabled={verifyWorking}
-              >
-                {verifyWorking ? "Kod gönderiliyor..." : "Hesabı Doğrula"}
-              </Button>
-<Button
-            type="button"
-            onClick={() => {
-                  const selectedPlan = sessionStorage
-                    .getItem("neyeihtiyacvar.selectedPlanCode")
-                    ?.trim()
-                    .toLowerCase();
-
-                  const target =
-                    selectedPlan === "kobi" ||
-                    selectedPlan === "avantaj" ||
-                    selectedPlan === "profesyonel"
-                      ? `/uyelik/odeme?paket=${encodeURIComponent(selectedPlan)}`
-                      : "/uyelik/odeme";
-
-                  window.location.assign(target);
-                }}
-          >
-                Doğrulamadan Devam Et
-              </Button>
+      <div className="mt-4">
+        <div className="text-center">
+          <h2 className="font-display text-3xl font-bold sm:text-4xl">
+            Hesap Doğrulama
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            Hesabınızın güvenliği için e-posta ve telefon numaranızı doğrulayın.
+          </p>
         </div>
 
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        {error ? (
+          <div className="mx-auto mt-4 max-w-3xl rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-2">
+          <div className="rounded-[22px] border border-border bg-card p-5 shadow-sm">
+            <div className="grid size-12 place-items-center rounded-full bg-orange-100 text-orange-600">
+              <span className="text-2xl" aria-hidden="true">✉</span>
+            </div>
+            <h3 className="mt-4 font-display text-xl font-bold">
+              E-posta Doğrulaması
+            </h3>
+            <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
+              Kayıt sırasında belirttiğiniz e-posta adresine doğrulama kodu göndereceğiz.
+            </p>
+            <div className="mt-4 rounded-xl border border-input bg-background px-4 py-3 text-sm font-medium">
+              {registered.user.email}
+            </div>
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              size="lg"
+              onClick={() => void verifyNow("email")}
+              disabled={verifyWorking}
+            >
+              {verifyWorking ? "Kod gönderiliyor..." : "E-posta ile Doğrula"}
+            </Button>
+          </div>
+
+          <div className="rounded-[22px] border border-border bg-card p-5 shadow-sm">
+            <div className="grid size-12 place-items-center rounded-full bg-orange-100 text-orange-600">
+              <span className="text-2xl" aria-hidden="true">☎</span>
+            </div>
+            <h3 className="mt-4 font-display text-xl font-bold">
+              Telefon Doğrulaması
+            </h3>
+            <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
+              Kayıt sırasında belirttiğiniz telefon numarasına doğrulama kodu göndereceğiz.
+            </p>
+            <div className="mt-4 rounded-xl border border-input bg-background px-4 py-3 text-sm font-medium">
+              {registered.user.phoneNumber || "Telefon numarası bulunamadı"}
+            </div>
+            <Button
+              type="button"
+              className="mt-4 w-full"
+              size="lg"
+              onClick={() => void verifyNow("phone")}
+              disabled={verifyWorking || !registered.user.phoneNumber}
+            >
+              {verifyWorking ? "Kod gönderiliyor..." : "Telefon ile Doğrula"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-5 max-w-4xl border-t border-border pt-5 text-center">
+          <p className="text-sm text-muted-foreground">
+            Şu anda doğrulama yapmak istemiyorum.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.assign(paymentTarget)}
+            className="mt-3 rounded-xl border border-orange-500 px-6 py-2.5 text-sm font-bold text-orange-600 transition hover:bg-orange-50"
+          >
+            Daha Sonra Doğrula
+          </button>
+        </div>
+
+        <div className="mx-auto mt-5 flex max-w-4xl items-center justify-between">
           <button
             type="button"
             onClick={() => router.back()}
@@ -797,34 +870,13 @@ function chooseProviderKind(kind: ProviderKind) {
           >
             Geri
           </button>
-
           <button
             type="button"
-            onClick={() => {
-              const plan =
-                sessionStorage
-                  .getItem("neyeihtiyacvar.selectedPlanCode")
-                  ?.trim()
-                  .toLowerCase();
-
-              const target =
-                plan === "kobi" ||
-                plan === "avantaj" ||
-                plan === "profesyonel"
-                  ? `/uyelik/odeme?paket=${encodeURIComponent(plan)}`
-                  : "/uyelik/odeme";
-
-              window.location.assign(target);
-            }}
-            className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700"
+            onClick={() => window.location.assign(paymentTarget)}
+            className="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
           >
             İleri
           </button>
-        </div>
-<p className="mt-4 text-xs leading-5 text-muted-foreground">
-          İşletme yayına alınmadan önce e-posta ve telefon
-          doğrulamasının ikisi de tamamlanmalıdır.
-        </p>
         </div>
       </div>
     );
@@ -935,9 +987,11 @@ function chooseProviderKind(kind: ProviderKind) {
         !applicantName.trim() ||
         !email.trim() ||
         phoneDigits.length !== 10 ||
-        (!isUsta && !businessName.trim())
+        (!isUsta && !businessName.trim()) ||
+        !termsAccepted ||
+        !businessTermsAccepted
       ) {
-        setError("Lütfen zorunlu alanları eksiksiz doldurun.");
+        setError("Lütfen zorunlu alanları eksiksiz doldurun ve sözleşmeleri onaylayın.");
         return;
       }
 
@@ -1037,20 +1091,6 @@ function chooseProviderKind(kind: ProviderKind) {
             data-location-registration-map
             className="mb-5 overflow-hidden rounded-2xl border border-orange-100 bg-white shadow-sm"
           >
-            <div className="border-b border-orange-100 bg-orange-50/40 px-4 py-4 sm:px-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-xl">
-                  📍
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-950">İşletme Konumu</h3>
-                  <p className="mt-1 text-sm leading-5 text-slate-600">
-                    İl ve ilçenizi seçin, açık adresinizi yazın. Ardından haritadan işletmenizin bulunduğu noktayı işaretleyin.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             <div className="space-y-4 p-4 sm:p-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
@@ -1129,7 +1169,47 @@ function chooseProviderKind(kind: ProviderKind) {
               </div>
             </div>
           </section>
-<div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+<div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/20 p-3">
+          <label className="flex cursor-pointer items-start gap-3 text-[13px] leading-5">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(event) => setTermsAccepted(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+            <span>
+              <Link
+                href="/sozlesmeler/kullanim-kosullari"
+                target="_blank"
+                className="font-semibold text-primary underline-offset-4 hover:underline"
+              >
+                Kullanım ve Üyelik Koşulları
+              </Link>{" "}
+              metnini okudum ve kabul ediyorum. *
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 text-[13px] leading-5">
+            <input
+              type="checkbox"
+              checked={businessTermsAccepted}
+              onChange={(event) => setBusinessTermsAccepted(event.target.checked)}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
+            />
+            <span>
+              <Link
+                href="/sozlesmeler/isletme-kosullari"
+                target="_blank"
+                className="font-semibold text-primary underline-offset-4 hover:underline"
+              >
+                İşletme ve Hizmet Sağlayıcı Koşulları
+              </Link>{" "}
+              metnini okudum ve kabul ediyorum. *
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
           <button
             type="button"
             onClick={() => { setError(""); setProviderKind(null); setWizardStep(2); }}
@@ -1160,15 +1240,25 @@ function chooseProviderKind(kind: ProviderKind) {
       }
 
       setError("");
-      setWizardStep(4);
+      document.getElementById("business-registration-submit")?.click();
     };
 
     return (
       <div className="mt-3">
-        <div className="rounded-[22px] border border-border bg-card p-4 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-[22px] border border-border bg-card p-4 shadow-sm"
+        >
+          <button
+            id="business-registration-submit"
+            type="submit"
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden="true"
+          />
         <div>
           <h2 className="mt-0.5 font-display text-xl font-bold">
-            Konum ve hizmet bilgileri
+            Hizmet bilgileri
           </h2>
           <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
             Hizmet verdiğiniz bölgeyi ve hizmet alanınızı seçin.
@@ -1317,285 +1407,12 @@ function chooseProviderKind(kind: ProviderKind) {
             İleri
           </button>
         </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (providerKind && wizardStep === 4) {
-    return (
-      <div className="mt-3">
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-[22px] border border-border bg-card p-4 shadow-sm"
-        >
-          <h2 className="font-display text-xl font-bold">
-            Güvenlik ve koşullar
-          </h2>
-
-          <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
-            {existingAccountMode
-              ? "Mevcut hesabın kullanılacak. İşletme kaydı için gerekli koşulları onaylayarak devam et."
-              : "Åifrenizi oluÅŸturun ve kayÄ±t koÅŸullarÄ±nÄ± onaylayÄ±n."}
-          </p>
-
-          {!existingAccountMode ? (
-            <>
-              <div className="mt-3 grid gap-x-2 gap-y-2.5 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-[13px] font-medium">
-                    Åifre *
-                  </label>
-
-                  <div className="relative">
-                    <input
-                      type={
-                        showPassword
-                          ? "text"
-                          : "password"
-                      }
-                      value={password}
-                      onChange={(event) =>
-                        setPassword(
-                          event.target.value,
-                        )
-                      }
-                      className="h-10 w-full rounded-xl border border-input bg-background px-3 pr-10 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
-                      placeholder="En az 8 karakter"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowPassword(
-                          (current) =>
-                            !current,
-                        )
-                      }
-                      className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label={
-                        showPassword
-                          ? "Åifreyi gizle"
-                          : "Åifreyi gÃ¶ster"
-                      }
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="size-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        {showPassword ? (
-                          <>
-                            <path d="m2 2 20 20" />
-                            <path d="M6.7 6.7C4.8 8 3.4 9.8 2.5 12c1.8 4.4 5.2 7 9.5 7 1.5 0 2.9-.3 4.1-.9" />
-                            <path d="M10.7 10.7a2 2 0 0 0 2.6 2.6" />
-                            <path d="M14.1 5.2c3.3.7 5.9 3.1 7.4 6.8-.6 1.5-1.5 2.8-2.5 3.9" />
-                          </>
-                        ) : (
-                          <>
-                            <path d="M2.5 12S5.5 5 12 5s9.5 7 9.5 7-3 7-9.5 7S2.5 12 2.5 12Z" />
-                            <circle
-                              cx="12"
-                              cy="12"
-                              r="3"
-                            />
-                          </>
-                        )}
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[13px] font-medium">
-                    Åifre Tekrar *
-                  </label>
-
-                  <div className="relative">
-                    <input
-                      type={
-                        showPasswordAgain
-                          ? "text"
-                          : "password"
-                      }
-                      value={passwordAgain}
-                      onChange={(event) =>
-                        setPasswordAgain(
-                          event.target.value,
-                        )
-                      }
-                      className="h-10 w-full rounded-xl border border-input bg-background px-3 pr-10 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
-                      placeholder="Åifreyi tekrar yazÄ±n"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowPasswordAgain(
-                          (current) =>
-                            !current,
-                        )
-                      }
-                      className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                      aria-label={
-                        showPasswordAgain
-                          ? "Åifreyi gizle"
-                          : "Åifreyi gÃ¶ster"
-                      }
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="size-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        {showPasswordAgain ? (
-                          <>
-                            <path d="m2 2 20 20" />
-                            <path d="M6.7 6.7C4.8 8 3.4 9.8 2.5 12c1.8 4.4 5.2 7 9.5 7 1.5 0 2.9-.3 4.1-.9" />
-                            <path d="M10.7 10.7a2 2 0 0 0 2.6 2.6" />
-                            <path d="M14.1 5.2c3.3.7 5.9 3.1 7.4 6.8-.6 1.5-1.5 2.8-2.5 3.9" />
-                          </>
-                        ) : (
-                          <>
-                            <path d="M2.5 12S5.5 5 12 5s9.5 7 9.5 7-3 7-9.5 7S2.5 12 2.5 12Z" />
-                            <circle
-                              cx="12"
-                              cy="12"
-                              r="3"
-                            />
-                          </>
-                        )}
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <p className="mt-1.5 text-[11px] text-muted-foreground">
-                En az 8 karakter; büyük harf, küçük harf ve rakam içermelidir.
-              </p>
-            </>
-          ) : (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] leading-5 text-emerald-800">
-              Giriş yaptığın mevcut kullanıcı hesabı kullanılacak.
-              Åifreni tekrar girmen gerekmiyor.
-            </div>
-          )}
-
-          <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/20 p-3">
-            <label className="flex items-start gap-2 text-[13px] leading-5">
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) =>
-                  setTermsAccepted(
-                    event.target.checked,
-                  )
-                }
-                className="mt-1 size-4"
-              />
-
-              <span>
-                Kullanım ve Üyelik Koşulları metnini
-                okudum ve kabul ediyorum. *
-              </span>
-            </label>
-
-                        <div className="sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
-              <div className="mb-3">
-                <div className="text-sm font-semibold">İşletme Konumunu Haritadan Seç</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Haritaya dokun, işaretçiyi sürükle veya telefondan mevcut konumunu kullan. Seçilen noktadan adres otomatik alınır.
-                </p>
-              </div>
-              <BusinessLocationMap
-                latitude={mapLatitude}
-                longitude={mapLongitude}
-                onChange={({ latitude, longitude, address, city, district, districtCandidates }) => {
-                    setMapLatitude(latitude);
-                    setMapLongitude(longitude);
-                    if (address) setMapAddress(address);
-                    applyMapAdministrativeArea(city, district, districtCandidates);
-                  }}
-              />
-              {mapAddress ? (
-                <div className="mt-3">
-                  <label className="mb-2 block text-sm font-medium">Haritadan Alınan Açık Adres</label>
-                  <textarea
-                    value={mapAddress}
-                    onChange={(event) => setMapAddress(event.target.value)}
-                    rows={3}
-                    maxLength={500}
-                    className="w-full resize-y rounded-md border border-input bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                  />
-                </div>
-              ) : null}
-            </div>
-<label className="flex items-start gap-2 text-[13px] leading-5">
-              <input
-                type="checkbox"
-                checked={businessTermsAccepted}
-                onChange={(event) =>
-                  setBusinessTermsAccepted(
-                    event.target.checked,
-                  )
-                }
-                className="mt-1 size-4"
-              />
-
-              <span>
-                İşletme ve Hizmet Sağlayıcı Koşulları
-                metnini okudum ve kabul ediyorum. *
-              </span>
-            </label>
-          </div>
-
-          {error ? (
-            <div className="mt-2.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setWizardStep(3);
-              }}
-              className="rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-muted"
-            >
-              Geri
-            </button>
-
-            <button
-              type="submit"
-              disabled={
-                submitting ||
-                !termsAccepted ||
-                !businessTermsAccepted
-              }
-              className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting
-                ? "Devam ediliyor..."
-                : "Devam Et"}
-            </button>
-          </div>
         </form>
       </div>
     );
   }
+
+
   return (
     <form
       onSubmit={handleSubmit}

@@ -254,36 +254,36 @@ export default function BusinessLocationMap({
         </MapContainer>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col items-center gap-2 text-center">
         <button
           type="button"
           onClick={currentLocation}
           disabled={busy}
-          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "İşleniyor..." : "📍 Mevcut Konumumu Kullan"}
         </button>
 
-        <span className="text-xs text-muted-foreground">
+        <p className="text-xs leading-5 text-muted-foreground">
           Haritaya tıklayabilir veya işaretçiyi sürükleyebilirsiniz.
-        </span>
+        </p>
+
+        {message ? (
+          <p className="text-xs font-medium leading-5 text-muted-foreground">
+            {message}
+          </p>
+        ) : null}
+
+        {latitude !== null && longitude !== null ? (
+          <p className="text-xs font-medium leading-5 text-green-700">
+            Konum seçildi ve kaydetmeye hazır.
+          </p>
+        ) : (
+          <p className="text-xs font-medium leading-5 text-amber-700">
+            Henüz harita konumu seçilmedi.
+          </p>
+        )}
       </div>
-
-      {message ? (
-        <p className="text-xs font-medium text-muted-foreground">
-          {message}
-        </p>
-      ) : null}
-
-      {latitude !== null && longitude !== null ? (
-        <p className="text-xs font-medium text-green-700">
-          Konum seçildi ve kaydetmeye hazır.
-        </p>
-      ) : (
-        <p className="text-xs text-amber-700">
-          Henüz harita konumu seçilmedi.
-        </p>
-      )}
     </div>
   );
 }
