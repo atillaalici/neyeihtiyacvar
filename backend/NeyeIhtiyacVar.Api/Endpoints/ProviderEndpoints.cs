@@ -117,6 +117,7 @@ public static class ProviderEndpoints
                     x.ShortDescription,
                     x.CategorySlug,
                     x.ServiceSlug,
+                    x.AdditionalServices,
                     x.CitySlug,
                     x.DistrictSlug,
                     PublicPhone = canViewContact ? x.PublicPhone : null,

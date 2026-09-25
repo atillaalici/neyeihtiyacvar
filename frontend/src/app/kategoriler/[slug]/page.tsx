@@ -19,6 +19,7 @@ type PublicProvider = {
   businessName: string;
   categorySlug: string;
   serviceSlug: string;
+  additionalServices: string[];
 };
 
 type CategoryPresentation = {
@@ -182,10 +183,21 @@ export default async function CategoryDetailPage({
   const providerCountByService = new Map<string, number>();
 
   for (const provider of providers) {
-    providerCountByService.set(
+    const providerServices = new Set([
       provider.serviceSlug,
-      (providerCountByService.get(provider.serviceSlug) ?? 0) + 1,
-    );
+      ...(provider.additionalServices ?? []),
+    ]);
+
+    for (const serviceSlug of providerServices) {
+      if (!serviceSlug) {
+        continue;
+      }
+
+      providerCountByService.set(
+        serviceSlug,
+        (providerCountByService.get(serviceSlug) ?? 0) + 1,
+      );
+    }
   }
 
   return (
@@ -241,7 +253,7 @@ export default async function CategoryDetailPage({
               Alt kategoriyi seç; ilgili işletmeleri Keşfet ekranında listeleyelim.
             </p>
 
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
               {category.services.map((serviceName) => {
                 const serviceSlug = toServiceSlug(serviceName);
                 const providerCount =

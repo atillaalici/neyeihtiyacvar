@@ -59,6 +59,57 @@ public sealed class SmartSearchService(
 
         var catalog = await LoadCatalogAsync(cancellationToken);
 
+        // A-B-C arama kutuphanesi birincil niyet kaynagidir:
+        // C = kullanici cumlesi -> B = hizmet -> A = ana kategori.
+        // Kutuphane eslesme bulursa Smart Search ayni sonucu kullanir;
+        // AI/yerel cozumleme yalnizca kutuphane sonuc uretemezse devreye girer.
+        var librarySuggestions =
+            await DbSearchIntentLibrary.SuggestAsync(
+                dbContext,
+                cleanQuery,
+                8,
+                cancellationToken);
+
+        if (librarySuggestions.Length > 0)
+        {
+            var primary = librarySuggestions[0];
+
+            var primaryCatalogItem = catalog.FirstOrDefault(x =>
+                string.Equals(
+                    x.CategorySlug,
+                    primary.CategorySlug,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    x.ServiceSlug,
+                    primary.ServiceSlug,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (primaryCatalogItem is not null)
+            {
+                var relatedServiceSlugs = librarySuggestions
+                    .Skip(1)
+                    .Select(x => x.ServiceSlug)
+                    .Where(x => !string.Equals(
+                        x,
+                        primary.ServiceSlug,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(7)
+                    .ToArray();
+
+                return new SmartSearchIntent(
+                    cleanQuery,
+                    "abc-library",
+                    Math.Clamp(primary.Score / 100.0, 0.0, 1.0),
+                    primaryCatalogItem.CategorySlug,
+                    primaryCatalogItem.CategoryName,
+                    primaryCatalogItem.ServiceSlug,
+                    primaryCatalogItem.ServiceName,
+                    relatedServiceSlugs,
+                    false);
+            }
+        }
+
         if (catalog.Count == 0)
         {
             return new SmartSearchIntent(
