@@ -789,7 +789,7 @@ function chooseProviderKind(kind: ProviderKind) {
             Hesap Doğrulama
           </h2>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Hesabınızın güvenliği için e-posta ve telefon numaranızı doğrulayın.
+            İşletmenizin yayına alınabilmesi için e-posta adresinizi doğrulayın. Telefon doğrulaması şimdilik isteğe bağlıdır.
           </p>
         </div>
 
@@ -832,7 +832,7 @@ function chooseProviderKind(kind: ProviderKind) {
               Telefon Doğrulaması
             </h3>
             <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
-              Kayıt sırasında belirttiğiniz telefon numarasına doğrulama kodu göndereceğiz.
+              Telefon doğrulaması şimdilik isteğe bağlıdır. SMS doğrulama hizmeti etkinleştirildiğinde bu alanı kullanabilirsiniz.
             </p>
             <div className="mt-4 rounded-xl border border-input bg-background px-4 py-3 text-sm font-medium">
               {registered.user.phoneNumber || "Telefon numarası bulunamadı"}

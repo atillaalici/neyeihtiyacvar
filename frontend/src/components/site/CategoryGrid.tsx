@@ -80,7 +80,7 @@ export function CategoryGrid({
       )}
 
       {loading && (
-        <div className="mt-8 grid auto-rows-fr grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid auto-rows-fr grid-cols-2 gap-4 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
@@ -97,7 +97,7 @@ export function CategoryGrid({
       )}
 
       {!loading && !error && (
-        <div className="mt-8 grid auto-rows-fr grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid auto-rows-fr grid-cols-2 gap-4 lg:grid-cols-4">
           {categories.map((category) => (
             <CategoryCard
               key={category.id}

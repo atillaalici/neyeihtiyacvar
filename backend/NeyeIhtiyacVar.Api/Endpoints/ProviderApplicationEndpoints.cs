@@ -517,13 +517,12 @@ public static class ProviderApplicationEndpoints
                     .FirstOrDefaultAsync();
 
                 if (ownerVerification is null ||
-                    ownerVerification.EmailVerifiedAtUtc is null ||
-                    ownerVerification.PhoneVerifiedAtUtc is null)
+                    ownerVerification.EmailVerifiedAtUtc is null)
                 {
                     return Results.BadRequest(new
                     {
                         code = "business_verification_required",
-                        message = "Ä°ÅŸletme yayÄ±na alÄ±nmadan Ã¶nce hesap sahibinin e-posta ve telefon doÄŸrulamasÄ±nÄ± tamamlamasÄ± gerekir."
+                        message = "Ä°ÅŸletme yayÄ±na alÄ±nmadan Ã¶nce hesap sahibinin e-posta doÄŸrulamasÄ±nÄ± tamamlamasÄ± gerekir."
                     });
                 }
             }

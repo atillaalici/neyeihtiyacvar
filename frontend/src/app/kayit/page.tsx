@@ -603,8 +603,8 @@ function RegisterPageContent() {
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Kullanıcı hesabında ihtiyaç talebi oluşturmak için e-posta
-              doğrulaması gerekir. İşletme hesabında ise yayına alınmadan önce
-              e-posta ve telefon doğrulamasının ikisi de tamamlanmalıdır.
+              doğrulaması gerekir. İşletme hesabının yayına alınabilmesi için
+              e-posta doğrulamasının tamamlanması yeterlidir.
             </p>
 
             <div className="mt-6 grid gap-2">

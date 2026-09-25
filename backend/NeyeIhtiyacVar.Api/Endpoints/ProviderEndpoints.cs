@@ -126,8 +126,7 @@ public static class ProviderEndpoints
                     isVerifiedBusiness =
                         x.OwnerUserId != null &&
                         x.OwnerUser != null &&
-                        x.OwnerUser.EmailVerifiedAtUtc != null &&
-                        x.OwnerUser.PhoneVerifiedAtUtc != null,
+                        x.OwnerUser.EmailVerifiedAtUtc != null,
                     publicationStatus = x.PublicationStatus.ToString().ToLowerInvariant()
                 })
                 .ToListAsync();
@@ -172,8 +171,7 @@ public static class ProviderEndpoints
                     isVerifiedBusiness =
                         x.OwnerUserId != null &&
                         x.OwnerUser != null &&
-                        x.OwnerUser.EmailVerifiedAtUtc != null &&
-                        x.OwnerUser.PhoneVerifiedAtUtc != null,
+                        x.OwnerUser.EmailVerifiedAtUtc != null,
                     publicationStatus = x.PublicationStatus.ToString().ToLowerInvariant()
                 })
                 .FirstOrDefaultAsync();

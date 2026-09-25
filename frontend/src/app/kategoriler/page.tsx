@@ -80,7 +80,7 @@ export default function CategoriesPage() {
             </Link>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 lg:gap-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
             {categories.map((category) => (
               <Link
                 key={category.title}

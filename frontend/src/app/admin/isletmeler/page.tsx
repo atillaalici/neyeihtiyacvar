@@ -154,7 +154,7 @@ export default function AdminProvidersPage() {
       if (!response.ok) {
         setError(
           data?.message ??
-            "İşletme yayına alınamadı. E-posta ve telefon doğrulamalarını kontrol edin.",
+            "İşletme yayına alınamadı. E-posta doğrulamasını kontrol edin.",
         );
         return;
       }

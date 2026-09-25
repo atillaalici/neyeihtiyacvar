@@ -151,8 +151,7 @@ public static class BusinessRegistrationEndpoints
                     applicationId = (Guid?)null,
                     providerId = (Guid?)null,
                     verificationRequired =
-                        authenticatedUser.EmailVerifiedAtUtc is null ||
-                        authenticatedUser.PhoneVerifiedAtUtc is null,
+                        authenticatedUser.EmailVerifiedAtUtc is null,
                     existingAccount = true,
                     message =
                         "Mevcut hesabın kullanıldı. İşletme bilgilerin ödeme adımına kadar taslak olarak korunacak."

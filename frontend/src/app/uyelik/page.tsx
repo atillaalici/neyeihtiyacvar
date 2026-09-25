@@ -230,7 +230,7 @@ export default function MembershipPage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-8 grid max-w-6xl gap-4 md:grid-cols-3 md:items-stretch xl:mt-12 xl:gap-6">
+          <div className="mx-auto mt-8 grid max-w-6xl grid-cols-2 gap-2.5 md:grid-cols-3 md:items-stretch md:gap-4 xl:mt-12 xl:gap-6">
             {orderedPlans.map((plan) => {
               const isProfessional = plan.code === "profesyonel";
               const isKobi = plan.code === "kobi";
@@ -239,21 +239,22 @@ export default function MembershipPage() {
                 <article
                   key={plan.id}
                   className={[
-                    "relative flex min-h-full min-w-0 flex-col overflow-hidden rounded-[24px] border bg-card p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:p-5 xl:rounded-[28px] xl:p-7",
+                    "relative flex min-h-full min-w-0 flex-col overflow-hidden rounded-[18px] border bg-card p-2.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:rounded-[24px] sm:p-5 xl:rounded-[28px] xl:p-7",
+                    isProfessional ? "col-span-2 w-[calc(50%-0.3125rem)] justify-self-center md:col-span-1 md:w-auto md:justify-self-stretch" : "",
                     plan.isRecommended
                       ? "border-orange-400 ring-2 ring-orange-200/70"
                       : "border-border",
                   ].join(" ")}
                 >
                   {plan.isRecommended ? (
-                    <div className="absolute right-5 top-5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white shadow-sm">
+                    <div className="absolute right-2 top-2 rounded-full bg-orange-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-sm sm:right-5 sm:top-5 sm:px-3 sm:py-1 sm:text-xs">
                       ÖNERİLEN
                     </div>
                   ) : null}
 
                   <div
                     className={[
-                      "grid size-12 place-items-center rounded-2xl",
+                      "grid size-9 place-items-center rounded-xl sm:size-12 sm:rounded-2xl",
                       plan.isRecommended
                         ? "bg-orange-100 text-orange-600"
                         : isProfessional
@@ -262,29 +263,29 @@ export default function MembershipPage() {
                     ].join(" ")}
                   >
                     {plan.isRecommended ? (
-                      <Crown className="size-6" />
+                      <Crown className="size-4 sm:size-6" />
                     ) : isProfessional ? (
-                      <Sparkles className="size-6" />
+                      <Sparkles className="size-4 sm:size-6" />
                     ) : (
-                      <Building2 className="size-6" />
+                      <Building2 className="size-4 sm:size-6" />
                     )}
                   </div>
 
                   <div className="mt-3">
-                    <h2 className="font-display text-xl font-bold xl:text-2xl">{plan.name}</h2>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground sm:min-h-16 sm:text-sm sm:leading-6">
+                    <h2 className="font-display text-base font-bold sm:text-xl xl:text-2xl">{plan.name}</h2>
+                    <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground sm:mt-2 sm:min-h-16 sm:text-sm sm:leading-6">
                       {plan.description}
                     </p>
                   </div>
 
                   <div className="mt-3 border-y border-border/70 py-2.5">
                     <div className="flex items-end gap-2">
-                      <span className="text-3xl font-black tracking-tight xl:text-4xl">
+                      <span className="text-xl font-black tracking-tight sm:text-3xl xl:text-4xl">
                         {money(plan.annualPrice)} TL
                       </span>
-                      <span className="pb-1 text-sm text-muted-foreground">/ yıl</span>
+                      <span className="pb-0.5 text-[10px] text-muted-foreground sm:pb-1 sm:text-sm">/ yıl</span>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                    <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground sm:mt-2 sm:text-sm">
                       Aylık karşılığı yaklaşık{" "}
                       <strong className="text-foreground">
                         {money(plan.monthlyEquivalent)} TL
@@ -292,11 +293,11 @@ export default function MembershipPage() {
                     </p>
                   </div>
 
-                  <div className="mt-4 rounded-2xl bg-muted/50 p-3 xl:mt-5 xl:p-4">
+                  <div className="mt-3 rounded-xl bg-muted/50 p-2 sm:mt-4 sm:rounded-2xl sm:p-3 xl:mt-5 xl:p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Hizmet kapasitesi
                     </div>
-                    <div className="mt-1 text-2xl font-bold">
+                    <div className="mt-1 text-lg font-bold sm:text-2xl">
                       {plan.serviceLimit} hizmet
                     </div>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -304,7 +305,7 @@ export default function MembershipPage() {
                     </p>
                   </div>
 
-                  <div className="mt-5 flex-1 space-y-2.5 xl:mt-6 xl:space-y-3">
+                  <div className="mt-3 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2.5 xl:mt-6 xl:space-y-3">
                     {featureRows.map((feature) => {
                       const enabled = feature.enabled(plan);
 
@@ -312,21 +313,21 @@ export default function MembershipPage() {
                         <div
                           key={feature.label}
                           className={[
-                            "flex min-w-0 items-center gap-2.5 text-xs sm:text-sm",
+                            "flex min-w-0 items-center gap-1.5 text-[10px] sm:gap-2.5 sm:text-sm",
                             enabled ? "text-foreground" : "text-muted-foreground/55",
                           ].join(" ")}
                         >
                           <span
                             className={[
-                              "grid size-6 shrink-0 place-items-center rounded-full",
+                              "grid size-5 shrink-0 place-items-center rounded-full sm:size-6",
                               enabled
                                 ? "bg-emerald-50 text-emerald-600"
                                 : "bg-muted text-muted-foreground/50",
                             ].join(" ")}
                           >
-                            {enabled ? <Check className="size-4" /> : feature.icon}
+                            {enabled ? <Check className="size-3 sm:size-4" /> : feature.icon}
                           </span>
-                          <span className="min-w-0 leading-5">{feature.label}</span>
+                          <span className="min-w-0 leading-4 sm:leading-5">{feature.label}</span>
                         </div>
                       );
                     })}
@@ -335,7 +336,7 @@ export default function MembershipPage() {
                   <Link
                     href={`/kayit?hesap=isletme&paket=${encodeURIComponent(plan.code)}`}
                     className={[
-                      "mt-7 inline-flex h-12 items-center justify-center rounded-xl px-5 text-sm font-bold transition",
+                      "mt-4 inline-flex h-10 items-center justify-center rounded-xl px-2 text-[10px] font-bold transition sm:mt-7 sm:h-12 sm:px-5 sm:text-sm",
                       plan.isRecommended
                         ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20 hover:bg-orange-600"
                         : isKobi
