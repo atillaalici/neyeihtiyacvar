@@ -36,6 +36,10 @@ import {
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken, getStoredUser } from "@/lib/auth";
 import { trackPlatformAnalytics } from "@/lib/platform-analytics";
+import {
+  getStoredSiteLocation,
+  saveManualSiteLocation,
+} from "@/lib/site-location";
 
 type Category = {
   id: string;
@@ -140,6 +144,10 @@ function NeedCreatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storedUser = getStoredUser();
+  const initialCitySlug =
+    searchParams.get("il")?.trim() ?? storedUser?.citySlug ?? "";
+  const initialDistrictSlug =
+    searchParams.get("ilce")?.trim() ?? storedUser?.districtSlug ?? "";
 
   const [query, setQuery] = useState(
     searchParams.get("q")?.trim() ??
@@ -147,12 +155,8 @@ function NeedCreatePageContent() {
       "",
   );
   const [detail, setDetail] = useState("");
-  const [citySlug, setCitySlug] = useState(
-    searchParams.get("il")?.trim() ?? storedUser?.citySlug ?? "",
-  );
-  const [districtSlug, setDistrictSlug] = useState(
-    searchParams.get("ilce")?.trim() ?? storedUser?.districtSlug ?? "",
-  );
+  const [citySlug, setCitySlug] = useState(initialCitySlug);
+  const [districtSlug, setDistrictSlug] = useState(initialDistrictSlug);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [cities, setCities] = useState<City[]>([]);
@@ -262,6 +266,28 @@ function NeedCreatePageContent() {
         if (!active) return;
         setCategories(categoryData);
         setCities(locationData);
+
+        const hasExplicitLocation =
+          Boolean(initialCitySlug) || Boolean(initialDistrictSlug);
+
+        if (!hasExplicitLocation) {
+          const storedLocation = getStoredSiteLocation();
+
+          if (storedLocation) {
+            const storedCity = locationData.find(
+              (item) => item.slug === storedLocation.citySlug,
+            );
+
+            const storedDistrict = storedCity?.districts.find(
+              (item) => item.slug === storedLocation.districtSlug,
+            );
+
+            if (storedCity && storedDistrict) {
+              setCitySlug(storedCity.slug);
+              setDistrictSlug(storedDistrict.slug);
+            }
+          }
+        }
       } catch {
         if (active) setError("Kategori ve konum bilgileri yüklenemedi.");
       } finally {
@@ -274,7 +300,7 @@ function NeedCreatePageContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialCitySlug, initialDistrictSlug]);
 
   useEffect(() => {
     const cleanQuery = query.trim();
@@ -597,8 +623,7 @@ function NeedCreatePageContent() {
                         setCitySlug(value);
                         setDistrictSlug("");
                         setRecommendationData(null);
-                        // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveIntentSuggestions([]);
+                        setLiveIntentSuggestions([]);
                       }}
                       disabled={loadingCatalog}
                     >
@@ -622,8 +647,23 @@ function NeedCreatePageContent() {
                       onValueChange={(value) => {
                         setDistrictSlug(value);
                         setRecommendationData(null);
-                        // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLiveIntentSuggestions([]);
+                        setLiveIntentSuggestions([]);
+
+                        const cityItem =
+                          cities.find((item) => item.slug === citySlug) ?? null;
+                        const districtItem =
+                          cityItem?.districts.find(
+                            (item) => item.slug === value,
+                          ) ?? null;
+
+                        if (citySlug && value) {
+                          saveManualSiteLocation(
+                            citySlug,
+                            value,
+                            cityItem?.name ?? null,
+                            districtItem?.name ?? null,
+                          );
+                        }
                       }}
                       disabled={!citySlug || loadingCatalog}
                     >

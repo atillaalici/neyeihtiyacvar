@@ -247,7 +247,7 @@ function intentText(intent: IntentType) {
 }
 
 export function HeroSearch() {
-  const searchApiBaseUrl = apiBaseUrl || "http://localhost:5155";
+  const searchApiBaseUrl = apiBaseUrl;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const searchSourceRef = useRef<"enter" | "button" | "typing">("button");

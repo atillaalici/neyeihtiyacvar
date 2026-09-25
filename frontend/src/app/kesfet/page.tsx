@@ -30,6 +30,11 @@ import { apiBaseUrl } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
 import { getAccessToken } from "@/lib/auth";
 import type { ProviderSummary } from "@/lib/providers";
+import {
+  LOCATION_PREFERENCE_KEY,
+  resolveAndSaveCoordinates,
+  saveManualSiteLocation,
+} from "@/lib/site-location";
 
 type Recommendation = {
   id: string;
@@ -445,6 +450,8 @@ function ExplorePageContent() {
     city: string;
     district: string;
   }) {
+    saveManualSiteLocation(value.city, value.district);
+
     const params = new URLSearchParams();
 
     if (q) {
@@ -481,46 +488,20 @@ function ExplorePageContent() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          try {
-            localStorage.setItem(
-              "niv_current_location",
-              JSON.stringify({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-                updatedAt: Date.now(),
-              }),
-            );
-            localStorage.setItem("niv_location_preference", "allowed");
-          } catch {}
-
-          const params = new URLSearchParams({
-            lat: String(position.coords.latitude),
-            lon: String(position.coords.longitude),
-          });
-
-          const response = await fetch(
-            `${apiBaseUrl}/api/recommendations/location?${params.toString()}`,
-            { cache: "no-store" },
+          const data = await resolveAndSaveCoordinates(
+            position.coords.latitude,
+            position.coords.longitude,
+            position.coords.accuracy,
           );
 
-          if (!response.ok) {
-            throw new Error("Konum çözümlenemedi.");
-          }
+          try {
+            localStorage.setItem(
+              LOCATION_PREFERENCE_KEY,
+              data ? "allowed" : "allowed-unresolved",
+            );
+          } catch {}
 
-          const data = (await response.json()) as {
-            found: boolean;
-            citySlug: string | null;
-            cityName: string | null;
-            districtSlug: string | null;
-            districtName: string | null;
-          };
-
-          if (
-            !data.found ||
-            !data.citySlug ||
-            !data.districtSlug
-          ) {
+          if (!data) {
             setLocationMessage(
               "Konumunu aldık ancak il ve ilçeyi kesinleştiremedik. Lütfen aşağıdan seç.",
             );
@@ -529,7 +510,7 @@ function ExplorePageContent() {
           }
 
           setLocationMessage(
-            `${data.cityName} / ${data.districtName} konumu bulundu.`,
+            `${data.cityName ?? data.citySlug} / ${data.districtName ?? data.districtSlug} konumu bulundu.`,
           );
 
           applyLocation({

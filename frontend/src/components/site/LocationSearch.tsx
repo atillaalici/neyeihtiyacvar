@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { apiBaseUrl } from "@/lib/api";
+import {
+  getStoredSiteLocation,
+  saveManualSiteLocation,
+  SITE_LOCATION_EVENT,
+  type SiteLocation,
+} from "@/lib/site-location";
 
 type DistrictDto = {
   id: string;
@@ -38,6 +44,7 @@ export function LocationSearch({
   const [district, setDistrict] = useState(initialDistrict);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const userChangedRef = useRef(false);
 
   const selectedCity = useMemo(
     () => cities.find((item) => item.slug === city) ?? null,
@@ -72,11 +79,31 @@ export function LocationSearch({
           throw new Error(`Eksik il listesi: ${data.length}`);
         }
 
-        if (active) {
-          setCities(data);
+        if (!active) return;
+
+        setCities(data);
+
+        if (!initialCity && !initialDistrict && !userChangedRef.current) {
+          const stored = getStoredSiteLocation();
+
+          if (
+            stored &&
+            data.some(
+              (item) =>
+                item.slug === stored.citySlug &&
+                item.districts.some(
+                  (districtItem) =>
+                    districtItem.slug === stored.districtSlug,
+                ),
+            )
+          ) {
+            setCity(stored.citySlug);
+            setDistrict(stored.districtSlug);
+          }
         }
       } catch (err) {
         console.error("LocationSearch:", err);
+
         if (active) {
           setCities([]);
           setError("İl ve ilçe bilgileri yüklenemedi.");
@@ -93,17 +120,54 @@ export function LocationSearch({
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialCity, initialDistrict]);
 
   useEffect(() => {
-    if (city && cities.length > 0 && !cities.some((item) => item.slug === city)) {
-      const timer = window.setTimeout(() => { setCity(""); setDistrict(""); }, 0);
+    function handleSiteLocation(event: Event) {
+      if (userChangedRef.current || initialCity || initialDistrict) {
+        return;
+      }
+
+      const location = (event as CustomEvent<SiteLocation>).detail;
+      if (!location) return;
+
+      setCity(location.citySlug);
+      setDistrict(location.districtSlug);
+    }
+
+    window.addEventListener(SITE_LOCATION_EVENT, handleSiteLocation);
+
+    return () => {
+      window.removeEventListener(
+        SITE_LOCATION_EVENT,
+        handleSiteLocation,
+      );
+    };
+  }, [initialCity, initialDistrict]);
+
+  useEffect(() => {
+    if (
+      city &&
+      cities.length > 0 &&
+      !cities.some((item) => item.slug === city)
+    ) {
+      const timer = window.setTimeout(() => {
+        setCity("");
+        setDistrict("");
+      }, 0);
+
       return () => window.clearTimeout(timer);
     }
   }, [cities, city]);
 
   useEffect(() => {
-    if (district && selectedCity && !selectedCity.districts.some((item) => item.slug === district)) {
+    if (
+      district &&
+      selectedCity &&
+      !selectedCity.districts.some(
+        (item) => item.slug === district,
+      )
+    ) {
       const timer = window.setTimeout(() => setDistrict(""), 0);
       return () => window.clearTimeout(timer);
     }
@@ -111,12 +175,34 @@ export function LocationSearch({
 
   const districts = selectedCity?.districts ?? [];
 
+  function rememberSelection(
+    citySlug: string,
+    districtSlug: string,
+  ) {
+    const cityItem =
+      cities.find((item) => item.slug === citySlug) ?? null;
+
+    const districtItem =
+      cityItem?.districts.find(
+        (item) => item.slug === districtSlug,
+      ) ?? null;
+
+    saveManualSiteLocation(
+      citySlug,
+      districtSlug,
+      cityItem?.name ?? null,
+      districtItem?.name ?? null,
+    );
+  }
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
 
         if (!city || !district) return;
+
+        rememberSelection(city, district);
 
         window.dispatchEvent(
           new CustomEvent("niv:home-location-filter", {
@@ -129,20 +215,28 @@ export function LocationSearch({
       className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-soft sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end"
     >
       <div className="min-w-0">
-        <label htmlFor="niv-city" className="mb-1.5 block text-sm font-medium">
+        <label
+          htmlFor="niv-city"
+          className="mb-1.5 block text-sm font-medium"
+        >
           İl
         </label>
+
         <select
           id="niv-city"
           value={city}
           onChange={(event) => {
+            userChangedRef.current = true;
             setCity(event.target.value);
             setDistrict("");
           }}
           disabled={loading}
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <option value="">{loading ? "İller yükleniyor..." : "İl Seç"}</option>
+          <option value="">
+            {loading ? "İller yükleniyor..." : "İl Seç"}
+          </option>
+
           {cities.map((item) => (
             <option key={item.id} value={item.slug}>
               {item.name}
@@ -152,17 +246,29 @@ export function LocationSearch({
       </div>
 
       <div className="min-w-0">
-        <label htmlFor="niv-district" className="mb-1.5 block text-sm font-medium">
+        <label
+          htmlFor="niv-district"
+          className="mb-1.5 block text-sm font-medium"
+        >
           İlçe
         </label>
+
         <select
           id="niv-district"
           value={district}
-          onChange={(event) => setDistrict(event.target.value)}
+          onChange={(event) => {
+            userChangedRef.current = true;
+            setDistrict(event.target.value);
+
+            if (city && event.target.value) {
+              rememberSelection(city, event.target.value);
+            }
+          }}
           disabled={loading || !selectedCity}
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="">İlçe Seç</option>
+
           {districts.map((item) => (
             <option key={item.id} value={item.slug}>
               {item.name}
@@ -181,7 +287,9 @@ export function LocationSearch({
       </Button>
 
       {error ? (
-        <p className="text-sm text-destructive sm:col-span-3">{error}</p>
+        <p className="text-sm text-destructive sm:col-span-3">
+          {error}
+        </p>
       ) : null}
     </form>
   );
