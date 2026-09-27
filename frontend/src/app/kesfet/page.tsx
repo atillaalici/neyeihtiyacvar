@@ -267,6 +267,8 @@ function ExplorePageContent() {
       "ilce",
       "kategori",
       "hizmet",
+      "lat",
+      "lon",
     ] as const) {
       const value = searchParams.get(key);
 
@@ -287,6 +289,8 @@ function ExplorePageContent() {
       "ilce",
       "kategori",
       "hizmet",
+      "lat",
+      "lon",
     ] as const) {
       const value = searchParams.get(key);
 
@@ -449,8 +453,15 @@ function ExplorePageContent() {
   function applyLocation(value: {
     city: string;
     district: string;
+    latitude?: number;
+    longitude?: number;
   }) {
-    saveManualSiteLocation(value.city, value.district);
+    if (
+      typeof value.latitude !== "number" ||
+      typeof value.longitude !== "number"
+    ) {
+      saveManualSiteLocation(value.city, value.district);
+    }
 
     const params = new URLSearchParams();
 
@@ -468,6 +479,14 @@ function ExplorePageContent() {
 
     params.set("il", value.city);
     params.set("ilce", value.district);
+
+    if (
+      typeof value.latitude === "number" &&
+      typeof value.longitude === "number"
+    ) {
+      params.set("lat", String(value.latitude));
+      params.set("lon", String(value.longitude));
+    }
 
     router.push(`/kesfet?${params.toString()}`);
   }
@@ -516,6 +535,8 @@ function ExplorePageContent() {
           applyLocation({
             city: data.citySlug,
             district: data.districtSlug,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
           });
         } catch {
           setLocationMessage(
@@ -596,6 +617,8 @@ function ExplorePageContent() {
                   applyLocation({
                     city: data.citySlug,
                     district: data.districtSlug,
+                    latitude: parsed.latitude,
+                    longitude: parsed.longitude,
                   });
                   return;
                 }

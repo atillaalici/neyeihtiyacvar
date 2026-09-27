@@ -73,6 +73,14 @@ export function ProviderCard({
             />
             <span className="line-clamp-1">
               {provider.citySlug} / {provider.districtSlug}
+              {typeof provider.distanceKm === "number" && (
+                <>
+                  {" • "}
+                  {provider.distanceKm.toLocaleString("tr-TR", {
+                    maximumFractionDigits: 1,
+                  })} km
+                </>
+              )}
             </span>
           </span>
         </div>

@@ -7,6 +7,9 @@ export type ProviderSummary = {
   serviceSlug: string;
   citySlug: string;
   districtSlug: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
   publicPhone: string | null;
   publicWhatsapp: string | null;
   isVerifiedBusiness: boolean;

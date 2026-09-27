@@ -16,6 +16,8 @@ public static class ProviderEndpoints
             string? ilce,
             string? kategori,
             string? hizmet,
+            double? lat,
+            double? lon,
             AppDbContext dbContext,
             HttpContext httpContext) =>
         {
@@ -107,8 +109,6 @@ public static class ProviderEndpoints
             }
 
             var providers = await query
-                .OrderByDescending(x => x.PublishedAtUtc)
-                .ThenBy(x => x.BusinessName)
                 .Select(x => new
                 {
                     x.Id,
@@ -124,6 +124,7 @@ public static class ProviderEndpoints
                     PublicWhatsapp = canViewContact ? x.PublicWhatsapp : null,
                     x.Latitude,
                     x.Longitude,
+                    x.PublishedAtUtc,
                     isVerifiedBusiness =
                         x.OwnerUserId != null &&
                         x.OwnerUser != null &&
@@ -132,7 +133,81 @@ public static class ProviderEndpoints
                 })
                 .ToListAsync();
 
-            return Results.Ok(providers);
+            var hasValidCoordinates =
+                lat.HasValue &&
+                lon.HasValue &&
+                lat.Value >= -90 &&
+                lat.Value <= 90 &&
+                lon.Value >= -180 &&
+                lon.Value <= 180;
+
+            var result = providers
+                .Select(x =>
+                {
+                    double? distanceKm = null;
+
+                    if (hasValidCoordinates &&
+                        x.Latitude.HasValue &&
+                        x.Longitude.HasValue)
+                    {
+                        distanceKm = CalculateDistanceKm(
+                            lat!.Value,
+                            lon!.Value,
+                            x.Latitude.Value,
+                            x.Longitude.Value);
+                    }
+
+                    return new
+                    {
+                        x.Id,
+                        x.Slug,
+                        x.BusinessName,
+                        x.ShortDescription,
+                        x.CategorySlug,
+                        x.ServiceSlug,
+                        x.AdditionalServices,
+                        x.CitySlug,
+                        x.DistrictSlug,
+                        x.PublicPhone,
+                        x.PublicWhatsapp,
+                        x.Latitude,
+                        x.Longitude,
+                        distanceKm,
+                        x.isVerifiedBusiness,
+                        x.publicationStatus,
+                        x.PublishedAtUtc
+                    };
+                });
+
+            var ordered = hasValidCoordinates
+                ? result
+                    .OrderBy(x => x.distanceKm.HasValue ? 0 : 1)
+                    .ThenBy(x => x.distanceKm ?? double.MaxValue)
+                    .ThenBy(x => x.BusinessName)
+                : result
+                    .OrderByDescending(x => x.PublishedAtUtc)
+                    .ThenBy(x => x.BusinessName);
+
+            return Results.Ok(
+                ordered.Select(x => new
+                {
+                    x.Id,
+                    x.Slug,
+                    x.BusinessName,
+                    x.ShortDescription,
+                    x.CategorySlug,
+                    x.ServiceSlug,
+                    x.AdditionalServices,
+                    x.CitySlug,
+                    x.DistrictSlug,
+                    x.PublicPhone,
+                    x.PublicWhatsapp,
+                    x.Latitude,
+                    x.Longitude,
+                    x.distanceKm,
+                    x.isVerifiedBusiness,
+                    x.publicationStatus
+                }));
         });
 
         group.MapGet("/{slug}", async (
@@ -189,5 +264,41 @@ public static class ProviderEndpoints
         });
 
         return app;
+    }
+
+    private static double CalculateDistanceKm(
+        double latitude1,
+        double longitude1,
+        double latitude2,
+        double longitude2)
+    {
+        const double earthRadiusKm = 6371.0088;
+
+        var latitudeDelta =
+            DegreesToRadians(latitude2 - latitude1);
+        var longitudeDelta =
+            DegreesToRadians(longitude2 - longitude1);
+
+        var lat1 = DegreesToRadians(latitude1);
+        var lat2 = DegreesToRadians(latitude2);
+
+        var a =
+            Math.Sin(latitudeDelta / 2) *
+            Math.Sin(latitudeDelta / 2) +
+            Math.Cos(lat1) *
+            Math.Cos(lat2) *
+            Math.Sin(longitudeDelta / 2) *
+            Math.Sin(longitudeDelta / 2);
+
+        var c = 2 * Math.Atan2(
+            Math.Sqrt(a),
+            Math.Sqrt(1 - a));
+
+        return Math.Round(earthRadiusKm * c, 1);
+    }
+
+    private static double DegreesToRadians(double degrees)
+    {
+        return degrees * Math.PI / 180;
     }
 }
