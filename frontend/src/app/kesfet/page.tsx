@@ -507,6 +507,14 @@ function ExplorePageContent() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          if (position.coords.accuracy > 5000) {
+            setLocationMessage(
+              "Cihaz konumu yeterince hassas bulunamadı. Lütfen il ve ilçeni seç.",
+            );
+            setShowManualLocation(true);
+            return;
+          }
+
           const data = await resolveAndSaveCoordinates(
             position.coords.latitude,
             position.coords.longitude,
@@ -563,9 +571,9 @@ function ExplorePageContent() {
         setShowManualLocation(true);
       },
       {
-        enableHighAccuracy: false,
-        timeout: 10000,
-        maximumAge: 300000,
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
       },
     );
   }
@@ -588,11 +596,14 @@ function ExplorePageContent() {
           const parsed = JSON.parse(stored) as {
             latitude?: number;
             longitude?: number;
+            accuracy?: number | null;
           };
 
           if (
             typeof parsed.latitude === "number" &&
-            typeof parsed.longitude === "number"
+            typeof parsed.longitude === "number" &&
+            typeof parsed.accuracy === "number" &&
+            parsed.accuracy <= 5000
           ) {
             setLocating(true);
             const locationParams = new URLSearchParams({
@@ -1329,15 +1340,49 @@ function ExplorePageContent() {
           !smartMode &&
           providers.length > 0 && (
             <>
-              <div className="mb-5">
-                <h2 className="font-display text-2xl font-semibold">
-                  İşletmeler
-                </h2>
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="font-display text-2xl font-semibold">
+                    İşletmeler
+                  </h2>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {providers.length} işletme bulundu
-                </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {providers.length} işletme bulundu
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowManualLocation((value) => !value)
+                  }
+                  className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl border border-border bg-background px-4 text-sm font-semibold transition hover:bg-muted sm:self-auto"
+                >
+                  <MapPin className="size-4" aria-hidden="true" />
+                  {showManualLocation
+                    ? "Konum Seçimini Kapat"
+                    : "Konumu Değiştir"}
+                </button>
               </div>
+
+              {showManualLocation && (
+                <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-5 shadow-soft sm:p-6">
+                  <div className="mb-4">
+                    <h3 className="font-display text-lg font-bold">
+                      İl ve ilçeni seç
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Arama sonuçlarını görmek istediğin konumu değiştirebilirsin.
+                    </p>
+                  </div>
+
+                  <LocationSearch
+                    initialCity={city}
+                    initialDistrict={district}
+                    onSearch={applyLocation}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 md:gap-2 lg:gap-3">
                 {providers

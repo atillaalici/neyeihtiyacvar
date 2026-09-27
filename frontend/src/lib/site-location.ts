@@ -193,6 +193,12 @@ export function saveManualSiteLocation(
 ) {
   if (!citySlug || !districtSlug) return;
 
+  if (isBrowser()) {
+    try {
+      window.localStorage.removeItem(CURRENT_LOCATION_KEY);
+    } catch {}
+  }
+
   saveSiteLocation({
     citySlug,
     districtSlug,
