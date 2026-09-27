@@ -173,8 +173,14 @@ public static class ProviderImageEndpoints
         return Guid.TryParse(raw, out var id) ? id : null;
     }
 
-    private static string GetImageFolder(IWebHostEnvironment env) =>
-        Path.Combine(env.ContentRootPath, "App_Data", "provider-images");
+    private static string GetImageFolder(IWebHostEnvironment env)
+    {
+        var configuredPath = Environment.GetEnvironmentVariable("PROVIDER_IMAGE_PATH");
+
+        return string.IsNullOrWhiteSpace(configuredPath)
+            ? Path.Combine(env.ContentRootPath, "App_Data", "provider-images")
+            : Path.GetFullPath(configuredPath);
+    }
 
     private static List<(int Index, string Path)> GetImageSlots(IWebHostEnvironment env, Guid id)
     {
