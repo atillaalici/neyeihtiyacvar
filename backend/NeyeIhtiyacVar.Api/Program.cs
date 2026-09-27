@@ -191,6 +191,7 @@ app.MapMembershipSelectionEndpoints();
 app.MapBillingInformationEndpoints();
 app.MapPromotionEndpoints();
 app.MapProviderImageEndpoints();
+app.MapUserProfileImageEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
 app.MapNotificationEndpoints();

@@ -21,12 +21,18 @@ public sealed class AccountVerificationCode
     public DateTime? UsedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public string? PendingPhoneNumber { get; set; }
+
+    public string? PendingWhatsAppNumber { get; set; }
 }
 
 public enum VerificationPurpose
 {
     AccountVerification = 0,
-    PasswordReset = 1
+    PasswordReset = 1,
+    AccountReactivation = 2,
+    ContactInformationChange = 3
 }
 
 public enum VerificationChannel

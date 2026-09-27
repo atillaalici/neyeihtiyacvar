@@ -5,6 +5,12 @@ export type AuthUser = {
   displayName: string;
   citySlug: string | null;
   districtSlug: string | null;
+  whatsAppNumber: string | null;
+  neighborhood: string | null;
+  street: string | null;
+  buildingNo: string | null;
+  apartmentNo: string | null;
+  openAddress: string | null;
   createdAtUtc: string;
   role: "user" | "provider" | "admin";
   emailVerified: boolean;

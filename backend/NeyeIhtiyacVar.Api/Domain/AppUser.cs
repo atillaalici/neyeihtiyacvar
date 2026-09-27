@@ -24,11 +24,25 @@ public sealed class AppUser
 
     public string? DistrictSlug { get; set; }
 
+    public string? WhatsAppNumber { get; set; }
+
+    public string? Neighborhood { get; set; }
+
+    public string? Street { get; set; }
+
+    public string? BuildingNo { get; set; }
+
+    public string? ApartmentNo { get; set; }
+
+    public string? OpenAddress { get; set; }
+
     public UserRole Role { get; set; } = UserRole.User;
 
     public bool IsAdmin { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public DateTime? DeletedAtUtc { get; set; }
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 

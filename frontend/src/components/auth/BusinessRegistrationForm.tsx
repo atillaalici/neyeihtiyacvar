@@ -700,88 +700,23 @@ function chooseProviderKind(kind: ProviderKind) {
       setSubmitting(false);
     }
   }
-  async function verifyNow(channel: "email" | "phone") {
+  function verifyNow(channel: "email" | "phone") {
     if (!registered) {
       return;
     }
 
-    setVerifyWorking(true);
-    setError("");
+    const params = new URLSearchParams({
+      userId: registered.user.id,
+      email: registered.user.email,
+      phone: registered.user.phoneNumber ?? "",
+      channel,
+      returnUrl: "/uyelik/odeme",
+    });
 
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/auth/verification/resend`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: registered.user.id,
-            channel,
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(
-          data?.message ??
-            (channel === "email"
-              ? "E-posta doğrulama kodu gönderilemedi."
-              : "Telefon doğrulama kodu gönderilemedi."),
-        );
-        return;
-      }
-
-      if (data?.developmentCode) {
-        let currentCodes: Record<string, string> = {};
-        try {
-          currentCodes = JSON.parse(
-            sessionStorage.getItem("neyeihtiyacvar.devVerificationCodes") ?? "{}",
-          );
-        } catch {
-          currentCodes = {};
-        }
-        sessionStorage.setItem(
-          "neyeihtiyacvar.devVerificationCodes",
-          JSON.stringify({
-            ...currentCodes,
-            [channel]: String(data.developmentCode),
-          }),
-        );
-      }
-
-      const params = new URLSearchParams({
-        userId: registered.user.id,
-        email: registered.user.email,
-        phone: registered.user.phoneNumber ?? "",
-        channel,
-        returnUrl: "/uyelik/odeme",
-      });
-
-      router.push(`/dogrula?${params.toString()}`);
-    } catch {
-      setError("Doğrulama kodu istenirken sunucuya bağlanılamadı.");
-    } finally {
-      setVerifyWorking(false);
-    }
+    router.push(`/dogrula?${params.toString()}`);
   }
 
   if (registered) {
-    const selectedPlan = sessionStorage
-      .getItem("neyeihtiyacvar.selectedPlanCode")
-      ?.trim()
-      .toLowerCase();
-
-    const paymentTarget =
-      selectedPlan === "kobi" ||
-      selectedPlan === "avantaj" ||
-      selectedPlan === "profesyonel"
-        ? `/uyelik/odeme?paket=${encodeURIComponent(selectedPlan)}`
-        : "/uyelik/odeme";
-
     return (
       <div className="mt-4">
         <div className="text-center">
@@ -849,18 +784,6 @@ function chooseProviderKind(kind: ProviderKind) {
           </div>
         </div>
 
-        <div className="mx-auto mt-5 max-w-4xl border-t border-border pt-5 text-center">
-          <p className="text-sm text-muted-foreground">
-            Şu anda doğrulama yapmak istemiyorum.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.assign(paymentTarget)}
-            className="mt-3 rounded-xl border border-orange-500 px-6 py-2.5 text-sm font-bold text-orange-600 transition hover:bg-orange-50"
-          >
-            Daha Sonra Doğrula
-          </button>
-        </div>
 
         <div className="mx-auto mt-5 flex max-w-4xl items-center justify-between">
           <button
@@ -870,13 +793,9 @@ function chooseProviderKind(kind: ProviderKind) {
           >
             Geri
           </button>
-          <button
-            type="button"
-            onClick={() => window.location.assign(paymentTarget)}
-            className="rounded-xl bg-orange-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
-          >
-            İleri
-          </button>
+          <p className="max-w-md text-right text-sm font-medium text-muted-foreground">
+            Ödeme adımına geçebilmek için e-posta adresinizi doğrulamanız zorunludur.
+          </p>
         </div>
       </div>
     );

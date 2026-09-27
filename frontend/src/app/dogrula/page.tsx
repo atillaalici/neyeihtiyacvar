@@ -28,6 +28,10 @@ function VerifyPageContent() {
   const queryUserId = searchParams.get("userId") ?? "";
   const queryEmail = searchParams.get("email") ?? "";
   const queryPhone = searchParams.get("phone") ?? "";
+  const purpose =
+    searchParams.get("purpose") === "contact-change"
+      ? "contact-change"
+      : undefined;
   const returnUrl = searchParams.get("returnUrl") ?? "/hesabim";
 
   const [account, setAccount] = useState<AuthUser | null>(null);
@@ -138,6 +142,7 @@ function VerifyPageContent() {
             userId,
             channel,
             code,
+            purpose,
           }),
         },
       );
@@ -198,6 +203,7 @@ function VerifyPageContent() {
           body: JSON.stringify({
             userId,
             channel,
+            purpose,
           }),
         },
       );

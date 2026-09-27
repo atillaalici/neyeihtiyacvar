@@ -87,14 +87,14 @@ export function EditableProviderImage({
     <section
       className={
         compact
-          ? "w-[300px] overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
+          ? "w-[400px] overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
           : "w-full overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
       }
     >
       <div
         className={
           compact
-            ? "relative h-[108px] w-full bg-muted"
+            ? "relative h-[200px] w-full bg-muted"
             : "relative h-[150px] w-full bg-muted sm:h-[165px]"
         }
       >
@@ -122,25 +122,16 @@ export function EditableProviderImage({
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <div className="min-w-0">
+      {!compact && (
+        <div className="px-3 py-2">
           <div className="truncate text-sm font-semibold">
             {provider.businessName}
           </div>
-          {!compact ? (
-            <div className="text-xs text-muted-foreground">
-              İşletme görseli
-            </div>
-          ) : null}
+          <div className="text-xs text-muted-foreground">
+            İşletme görseli
+          </div>
         </div>
-
-        <Link
-          href="/hesabim#isletme-fotograflari"
-          className="shrink-0 text-xs font-semibold text-primary hover:underline"
-        >
-          Değiştir
-        </Link>
-      </div>
+      )}
     </section>
   );
 }

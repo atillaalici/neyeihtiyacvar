@@ -72,6 +72,20 @@ function LoginPageContent() {
         return;
       }
 
+      if (
+        response.status === 403 &&
+        data?.code === "account_frozen"
+      ) {
+        const params = new URLSearchParams({
+          userId: data.userId,
+          email: data.email,
+          returnUrl,
+        });
+
+        router.push(`/hesabi-etkinlestir?${params.toString()}`);
+        return;
+      }
+
       if (!response.ok) {
         setError(data?.message ?? "Giriş yapılamadı.");
         return;

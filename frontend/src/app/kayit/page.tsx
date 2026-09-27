@@ -27,21 +27,19 @@ import { RegistrationProgress } from "@/components/auth/RegistrationProgress";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { apiBaseUrl } from "@/lib/api";
-import { saveAuth, type AuthResponse } from "@/lib/auth";
 
 type AccountType = "user" | "business";
 type EmailAvailability = "idle" | "checking" | "available" | "taken";
 
-type RegisterResponse = AuthResponse & {
+type RegisterResponse = {
   verificationRequired: boolean;
   userId: string;
   email: string;
   phoneNumber: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
   message: string;
-  developmentCodes?: {
-    email: string;
-    phone: string;
-  } | null;
+  developmentCode?: string | null;
 };
 
 type RegisterErrorResponse = {
@@ -105,8 +103,6 @@ function RegisterPageContent() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [socialMessage, setSocialMessage] = useState("");
-  const [showVerifyChoice, setShowVerifyChoice] = useState(false);
-  const [registeredUser, setRegisteredUser] = useState<RegisterResponse | null>(null);
 
   const passwordRules = useMemo(
     () => ({
@@ -341,17 +337,24 @@ function RegisterPageContent() {
 
       const registerData = data as RegisterResponse;
 
-      saveAuth(registerData);
-
-      if (registerData.developmentCodes) {
+      if (registerData.developmentCode) {
         sessionStorage.setItem(
           "neyeihtiyacvar.devVerificationCodes",
-          JSON.stringify(registerData.developmentCodes),
+          JSON.stringify({
+            email: registerData.developmentCode,
+          }),
         );
       }
 
-      setRegisteredUser(registerData);
-      setShowVerifyChoice(true);
+      const params = new URLSearchParams({
+        userId: registerData.userId,
+        email: registerData.email,
+        phone: registerData.phoneNumber ?? "",
+        channel: "email",
+        returnUrl,
+      });
+
+      router.push(`/dogrula?${params.toString()}`);
     } catch {
       setError(
         "Sunucuya bağlanılamadı. İnternet bağlantısını ve backend servisinin çalıştığını kontrol et.",
@@ -590,98 +593,6 @@ function RegisterPageContent() {
 
   return (
     <SiteLayout>
-      {showVerifyChoice && registeredUser && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-xl">
-            <p className="text-sm font-semibold text-primary">
-              Hesabın oluşturuldu
-            </p>
-
-            <h2 className="mt-2 font-display text-2xl font-bold">
-              Hesabını doğrulamak ister misin?
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Kullanıcı hesabında ihtiyaç talebi oluşturmak için e-posta
-              doğrulaması gerekir. İşletme hesabının yayına alınabilmesi için
-              e-posta doğrulamasının tamamlanması yeterlidir.
-            </p>
-
-            <div className="mt-6 grid gap-2">
-              <Button
-                type="button"
-                onClick={async () => {
-                  setLoading(true);
-                  setError("");
-
-                  try {
-                    const response = await fetch(
-                      `${apiBaseUrl}/api/auth/verification/resend`,
-                      {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                          userId: registeredUser.userId,
-                          channel: "email",
-                        }),
-                      },
-                    );
-
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                      setError(
-                        data?.message ??
-                          "E-posta doğrulama kodu gönderilemedi.",
-                      );
-                      return;
-                    }
-
-                    if (data?.developmentCode) {
-                      sessionStorage.setItem(
-                        "neyeihtiyacvar.devVerificationCodes",
-                        JSON.stringify({
-                          email: String(data.developmentCode),
-                        }),
-                      );
-                    }
-
-                    const params = new URLSearchParams({
-                      userId: registeredUser.userId,
-                      email: registeredUser.email,
-                      phone: registeredUser.phoneNumber,
-                      channel: "email",
-                      returnUrl,
-                    });
-
-                    router.push(`/dogrula?${params.toString()}`);
-                  } catch {
-                    setError("Doğrulama kodu gönderilemedi.");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-              >
-                Şimdi Doğrula
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowVerifyChoice(false);
-                  router.push(returnUrl);
-                  router.refresh();
-                }}
-              >
-                Doğrulamadan Devam Et
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       <section className="section-shell py-10 sm:py-14">
         <div className="mx-auto max-w-2xl">
           <div className="mb-7 text-center">

@@ -87,6 +87,12 @@ type ProviderOffer = {
   updatedAtUtc: string;
 };
 
+type ProviderImage = {
+  index: number;
+  imageUrl: string;
+  isCover: boolean;
+};
+
 type OfferDraft = {
   message: string;
   price: string;
@@ -193,6 +199,12 @@ function ProviderPanelPageContent() {
   const [sendingNeedId, setSendingNeedId] = useState<string | null>(null);
   const [withdrawingOfferId, setWithdrawingOfferId] = useState<string | null>(null);
   const [savingNotifications, setSavingNotifications] = useState(false);
+
+  const [providerImages, setProviderImages] = useState<ProviderImage[]>([]);
+  const [imagesLoading, setImagesLoading] = useState(true);
+  const [imageWorking, setImageWorking] = useState(false);
+  const [imageNotice, setImageNotice] = useState("");
+  const [imageError, setImageError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -316,6 +328,39 @@ function ProviderPanelPageContent() {
 
         void (async () => {
           try {
+            const imagesResponse = await fetch(
+              `${apiBaseUrl}/api/provider-panel/image`,
+              {
+                headers,
+                cache: "no-store",
+              },
+            );
+
+            if (!active) return;
+
+            if (!imagesResponse.ok) {
+              setImageError("İşletme fotoğrafları yüklenemedi.");
+              return;
+            }
+
+            const imagesData =
+              (await imagesResponse.json()) as ProviderImage[];
+
+            if (!active) return;
+
+            setProviderImages(imagesData);
+            setImageError("");
+          } catch {
+            if (active) {
+              setImageError("İşletme fotoğrafları yüklenemedi.");
+            }
+          } finally {
+            if (active) setImagesLoading(false);
+          }
+        })();
+
+        void (async () => {
+          try {
             const analyticsResponse = await fetch(
               `${apiBaseUrl}/api/provider-panel/analytics`,
               {
@@ -359,6 +404,150 @@ function ProviderPanelPageContent() {
       active = false;
     };
   }, [router]);
+
+  async function refreshProviderImages() {
+    const token = getAccessToken();
+    if (!token) return;
+
+    const response = await fetch(
+      `${apiBaseUrl}/api/provider-panel/image`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("İşletme fotoğrafları alınamadı.");
+    }
+
+    const data = (await response.json()) as ProviderImage[];
+    setProviderImages(data);
+  }
+
+  async function uploadProviderImage(file: File) {
+    const token = getAccessToken();
+
+    if (!token) {
+      router.replace("/giris");
+      return;
+    }
+
+    if (providerImages.length >= 5) {
+      setImageError("Bir işletme en fazla 5 fotoğraf yükleyebilir.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setImageWorking(true);
+    setImageError("");
+    setImageNotice("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/image`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setImageError(data?.message ?? "Fotoğraf yüklenemedi.");
+        return;
+      }
+
+      await refreshProviderImages();
+      setImageNotice("İşletme fotoğrafı başarıyla yüklendi.");
+    } catch {
+      setImageError("Fotoğraf yüklenirken bir hata oluştu.");
+    } finally {
+      setImageWorking(false);
+    }
+  }
+
+  async function setProviderCover(index: number) {
+    const token = getAccessToken();
+    if (!token) return;
+
+    setImageWorking(true);
+    setImageError("");
+    setImageNotice("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/image/cover/${index}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setImageError(data?.message ?? "Kapak fotoğrafı değiştirilemedi.");
+        return;
+      }
+
+      await refreshProviderImages();
+      setImageNotice("Kapak fotoğrafı değiştirildi.");
+    } catch {
+      setImageError("Kapak fotoğrafı değiştirilirken bir hata oluştu.");
+    } finally {
+      setImageWorking(false);
+    }
+  }
+
+  async function deleteProviderImage(index: number) {
+    const token = getAccessToken();
+    if (!token) return;
+
+    if (!window.confirm("Bu işletme fotoğrafını silmek istiyor musunuz?")) {
+      return;
+    }
+
+    setImageWorking(true);
+    setImageError("");
+    setImageNotice("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/image/${index}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setImageError(data?.message ?? "Fotoğraf silinemedi.");
+        return;
+      }
+
+      await refreshProviderImages();
+      setImageNotice("İşletme fotoğrafı silindi.");
+    } catch {
+      setImageError("Fotoğraf silinirken bir hata oluştu.");
+    } finally {
+      setImageWorking(false);
+    }
+  }
 
   function getDraft(needId: string): OfferDraft {
     return drafts[needId] ?? { message: "", price: "" };
@@ -613,10 +802,16 @@ function ProviderPanelPageContent() {
   return (
     <SiteLayout>
       <section className="relative border-b border-border bg-cream">
-        <div className="pointer-events-auto absolute right-4 top-8 z-10 hidden xl:block 2xl:right-8">
-          <EditableProviderImage compact />
-        </div>
-        <div className="section-shell py-10 sm:py-14 xl:pr-[340px]">
+        <div className="section-shell py-10 sm:py-14">
+          <div className="mb-6 lg:hidden">
+            <EditableProviderImage />
+          </div>
+
+          <div className="pointer-events-auto absolute right-4 top-8 z-10 hidden lg:block 2xl:right-8">
+            <EditableProviderImage compact />
+          </div>
+
+          <div className="lg:pr-[430px]">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div>
               <p className="text-sm font-medium text-primary">
@@ -650,12 +845,12 @@ function ProviderPanelPageContent() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="mr-auto flex w-full flex-col gap-2 sm:w-52 lg:mr-6">
               {profile.publicationStatus === "published" && (
                 <Link
                   href={`/isletme/${profile.slug}`}
                   target="_blank"
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium"
+                  className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 text-sm font-medium"
                 >
                   Yayındaki Profili Gör
                 </Link>
@@ -663,18 +858,12 @@ function ProviderPanelPageContent() {
 
               <Link
                 href="/hesabim"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium"
-              >
-                Profili Düzenle
-              </Link>
-
-              <Link
-                href="/hesabim"
-                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+                className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
               >
                 Hesabım
               </Link>
             </div>
+          </div>
           </div>
         </div>
       </section>
@@ -822,6 +1011,129 @@ function ProviderPanelPageContent() {
           ) : (
             <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
               {analyticsError || "Henüz görüntülenecek istatistik bulunmuyor."}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-display text-xl font-semibold">
+                İşletme Fotoğrafları
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Dijital vitrininizde gösterilecek fotoğrafları yönetin. En fazla
+                5 adet JPG, PNG veya WebP fotoğraf yükleyebilirsiniz.
+              </p>
+            </div>
+
+            <label
+              className={`inline-flex h-10 shrink-0 cursor-pointer items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition ${
+                imageWorking || providerImages.length >= 5
+                  ? "pointer-events-none opacity-50"
+                  : "hover:bg-primary/90"
+              }`}
+            >
+              {imageWorking ? "İşleniyor..." : "Fotoğraf Ekle"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={imageWorking || providerImages.length >= 5}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.currentTarget.value = "";
+
+                  if (file) {
+                    void uploadProviderImage(file);
+                  }
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="mt-3 text-xs text-muted-foreground">
+            {providerImages.length} / 5 fotoğraf
+          </div>
+
+          {imageNotice && (
+            <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              {imageNotice}
+            </div>
+          )}
+
+          {imageError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {imageError}
+            </div>
+          )}
+
+          {imagesLoading ? (
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="aspect-[4/3] animate-pulse rounded-xl bg-muted"
+                />
+              ))}
+            </div>
+          ) : providerImages.length === 0 ? (
+            <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-4 text-center">
+              <Building2
+                className="size-8 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <div className="mt-3 font-medium">
+                Henüz işletme fotoğrafı yüklenmemiş
+              </div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                İlk yüklediğiniz fotoğraf otomatik olarak kapak fotoğrafı olur.
+              </div>
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {providerImages.map((image) => (
+                <div
+                  key={image.index}
+                  className="overflow-hidden rounded-xl border border-border bg-background"
+                >
+                  <div className="relative aspect-[4/3] bg-muted">
+                    <img
+                      src={`${apiBaseUrl}${image.imageUrl}?v=${image.index}-${image.isCover ? "cover" : "image"}`}
+                      alt={`${profile.businessName} işletme fotoğrafı`}
+                      className="h-full w-full object-cover"
+                    />
+
+                    {image.isCover && (
+                      <span className="absolute left-2 top-2 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow">
+                        Kapak Fotoğrafı
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 p-3">
+                    {!image.isCover && (
+                      <button
+                        type="button"
+                        disabled={imageWorking}
+                        onClick={() => void setProviderCover(image.index)}
+                        className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-input px-3 text-xs font-semibold transition hover:bg-muted disabled:opacity-50"
+                      >
+                        Kapak Yap
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={imageWorking}
+                      onClick={() => void deleteProviderImage(image.index)}
+                      className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Sil
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -364,6 +364,24 @@ modelBuilder.Entity<ProviderApplication>(entity =>
                 .HasMaxLength(150)
                 .IsRequired();
 
+            entity.Property(x => x.WhatsAppNumber)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.Neighborhood)
+                .HasMaxLength(150);
+
+            entity.Property(x => x.Street)
+                .HasMaxLength(200);
+
+            entity.Property(x => x.BuildingNo)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.ApartmentNo)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.OpenAddress)
+                .HasMaxLength(500);
+
             entity.Property(x => x.Role)
                 .HasConversion<string>()
                 .HasMaxLength(20);
@@ -597,6 +615,12 @@ modelBuilder.Entity<ProviderApplication>(entity =>
             entity.Property(x => x.CodeHash)
                 .HasMaxLength(128)
                 .IsRequired();
+
+            entity.Property(x => x.PendingPhoneNumber)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.PendingWhatsAppNumber)
+                .HasMaxLength(30);
 
             entity.HasOne(x => x.User)
                 .WithMany()
