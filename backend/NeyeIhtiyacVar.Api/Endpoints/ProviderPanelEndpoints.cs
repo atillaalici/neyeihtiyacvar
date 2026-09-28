@@ -260,7 +260,8 @@ public static class ProviderPanelEndpoints
             UpdateOwnProviderBusinessRequest request,
             ClaimsPrincipal principal,
             IEmailSender emailSender,
-            AppDbContext dbContext) =>
+            AppDbContext dbContext,
+            IConfiguration configuration) =>
         {
             if (!TryGetUserId(principal, out var userId))
                 return Results.Unauthorized();
@@ -270,6 +271,15 @@ public static class ProviderPanelEndpoints
 
             if (provider is null)
                 return Results.NotFound(new { message = "Bu hesaba bağlı işletme bulunamadı." });
+
+            var owner = await dbContext.Users
+                .FirstOrDefaultAsync(x =>
+                    x.Id == userId &&
+                    x.IsActive &&
+                    x.DeletedAtUtc == null);
+
+            if (owner is null)
+                return Results.Unauthorized();
 
             if (request.ExpectedVersion != provider.Version)
                 return Results.Conflict(new
@@ -292,10 +302,27 @@ public static class ProviderPanelEndpoints
 
             var moderation = ProviderContentModeration.Check(businessName, request.Description);
 
+            var requestedPublicPhone = Optional(request.PublicPhone);
+            var requestedPublicWhatsapp = Optional(request.PublicWhatsapp);
+
+            var providerPhoneChanged =
+                !string.Equals(
+                    provider.PublicPhone ?? string.Empty,
+                    requestedPublicPhone ?? string.Empty,
+                    StringComparison.Ordinal);
+
+            var providerWhatsAppChanged =
+                !string.Equals(
+                    provider.PublicWhatsapp ?? string.Empty,
+                    requestedPublicWhatsapp ?? string.Empty,
+                    StringComparison.Ordinal);
+
+            var providerContactVerificationRequired =
+                providerPhoneChanged || providerWhatsAppChanged;
+
             provider.BusinessName = businessName;
             provider.Description = Optional(request.Description);
-            provider.PublicPhone = Optional(request.PublicPhone);
-            provider.PublicWhatsapp = Optional(request.PublicWhatsapp);
+
             if (moderation.RequiresReview)
             {
                 provider.ModerationViolationCount++;
@@ -365,6 +392,47 @@ public static class ProviderPanelEndpoints
                 }
             }
 
+            if (providerContactVerificationRequired)
+            {
+                var now = DateTime.UtcNow;
+
+                var pendingVerifications =
+                    await dbContext.AccountVerificationCodes
+                        .Where(x =>
+                            x.UserId == owner.Id &&
+                            x.Purpose == VerificationPurpose.ProviderContactInformationChange &&
+                            x.Channel == VerificationChannel.Email &&
+                            x.UsedAtUtc == null)
+                        .ToListAsync();
+
+                foreach (var pending in pendingVerifications)
+                {
+                    pending.UsedAtUtc = now;
+                }
+
+                // Bu kayıt yalnızca bekleyen işletme iletişim
+                // bilgilerini taşır. Gerçek doğrulama kodu,
+                // verification/resend endpointinde oluşturulur.
+                dbContext.AccountVerificationCodes.Add(
+                    new AccountVerificationCode
+                    {
+                        User = owner,
+                        Purpose = VerificationPurpose.ProviderContactInformationChange,
+                        Channel = VerificationChannel.Email,
+                        CodeHash = string.Empty,
+                        ExpiresAtUtc = now,
+                        AttemptCount = 0,
+                        CreatedAtUtc = now,
+                        PendingPhoneNumber = requestedPublicPhone,
+                        PendingWhatsAppNumber = requestedPublicWhatsapp
+                    });
+            }
+            else
+            {
+                provider.PublicPhone = requestedPublicPhone;
+                provider.PublicWhatsapp = requestedPublicWhatsapp;
+            }
+
             provider.UpdatedAtUtc = DateTime.UtcNow;
             provider.Version++;
 
@@ -379,7 +447,8 @@ public static class ProviderPanelEndpoints
                 provider.Description,
                 provider.PublicPhone,
                 provider.PublicWhatsapp,
-                provider.Version
+                provider.Version,
+                providerContactVerificationRequired
             });
         });
 

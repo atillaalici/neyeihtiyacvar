@@ -906,12 +906,37 @@ function chooseProviderKind(kind: ProviderKind) {
         !applicantName.trim() ||
         !email.trim() ||
         phoneDigits.length !== 10 ||
+        !phoneDigits.startsWith("5") ||
         (!isUsta && !businessName.trim()) ||
         !termsAccepted ||
         !businessTermsAccepted
       ) {
-        setError("Lütfen zorunlu alanları eksiksiz doldurun ve sözleşmeleri onaylayın.");
+        setError("Lütfen zorunlu alanları eksiksiz ve doğru şekilde doldurun ve sözleşmeleri onaylayın.");
         return;
+      }
+
+      if (!existingAccountMode) {
+        if (!password || !passwordAgain) {
+          setError("Lütfen şifrenizi ve şifre tekrarını girin.");
+          return;
+        }
+
+        if (password !== passwordAgain) {
+          setError("Şifreler birbiriyle eşleşmiyor.");
+          return;
+        }
+
+        if (
+          password.length < 8 ||
+          !/[A-ZÇĞİÖŞÜ]/.test(password) ||
+          !/[a-zçğıöşü]/.test(password) ||
+          !/[0-9]/.test(password)
+        ) {
+          setError(
+            "Şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermelidir.",
+          );
+          return;
+        }
       }
 
       setError("");
@@ -998,6 +1023,60 @@ function chooseProviderKind(kind: ProviderKind) {
               />
             </div>
           </div>
+
+          {!existingAccountMode ? (
+            <>
+              <div>
+                <label className="mb-1 block text-[13px] font-medium">
+                  Şifre *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 pr-16 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
+                    placeholder="En az 8 karakter"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? "Gizle" : "Göster"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[13px] font-medium">
+                  Şifre Tekrarı *
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswordAgain ? "text" : "password"}
+                    value={passwordAgain}
+                    onChange={(event) => setPasswordAgain(event.target.value)}
+                    autoComplete="new-password"
+                    className="h-10 w-full rounded-xl border border-input bg-background px-3 pr-16 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
+                    placeholder="Şifrenizi tekrar yazın"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordAgain((current) => !current)}
+                    className="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  >
+                    {showPasswordAgain ? "Gizle" : "Göster"}
+                  </button>
+                </div>
+              </div>
+
+              <p className="sm:col-span-2 -mt-1 text-xs leading-5 text-muted-foreground">
+                Şifre en az 8 karakter; büyük harf, küçük harf ve rakam içermelidir.
+              </p>
+            </>
+          ) : null}
         </div>
 
         {error ? (

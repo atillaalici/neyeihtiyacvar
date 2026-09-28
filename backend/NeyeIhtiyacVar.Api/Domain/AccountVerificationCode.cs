@@ -32,7 +32,8 @@ public enum VerificationPurpose
     AccountVerification = 0,
     PasswordReset = 1,
     AccountReactivation = 2,
-    ContactInformationChange = 3
+    ContactInformationChange = 3,
+    ProviderContactInformationChange = 4
 }
 
 public enum VerificationChannel

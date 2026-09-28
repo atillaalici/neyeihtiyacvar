@@ -17,6 +17,20 @@ import { getAccessToken, getStoredUser } from "@/lib/auth";
 
 type PlanCode = "kobi" | "avantaj" | "profesyonel";
 
+function formatLocationName(value?: string | null) {
+  if (!value) return "";
+
+  return value
+    .replaceAll("-", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) =>
+      part.charAt(0).toLocaleUpperCase("tr-TR") +
+      part.slice(1).toLocaleLowerCase("tr-TR"),
+    )
+    .join(" ");
+}
+
 const plans: Record<
   PlanCode,
   {
@@ -55,6 +69,27 @@ type PromotionValidationResult = {
   discountType: "percentage" | "fixed";
   discountValue: number;
 };
+
+type UpgradeQuote = {
+  membershipId: string;
+  currentPlan: {
+    code: string;
+    name: string;
+  };
+  targetPlan: {
+    id: string;
+    code: string;
+    name: string;
+    annualPrice: number;
+    serviceLimit: number;
+    sortOrder: number;
+  };
+  startsAtUtc: string;
+  expiresAtUtc: string;
+  paidAmount: number;
+  remainingCredit: number;
+  amountDue: number;
+};
 function MembershipPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -70,6 +105,10 @@ function MembershipPaymentContent() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [billingSaving, setBillingSaving] = useState(false);
   const [billingError, setBillingError] = useState("");
+  const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState("");
+
   const [billing, setBilling] = useState({
     billingType: "individual",
     nameOrTitle: "",
@@ -112,6 +151,7 @@ function MembershipPaymentContent() {
   }, [searchParams]);
 
   const plan = plans[planCode];
+  const isUpgrade = searchParams.get("mode") === "upgrade";
 
   useEffect(() => {
     const token = getAccessToken();
@@ -123,8 +163,8 @@ function MembershipPaymentContent() {
         nameOrTitle: current.nameOrTitle || user?.displayName?.trim() || "",
         email: current.email || user?.email?.trim() || "",
         phone: current.phone || user?.phoneNumber?.trim() || "",
-        city: current.city || user?.citySlug?.trim() || "",
-        district: current.district || user?.districtSlug?.trim() || "",
+        city: current.city || formatLocationName(user?.citySlug?.trim()),
+        district: current.district || formatLocationName(user?.districtSlug?.trim()),
       }));
     }, 0);
     if (!token) {
@@ -162,9 +202,72 @@ function MembershipPaymentContent() {
     return () => { cancelled = true; window.clearTimeout(profileTimer); };
   }, []);
 
+  useEffect(() => {
+    if (!isUpgrade) {
+      return;
+    }
+
+    const token = getAccessToken();
+
+    if (!token) {
+      router.replace("/giris");
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      setUpgradeLoading(true);
+      setUpgradeError("");
+
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/membership-selection/upgrade-quote/${encodeURIComponent(planCode)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setUpgradeQuote(null);
+          setUpgradeError(
+            data?.message ?? "Paket yükseltme bilgileri alınamadı.",
+          );
+          return;
+        }
+
+        setUpgradeQuote(data as UpgradeQuote);
+      } catch {
+        if (!cancelled) {
+          setUpgradeQuote(null);
+          setUpgradeError(
+            "Paket yükseltme bilgileri alınırken sunucuya bağlanılamadı.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setUpgradeLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isUpgrade, planCode, router]);
+
   function changePlan(code: PlanCode) {
     sessionStorage.setItem("neyeihtiyacvar.selectedPlanCode", code);
-    router.replace(`/uyelik/odeme?paket=${encodeURIComponent(code)}`);
+    router.replace(
+      `/uyelik/odeme?paket=${encodeURIComponent(code)}${isUpgrade ? "&mode=upgrade" : ""}`,
+    );
   }
   async function applyPromotionCode() {
     if (!billingSaved) {
@@ -394,10 +497,12 @@ function MembershipPaymentContent() {
               ÜYELİK / SON ADIM
             </p>
             <h1 className="mt-1 font-display text-2xl font-bold">
-              Paketini kontrol et
+              {isUpgrade ? "Paket yükseltme" : "Paketini kontrol et"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Seçtiğin paketi kontrol et, istersen aşağıdan değiştirebilirsin.
+              {isUpgrade
+                ? "Yeni paketini ve mevcut üyeliğinden düşülecek kalan tutarı kontrol et."
+                : "Seçtiğin paketi kontrol et, istersen aşağıdan değiştirebilirsin."}
             </p>
           </div>
 
@@ -417,9 +522,14 @@ function MembershipPaymentContent() {
 
               <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-right">
                 <div className="text-lg font-black text-slate-950">
-                  {plan.annualPrice.toLocaleString("tr-TR")} TL
+                  {(isUpgrade && upgradeQuote
+                    ? upgradeQuote.amountDue
+                    : plan.annualPrice
+                  ).toLocaleString("tr-TR")} TL
                 </div>
-                <div className="text-[11px] text-muted-foreground">/ yıl</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {isUpgrade ? "ödenecek tutar" : "/ yıl"}
+                </div>
               </div>
             </div>
 
@@ -438,6 +548,7 @@ function MembershipPaymentContent() {
               </div>
             </div>
 
+            {!isUpgrade ? (
             <div className="mt-3 border-t border-border pt-3">
               <div className="mb-2 text-[13px] font-bold">Paket seçenekleri</div>
 
@@ -488,6 +599,70 @@ function MembershipPaymentContent() {
                 tamamlandıktan sonra oluşturulur.
               </p>
             </div>
+            ) : null}
+
+            {isUpgrade ? (
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="text-sm font-bold">Paket Yükseltme Özeti</div>
+
+                {upgradeLoading ? (
+                  <div className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+                    Yükseltme tutarı hesaplanıyor...
+                  </div>
+                ) : upgradeError ? (
+                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+                    {upgradeError}
+                  </div>
+                ) : upgradeQuote ? (
+                  <div className="mt-3 space-y-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        Mevcut paket
+                      </span>
+                      <span className="font-bold">
+                        {upgradeQuote.currentPlan.name}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        Yeni paket
+                      </span>
+                      <span className="font-bold">
+                        {upgradeQuote.targetPlan.name}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        Yeni paket yıllık fiyatı
+                      </span>
+                      <span className="font-bold">
+                        {upgradeQuote.targetPlan.annualPrice.toLocaleString("tr-TR")} TL
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between gap-4">
+                      <span className="text-muted-foreground">
+                        Kullanılmamış paket kredisi
+                      </span>
+                      <span className="font-bold text-emerald-700">
+                        -{upgradeQuote.remainingCredit.toLocaleString("tr-TR")} TL
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between gap-4 border-t border-orange-200 pt-3">
+                      <span className="font-black">
+                        Ödenecek tutar
+                      </span>
+                      <span className="text-xl font-black text-orange-600">
+                        {upgradeQuote.amountDue.toLocaleString("tr-TR")} TL
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {billingOpen ? (
               <div className="mt-3 border-t border-border pt-3">
@@ -606,8 +781,12 @@ function MembershipPaymentContent() {
                     {billingLoading
                       ? "Fatura bilgileri kontrol ediliyor..."
                       : billingSaved
-                        ? "Fatura bilgileri kaydedildi. Promosyon adımına geçebilirsin."
-                        : "Promosyon kodundan önce fatura bilgilerini kaydet."}
+                        ? isUpgrade
+                          ? "Fatura bilgileri kaydedildi. Ödeme adımına geçebilirsin."
+                          : "Fatura bilgileri kaydedildi. Promosyon adımına geçebilirsin."
+                        : isUpgrade
+                          ? "Ödemeden önce fatura bilgilerini kaydet."
+                          : "Promosyon kodundan önce fatura bilgilerini kaydet."}
                   </span>
                   <button
                     type="button"
@@ -626,6 +805,7 @@ function MembershipPaymentContent() {
             ) : null}
 
             
+            {!isUpgrade ? (
             <div className="mt-3 border-t border-border pt-3">
               <label className="mb-1 block text-[13px] font-medium">
                 Promosyon kodu
@@ -696,6 +876,7 @@ function MembershipPaymentContent() {
                 </>
               ) : null}
             </div>
+            ) : null}
 
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
               <button
@@ -706,7 +887,7 @@ function MembershipPaymentContent() {
                 Geri
               </button>
 
-              {promoResult?.finalPrice === 0 ? (
+              {!isUpgrade && promoResult?.finalPrice === 0 ? (
                 <button
                   type="button"
                   onClick={() => void completeFreeRegistration()}
@@ -721,10 +902,17 @@ function MembershipPaymentContent() {
                 <button
                   type="button"
                   onClick={() => void continueToPayment()}
-                  disabled={billingSaving}
+                  disabled={
+                    billingSaving ||
+                    (isUpgrade && (upgradeLoading || !upgradeQuote))
+                  }
                   className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {billingSaving ? "Kaydediliyor..." : "Ödemeye Geç"}
+                  {billingSaving
+                    ? "Kaydediliyor..."
+                    : isUpgrade
+                      ? "Yükseltme Ödemesine Geç"
+                      : "Ödemeye Geç"}
                 </button>
               )}
             </div>

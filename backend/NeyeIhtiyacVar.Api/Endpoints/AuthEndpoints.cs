@@ -319,12 +319,20 @@ public static class AuthEndpoints
                 });
             }
 
-            var purpose = string.Equals(
-                request.Purpose?.Trim(),
-                "contact-change",
-                StringComparison.OrdinalIgnoreCase)
-                ? VerificationPurpose.ContactInformationChange
-                : VerificationPurpose.AccountVerification;
+            var purposeText = request.Purpose?.Trim();
+
+            var purpose =
+                string.Equals(
+                    purposeText,
+                    "provider-contact-change",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? VerificationPurpose.ProviderContactInformationChange
+                    : string.Equals(
+                        purposeText,
+                        "contact-change",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? VerificationPurpose.ContactInformationChange
+                        : VerificationPurpose.AccountVerification;
 
             if (string.IsNullOrWhiteSpace(request.Code) ||
                 request.Code.Trim().Length != 6 ||
@@ -393,6 +401,44 @@ public static class AuthEndpoints
             }
 
             verification.UsedAtUtc = now;
+
+            if (purpose == VerificationPurpose.ProviderContactInformationChange)
+            {
+                var provider = await dbContext.Providers
+                    .FirstOrDefaultAsync(x => x.OwnerUserId == user.Id);
+
+                if (provider is null)
+                {
+                    return Results.NotFound(new
+                    {
+                        message = "Bu hesaba bağlı işletme bulunamadı."
+                    });
+                }
+
+                provider.PublicPhone =
+                    string.IsNullOrWhiteSpace(verification.PendingPhoneNumber)
+                        ? null
+                        : verification.PendingPhoneNumber;
+
+                provider.PublicWhatsapp =
+                    string.IsNullOrWhiteSpace(verification.PendingWhatsAppNumber)
+                        ? null
+                        : verification.PendingWhatsAppNumber;
+
+                provider.UpdatedAtUtc = now;
+                provider.Version++;
+
+                await dbContext.SaveChangesAsync();
+
+                return Results.Ok(new
+                {
+                    message = "İşletme telefon ve WhatsApp bilgileri başarıyla doğrulandı.",
+                    providerContactInformationVerified = true,
+                    provider.PublicPhone,
+                    provider.PublicWhatsapp,
+                    provider.Version
+                });
+            }
 
             if (purpose == VerificationPurpose.ContactInformationChange)
             {
@@ -468,12 +514,20 @@ public static class AuthEndpoints
                 });
             }
 
-            var purpose = string.Equals(
-                request.Purpose?.Trim(),
-                "contact-change",
-                StringComparison.OrdinalIgnoreCase)
-                ? VerificationPurpose.ContactInformationChange
-                : VerificationPurpose.AccountVerification;
+            var purposeText = request.Purpose?.Trim();
+
+            var purpose =
+                string.Equals(
+                    purposeText,
+                    "provider-contact-change",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? VerificationPurpose.ProviderContactInformationChange
+                    : string.Equals(
+                        purposeText,
+                        "contact-change",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? VerificationPurpose.ContactInformationChange
+                        : VerificationPurpose.AccountVerification;
 
             var user = await dbContext.Users
                 .FirstOrDefaultAsync(x =>
@@ -489,7 +543,8 @@ public static class AuthEndpoints
                 });
             }
 
-            if (purpose == VerificationPurpose.ContactInformationChange &&
+            if ((purpose == VerificationPurpose.ContactInformationChange ||
+                 purpose == VerificationPurpose.ProviderContactInformationChange) &&
                 channel != VerificationChannel.Email)
             {
                 return Results.BadRequest(new
@@ -536,7 +591,7 @@ public static class AuthEndpoints
 
             if (purpose == VerificationPurpose.ContactInformationChange &&
                 last is not null &&
-                string.IsNullOrWhiteSpace(last.PendingPhoneNumber) &&
+                last.PendingPhoneNumber is null &&
                 last.PendingWhatsAppNumber is null)
             {
                 return Results.BadRequest(new
@@ -555,7 +610,8 @@ public static class AuthEndpoints
                 now,
                 configuration);
 
-            if (purpose == VerificationPurpose.ContactInformationChange &&
+            if ((purpose == VerificationPurpose.ContactInformationChange ||
+                 purpose == VerificationPurpose.ProviderContactInformationChange) &&
                 last is not null)
             {
                 verification.PendingPhoneNumber = last.PendingPhoneNumber;
@@ -589,11 +645,14 @@ public static class AuthEndpoints
 
             return Results.Ok(new
             {
-                message = purpose == VerificationPurpose.ContactInformationChange
-                    ? "Yeni iletişim bilgileri için doğrulama kodu e-postanıza gönderildi."
-                    : channel == VerificationChannel.Email
-                        ? "Yeni e-posta doğrulama kodu oluşturuldu."
-                        : "Yeni telefon doğrulama kodu oluşturuldu.",
+                message =
+                    purpose == VerificationPurpose.ProviderContactInformationChange
+                        ? "İşletme iletişim bilgileri için doğrulama kodu e-postanıza gönderildi."
+                        : purpose == VerificationPurpose.ContactInformationChange
+                            ? "Yeni iletişim bilgileri için doğrulama kodu e-postanıza gönderildi."
+                            : channel == VerificationChannel.Email
+                                ? "Yeni e-posta doğrulama kodu oluşturuldu."
+                                : "Yeni telefon doğrulama kodu oluşturuldu.",
                 developmentCode = environment.IsDevelopment()
                     ? code
                     : null

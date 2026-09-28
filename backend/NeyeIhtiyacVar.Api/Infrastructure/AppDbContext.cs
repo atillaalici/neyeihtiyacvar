@@ -606,7 +606,7 @@ modelBuilder.Entity<ProviderApplication>(entity =>
 
             entity.Property(x => x.Purpose)
                 .HasConversion<string>()
-                .HasMaxLength(30);
+                .HasMaxLength(50);
 
             entity.Property(x => x.Channel)
                 .HasConversion<string>()

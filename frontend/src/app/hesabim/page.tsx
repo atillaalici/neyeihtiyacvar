@@ -22,6 +22,8 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import BusinessPhotoManager from "@/components/account/BusinessPhotoManager";
+import BusinessAccountManager from "@/components/account/BusinessAccountManager";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import {
@@ -37,11 +39,41 @@ type City = { id: string; slug: string; name: string; districts: District[] };
 
 type Notice = { kind: "success" | "error" | "info"; text: string } | null;
 
+type MembershipUpgradeOption = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  annualPrice: number;
+  serviceLimit: number;
+  sortOrder: number;
+  remainingCredit: number;
+  amountDue: number;
+};
+
+type MembershipUpgradeData = {
+  membershipId: string;
+  currentPlan: {
+    id: string;
+    code: string;
+    name: string;
+    annualPrice: number;
+    serviceLimit: number;
+    sortOrder: number;
+  };
+  startsAtUtc: string;
+  expiresAtUtc: string;
+  paidAmount: number;
+  remainingRatio: number;
+  remainingCredit: number;
+  upgrades: MembershipUpgradeOption[];
+};
+
 export default function AccountPage() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [cities, setCities] = useState<City[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"personal" | "address" | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
@@ -56,6 +88,12 @@ export default function AccountPage() {
     useState(false);
   const [contactVerificationRetryAfter, setContactVerificationRetryAfter] =
     useState(0);
+
+  const [membershipData, setMembershipData] =
+    useState<MembershipUpgradeData | null>(null);
+  const [membershipLoading, setMembershipLoading] = useState(false);
+  const [membershipModalOpen, setMembershipModalOpen] = useState(false);
+  const [membershipError, setMembershipError] = useState("");
 
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -116,13 +154,15 @@ export default function AccountPage() {
       .then(async ([meResponse, locationResponse]) => {
         if (meResponse.ok) {
           const fresh = (await meResponse.json()) as AuthUser;
+
           setUser(fresh);
           updateStoredUser(fresh);
           setDisplayName(fresh.displayName);
           setPhoneNumber(fresh.phoneNumber ?? "");
-          setWhatsAppNumber(fresh.whatsAppNumber ?? fresh.phoneNumber ?? "");
+          setWhatsAppNumber(fresh.whatsAppNumber ?? "");
           setWhatsAppSameAsPhone(
-            !fresh.whatsAppNumber || fresh.whatsAppNumber === fresh.phoneNumber,
+            fresh.whatsAppNumber !== null &&
+              fresh.whatsAppNumber === fresh.phoneNumber,
           );
           setCitySlug(fresh.citySlug ?? "");
           setDistrictSlug(fresh.districtSlug ?? "");
@@ -154,13 +194,14 @@ export default function AccountPage() {
       ?.name ??
     (user?.districtSlug ? humanizeSlug(user.districtSlug) : "Eklenmemiş");
 
-  function startEditing() {
+  function startEditing(section: "personal" | "address") {
     if (!user) return;
     setDisplayName(user.displayName);
     setPhoneNumber(user.phoneNumber ?? "");
-    setWhatsAppNumber(user.whatsAppNumber ?? user.phoneNumber ?? "");
+    setWhatsAppNumber(user.whatsAppNumber ?? "");
     setWhatsAppSameAsPhone(
-      !user.whatsAppNumber || user.whatsAppNumber === user.phoneNumber,
+      user.whatsAppNumber !== null &&
+        user.whatsAppNumber === user.phoneNumber,
     );
     setCitySlug(user.citySlug ?? "");
     setDistrictSlug(user.districtSlug ?? "");
@@ -170,7 +211,7 @@ export default function AccountPage() {
     setApartmentNo(user.apartmentNo ?? "");
     setOpenAddress(user.openAddress ?? "");
     setNotice(null);
-    setEditing(true);
+    setEditing(section);
   }
 
   function verificationUrl(
@@ -406,7 +447,7 @@ export default function AccountPage() {
       setApartmentNo(updated.apartmentNo ?? "");
       setOpenAddress(updated.openAddress ?? "");
 
-      setEditing(false);
+      setEditing(null);
 
       const needsContactVerification =
         payload?.contactVerificationRequired === true;
@@ -762,6 +803,52 @@ export default function AccountPage() {
     }
   }
 
+  async function loadMembershipUpgradeOptions(openModal = false) {
+    const token = getAccessToken();
+
+    if (!token) return;
+
+    setMembershipLoading(true);
+    setMembershipError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/membership-selection/upgrade-options`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        },
+      );
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        setMembershipError(
+          payload?.message ?? "Paket bilgileri yüklenemedi.",
+        );
+        return;
+      }
+
+      setMembershipData(payload as MembershipUpgradeData);
+
+      if (openModal) {
+        setMembershipModalOpen(true);
+      }
+    } catch {
+      setMembershipError("Paket bilgileri yüklenemedi.");
+    } finally {
+      setMembershipLoading(false);
+    }
+  }
+
+  function selectUpgradePlan(planCode: string) {
+    window.location.assign(
+      `/uyelik/odeme?paket=${encodeURIComponent(planCode)}&mode=upgrade`,
+    );
+  }
+
   function logout() {
     clearAuth();
     window.location.assign("/");
@@ -784,127 +871,340 @@ export default function AccountPage() {
     avatarPreview ??
     `${apiBaseUrl}/api/users/${user.id}/profile-image`;
 
+  if (
+    user.role === "provider" &&
+    !membershipData &&
+    !membershipLoading &&
+    !membershipError
+  ) {
+    void loadMembershipUpgradeOptions();
+  }
+
+  if (user.role === "provider") {
+    return (
+      <SiteLayout>
+        <main className="min-h-screen bg-[#f8fafc] text-slate-950">
+          <div className="mx-auto w-full max-w-5xl px-4 py-7 sm:px-6 lg:px-8 xl:py-9">
+            <section className="mb-4 grid items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+              <div className="pt-1">
+                <p className="text-sm font-bold text-[#ea580c]">
+                  İşletme Hesabı
+                </p>
+                <h1 className="mt-1 text-[34px] font-black tracking-[-0.035em] sm:text-[38px]">
+                  Hesabım
+                </h1>
+
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    Mevcut Paket
+                  </p>
+                  <p className="mt-0.5 text-lg font-black text-slate-900">
+                    {membershipLoading
+                      ? "Yükleniyor..."
+                      : membershipData?.currentPlan.name ?? "—"}
+                  </p>
+
+                  <button
+                    type="button"
+                    disabled={
+                      membershipLoading ||
+                      !membershipData ||
+                      membershipData.upgrades.length === 0
+                    }
+                    onClick={() => {
+                      if (membershipData) {
+                        setMembershipModalOpen(true);
+                      } else {
+                        void loadMembershipUpgradeOptions(true);
+                      }
+                    }}
+                    className="mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-[#f4510b] px-4 text-xs font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {membershipData?.upgrades.length === 0
+                      ? "En Üst Pakettesiniz"
+                      : "Paket Değiştir"}
+                  </button>
+
+                  {membershipError ? (
+                    <p className="mt-2 text-xs font-semibold text-red-600">
+                      {membershipError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <p className="mt-3 max-w-[220px] text-sm leading-6 text-slate-500">
+                  İşletme bilgilerinizi buradan yönetebilir, profilinizi güncelleyebilirsiniz.
+                </p>
+              </div>
+
+              <div id="isletme-fotograflari" className="scroll-mt-24">
+                <BusinessPhotoManager />
+              </div>
+            </section>
+
+            <div className="min-w-0 space-y-4">
+                <BusinessAccountManager />
+
+                <section
+                  id="guvenlik"
+                  className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-xl font-black text-slate-950">
+                        Hesap ve Güvenlik
+                      </h2>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">
+                        Şifrenizi ve işletme hesabınızın doğrulama durumlarını yönetin.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="h-11 shrink-0 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold shadow-sm hover:bg-slate-50"
+                    >
+                      Çıkış Yap
+                    </button>
+                  </div>
+
+                  <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="grid size-10 place-items-center rounded-xl bg-orange-100 text-orange-600">
+                          <LockKeyhole className="size-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-slate-950">
+                            Şifre Değişikliği
+                          </h3>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            Hesabınız için güçlü ve benzersiz bir şifre kullanın.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-3">
+                        <PasswordInput
+                          label="Mevcut Şifre"
+                          value={currentPassword}
+                          onChange={setCurrentPassword}
+                          visible={showCurrent}
+                          setVisible={setShowCurrent}
+                        />
+
+                        <PasswordInput
+                          label="Yeni Şifre"
+                          value={newPassword}
+                          onChange={setNewPassword}
+                          visible={showNew}
+                          setVisible={setShowNew}
+                        />
+
+                        <PasswordInput
+                          label="Yeni Şifreyi Doğrula"
+                          value={confirmPassword}
+                          onChange={setConfirmPassword}
+                          visible={showConfirm}
+                          setVisible={setShowConfirm}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={requestPasswordChange}
+                          className="mt-1 h-11 w-full rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white transition hover:bg-[#dd4709] sm:ml-auto sm:w-auto"
+                        >
+                          Şifreyi Güncelle
+                        </button>
+
+                        {passwordNotice ? (
+                          <div
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                              passwordNotice.kind === "success"
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : passwordNotice.kind === "error"
+                                  ? "border-red-200 bg-red-50 text-red-700"
+                                  : "border-blue-200 bg-blue-50 text-blue-700"
+                            }`}
+                          >
+                            {passwordNotice.text}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5">
+                      <div>
+                        <h3 className="font-black text-slate-950">
+                          Hesap Doğrulamaları
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Hesabınızın güvenlik ve iletişim doğrulama durumları.
+                        </p>
+                      </div>
+
+                      <div className="mt-5 divide-y divide-slate-200">
+                        <div className="flex items-center justify-between gap-4 py-4">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">
+                              Hesap Doğrulama
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              İşletme hesabınız aktif kullanıcı hesabınıza bağlıdır.
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+                            Doğrulandı
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-4 py-4">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-800">
+                              E-posta Doğrulama
+                            </p>
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {user.email}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+                              user.emailVerified
+                                ? "bg-green-100 text-green-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {user.emailVerified ? "Doğrulandı" : "Doğrulanmadı"}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-4 py-4">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">
+                              SMS Doğrulama
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Telefon doğrulaması SMS servisiyle etkinleştirilecek.
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-200 px-3 py-1 text-xs font-black text-slate-600">
+                            Yakında
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+            </div>
+          </div>
+
+          {membershipModalOpen && membershipData ? (
+            <div className="fixed inset-0 z-[9999] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]">
+              <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-[#ea580c]">
+                      Üyelik Paketi
+                    </p>
+                    <h2 className="mt-1 text-2xl font-black text-slate-950">
+                      Paket Yükselt
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      Mevcut paketiniz:{" "}
+                      <span className="font-black text-slate-800">
+                        {membershipData.currentPlan.name}
+                      </span>
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMembershipModalOpen(false)}
+                    className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+                    aria-label="Kapat"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </div>
+
+                {membershipData.upgrades.length ? (
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    {membershipData.upgrades.map((plan) => (
+                      <div
+                        key={plan.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5"
+                      >
+                        <h3 className="text-xl font-black text-slate-950">
+                          {plan.name}
+                        </h3>
+
+                        <p className="mt-2 min-h-10 text-sm leading-5 text-slate-500">
+                          {plan.description}
+                        </p>
+
+                        <div className="mt-5 space-y-2 text-sm">
+                          <div className="flex justify-between gap-4">
+                            <span className="text-slate-500">
+                              Yıllık paket
+                            </span>
+                            <span className="font-bold">
+                              {plan.annualPrice.toLocaleString("tr-TR")} TL
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between gap-4">
+                            <span className="text-slate-500">
+                              Kalan paket kredisi
+                            </span>
+                            <span className="font-bold text-emerald-700">
+                              -{plan.remainingCredit.toLocaleString("tr-TR")} TL
+                            </span>
+                          </div>
+
+                          <div className="border-t border-slate-200 pt-3">
+                            <div className="flex items-end justify-between gap-4">
+                              <span className="font-bold text-slate-700">
+                                Ödenecek
+                              </span>
+                              <span className="text-2xl font-black text-[#ea580c]">
+                                {plan.amountDue.toLocaleString("tr-TR")} TL
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => selectUpgradePlan(plan.code)}
+                          className="mt-5 h-11 w-full rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white transition hover:bg-[#dd4709]"
+                        >
+                          Bu Pakete Yükselt
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5 text-sm font-semibold text-green-800">
+                    Kullanabileceğiniz daha üst bir paket bulunmuyor.
+                  </div>
+                )}
+
+                <p className="mt-5 text-xs leading-5 text-slate-500">
+                  Kalan paket krediniz, mevcut paketiniz için gerçekten
+                  ödediğiniz tutarın kullanılmamış süresine göre hesaplanır.
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </main>
+      </SiteLayout>
+    );
+  }
+
   return (
     <SiteLayout>
       <main className="account-page min-h-screen bg-[#f8fafc] text-slate-950">
         <div className="mx-auto w-full max-w-[1480px] px-4 py-7 sm:px-6 lg:px-8 xl:py-9">
-          {contactVerificationRequired ? (
-            <div className="flex min-h-[72vh] items-center justify-center py-8">
-              <div className="w-full max-w-[520px] rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-                <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-orange-50 text-[#ea580c]">
-                  <Mail className="size-7" aria-hidden="true" />
-                </div>
-
-                <div className="mt-5 text-center">
-                  <p className="text-sm font-bold text-[#ea580c]">
-                    Güvenlik Doğrulaması
-                  </p>
-                  <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                    E-posta Doğrulama
-                  </h1>
-                  <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
-                    Telefon veya WhatsApp numaranızı değiştirmek istediniz.
-                    Değişikliğin uygulanabilmesi için e-posta adresinizi
-                    doğrulamanız gerekiyor.
-                  </p>
-                </div>
-
-                <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-4 text-center">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Doğrulama kodunun gönderileceği adres
-                  </p>
-                  <p className="mt-1 break-all text-sm font-black text-slate-800">
-                    {user.email}
-                  </p>
-                </div>
-
-                {contactVerificationNotice ? (
-                  <div
-                    className={`mt-4 rounded-xl border px-4 py-3 text-sm ${
-                      contactVerificationNotice.kind === "success"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : contactVerificationNotice.kind === "error"
-                          ? "border-red-200 bg-red-50 text-red-800"
-                          : "border-blue-200 bg-blue-50 text-blue-800"
-                    }`}
-                  >
-                    {contactVerificationNotice.text}
-                  </div>
-                ) : null}
-
-                {!contactVerificationCodeSent ? (
-                  <button
-                    type="button"
-                    onClick={() => void startContactVerification()}
-                    disabled={contactVerificationWorking !== null}
-                    className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {contactVerificationWorking === "send"
-                      ? "Kod Gönderiliyor..."
-                      : "E-posta ile Doğrula"}
-                  </button>
-                ) : (
-                  <div className="mt-6">
-                    <label className="grid gap-2">
-                      <span className="text-center text-sm font-bold text-slate-700">
-                        6 Haneli Doğrulama Kodu
-                      </span>
-
-                      <input
-                        value={contactVerificationCode}
-                        onChange={(event) =>
-                          setContactVerificationCode(
-                            event.target.value.replace(/\\D/g, "").slice(0, 6),
-                          )
-                        }
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        autoFocus
-                        placeholder="000000"
-                        className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-center text-xl font-black tracking-[0.35em] outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      onClick={() => void verifyContactInformation()}
-                      disabled={
-                        contactVerificationWorking !== null ||
-                        contactVerificationCode.length !== 6
-                      }
-                      className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#f4510b] px-6 text-sm font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {contactVerificationWorking === "verify"
-                        ? "Doğrulanıyor..."
-                        : "Doğrula"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => void startContactVerification()}
-                      disabled={
-                        contactVerificationWorking !== null ||
-                        contactVerificationRetryAfter > 0
-                      }
-                      className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {contactVerificationWorking === "send"
-                        ? "Gönderiliyor..."
-                        : contactVerificationRetryAfter > 0
-                          ? `Tekrar Kod Gönder (${Math.floor(contactVerificationRetryAfter / 60)}:${String(contactVerificationRetryAfter % 60).padStart(2, "0")})`
-                          : "Tekrar Kod Gönder"}
-                    </button>
-
-                    <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-                      Kodun geçerlilik süresi 2 dakikadır.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
           <header className="mb-5">
             <p className="text-sm font-bold text-[#ea580c]">Hesap Yönetimi</p>
             <h1 className="mt-1 text-[34px] font-black tracking-[-0.035em] sm:text-[38px]">
@@ -975,7 +1275,7 @@ export default function AccountPage() {
                     {user.displayName}
                   </p>
                   <span className="mt-2 inline-flex rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600">
-                    {user.role === "provider" ? "İşletme Hesabı" : "Bireysel Hesap"}
+                    Bireysel Hesap
                   </span>
                   <button
                     type="button"
@@ -997,48 +1297,31 @@ export default function AccountPage() {
               </div>
             </Card>
 
-            {user.role !== "provider" ? (
-              <Card className="min-h-[245px] border-orange-200 bg-gradient-to-br from-orange-50/70 to-white">
-                <div className="flex h-full flex-col">
-                  <CardTitle
-                    icon={<Building2 className="size-5 text-white" />}
-                    iconClassName="bg-[#f4510b]"
-                  >
-                    İşletme Hesabına Geç
-                  </CardTitle>
-                  <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-600">
-                    Kendi işletmenizi ekleyin, dijital vitrininizi oluşturun ve
-                    bölgenizde hizmet arayan müşterilere ulaşın.
-                  </p>
-                  <Link
-                    href="/kayit?hesap=isletme"
-                    className="mt-auto flex h-12 items-center justify-center rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#dd4709]"
-                  >
-                    İşletme Hesabına Geç →
-                  </Link>
-                </div>
-              </Card>
-            ) : (
-              <Card className="min-h-[245px] border-blue-200 bg-blue-50/40">
-                <div className="flex h-full flex-col">
-                  <CardTitle icon={<Building2 className="size-5" />}>İşletme Hesabı</CardTitle>
-                  <p className="mt-5 text-[15px] leading-7 text-slate-600">
-                    İşletme profiliniz aktif. Vitrin ve işletme bilgilerinizi panelden yönetebilirsiniz.
-                  </p>
-                  <Link
-                    href="/panel"
-                    className="mt-auto flex h-12 items-center justify-center rounded-xl bg-slate-950 px-5 text-sm font-black text-white"
-                  >
-                    İşletme Paneline Git →
-                  </Link>
-                </div>
-              </Card>
-            )}
+            <Card className="min-h-[245px] border-orange-200 bg-gradient-to-br from-orange-50/70 to-white">
+              <div className="flex h-full flex-col">
+                <CardTitle
+                  icon={<Building2 className="size-5 text-white" />}
+                  iconClassName="bg-[#f4510b]"
+                >
+                  İşletme Hesabına Geç
+                </CardTitle>
+                <p className="mt-5 max-w-xl text-[15px] leading-7 text-slate-600">
+                  Kendi işletmenizi ekleyin, dijital vitrininizi oluşturun ve
+                  bölgenizde hizmet arayan müşterilere ulaşın.
+                </p>
+                <Link
+                  href="/kayit?hesap=isletme"
+                  className="mt-auto flex h-12 items-center justify-center rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#dd4709]"
+                >
+                  İşletme Hesabına Geç →
+                </Link>
+              </div>
+            </Card>
 
             <Card>
               <div className="flex items-center justify-between gap-4">
                 <CardTitle icon={<UserRound className="size-5" />}>Kişisel Bilgiler</CardTitle>
-                <EditButton onClick={startEditing} />
+                <EditButton onClick={() => startEditing("personal")} />
               </div>
               <div className="mt-5 divide-y divide-slate-100">
                 <InfoRow label="Ad Soyad" value={user.displayName} />
@@ -1088,7 +1371,7 @@ export default function AccountPage() {
             <Card className="min-h-[250px]">
               <div className="flex items-center justify-between gap-4">
                 <CardTitle icon={<MapPin className="size-5 text-red-500" />}>Adres Bilgisi</CardTitle>
-                <EditButton onClick={startEditing} />
+                <EditButton onClick={() => startEditing("address")} />
               </div>
               <div className="mt-5 divide-y divide-slate-100">
                 <InfoRow label="İl" value={cityName} />
@@ -1189,22 +1472,30 @@ export default function AccountPage() {
               {saving ? "Kaydediliyor..." : "Kaydet"}
             </button>
           </div>
-            </>
-          )}
         </div>
       </main>
 
-      {editing ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]">
+      {contactVerificationRequired ? (
+        <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]">
           <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-bold text-[#ea580c]">Hesap Bilgileri</p>
-                <h2 className="mt-1 text-2xl font-black">Bilgileri Düzenle</h2>
+                <p className="text-sm font-bold text-[#ea580c]">
+                  Güvenlik Doğrulaması
+                </p>
+                <h2 className="mt-1 text-2xl font-black">
+                  E-posta Adresini Doğrula
+                </h2>
               </div>
+
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={() => {
+                  setContactVerificationRequired(false);
+                  setContactVerificationCode("");
+                  setContactVerificationNotice(null);
+                  setContactVerificationCodeSent(false);
+                }}
                 className="grid size-9 place-items-center rounded-full border border-slate-200"
                 aria-label="Kapat"
               >
@@ -1212,82 +1503,302 @@ export default function AccountPage() {
               </button>
             </div>
 
-            <div className="mt-6 grid gap-4">
-              <Field label="Ad Soyad" value={displayName} onChange={setDisplayName} />
-              <Field
-                label="Telefon"
-                value={phoneNumber}
-                onChange={setPhoneNumber}
-                inputMode="tel"
-              />
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              Telefon veya WhatsApp değişikliğini tamamlamak için e-posta
+              adresinize gönderilen 6 haneli doğrulama kodunu girin.
+            </p>
 
-              <label className="grid gap-2">
-                <span className="text-sm font-bold text-slate-700">E-posta</span>
-                <input
-                  value={user.email}
-                  disabled
-                  className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500"
-                />
-              </label>
-
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-bold text-slate-700">WhatsApp</span>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={whatsAppSameAsPhone} onChange={(event) => { const checked = event.target.checked; setWhatsAppSameAsPhone(checked); if (checked) setWhatsAppNumber(phoneNumber); }} /> Telefonla aynı</label>
-                </div>
-                <input value={whatsAppSameAsPhone ? phoneNumber : whatsAppNumber} onChange={(event) => setWhatsAppNumber(event.target.value)} disabled={whatsAppSameAsPhone} inputMode="tel" className="mt-3 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 disabled:bg-slate-100" />
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2">
-                  <span className="text-sm font-bold text-slate-700">İl</span>
-                  <select
-                    value={citySlug}
-                    onChange={(event) => {
-                      setCitySlug(event.target.value);
-                      setDistrictSlug("");
-                    }}
-                    className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400"
-                  >
-                    <option value="">İl seçin</option>
-                    {cities.map((city) => (
-                      <option key={city.id} value={city.slug}>
-                        {city.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="grid gap-2">
-                  <span className="text-sm font-bold text-slate-700">İlçe</span>
-                  <select
-                    value={districtSlug}
-                    onChange={(event) => setDistrictSlug(event.target.value)}
-                    disabled={!selectedCity}
-                    className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 disabled:bg-slate-50"
-                  >
-                    <option value="">İlçe seçin</option>
-                    {(selectedCity?.districts ?? []).map((district) => (
-                      <option key={district.id} value={district.slug}>
-                        {district.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Mahalle / Köy" value={neighborhood} onChange={setNeighborhood} />
-                <Field label="Cadde / Sokak" value={street} onChange={setStreet} />
-                <Field label="Bina No" value={buildingNo} onChange={setBuildingNo} />
-                <Field label="Daire No (isteğe bağlı)" value={apartmentNo} onChange={setApartmentNo} />
-              </div>
-              <label className="grid gap-2"><span className="text-sm font-bold text-slate-700">Açık Adres / Adres Tarifi</span><textarea value={openAddress} onChange={(event) => setOpenAddress(event.target.value)} rows={3} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100" placeholder="Adres tarifi veya ek bilgi" /></label>
+            <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Doğrulama kodunun gönderileceği adres
+              </p>
+              <p className="mt-1 break-all text-sm font-black text-slate-800">
+                {user.email}
+              </p>
             </div>
+
+            {contactVerificationNotice ? (
+              <div
+                className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${
+                  contactVerificationNotice.kind === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : contactVerificationNotice.kind === "error"
+                      ? "border-red-200 bg-red-50 text-red-800"
+                      : "border-blue-200 bg-blue-50 text-blue-800"
+                }`}
+              >
+                {contactVerificationNotice.text}
+              </div>
+            ) : null}
+
+            {!contactVerificationCodeSent ? (
+              <button
+                type="button"
+                onClick={() => void startContactVerification()}
+                disabled={contactVerificationWorking !== null}
+                className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {contactVerificationWorking === "send"
+                  ? "Kod Gönderiliyor..."
+                  : "E-posta ile Kod Gönder"}
+              </button>
+            ) : (
+              <div className="mt-6">
+                <label className="grid gap-2">
+                  <span className="text-sm font-bold text-slate-700">
+                    6 Haneli Doğrulama Kodu
+                  </span>
+
+                  <input
+                    value={contactVerificationCode}
+                    onChange={(event) =>
+                      setContactVerificationCode(
+                        event.target.value.replace(/\D/g, "").slice(0, 6),
+                      )
+                    }
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    autoFocus
+                    placeholder="000000"
+                    className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-center text-xl font-black tracking-[0.35em] outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void verifyContactInformation()}
+                  disabled={
+                    contactVerificationWorking !== null ||
+                    contactVerificationCode.length !== 6
+                  }
+                  className="mt-4 inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#f4510b] px-6 text-sm font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {contactVerificationWorking === "verify"
+                    ? "Doğrulanıyor..."
+                    : "Doğrula"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void startContactVerification()}
+                  disabled={
+                    contactVerificationWorking !== null ||
+                    contactVerificationRetryAfter > 0
+                  }
+                  className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {contactVerificationWorking === "send"
+                    ? "Gönderiliyor..."
+                    : contactVerificationRetryAfter > 0
+                      ? `Tekrar Kod Gönder (${Math.floor(
+                          contactVerificationRetryAfter / 60,
+                        )}:${String(
+                          contactVerificationRetryAfter % 60,
+                        ).padStart(2, "0")})`
+                      : "Tekrar Kod Gönder"}
+                </button>
+
+                <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+                  Kodun geçerlilik süresi 2 dakikadır.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setContactVerificationRequired(false);
+                  setContactVerificationCode("");
+                  setContactVerificationNotice(null);
+                  setContactVerificationCodeSent(false);
+                }}
+                className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold"
+              >
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editing ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]">
+          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-[#ea580c]">
+                  {editing === "personal" ? "Kişisel Bilgiler" : "Adres Bilgisi"}
+                </p>
+                <h2 className="mt-1 text-2xl font-black">
+                  {editing === "personal"
+                    ? "Kişisel Bilgileri Düzenle"
+                    : "Adres Bilgilerini Düzenle"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="grid size-9 place-items-center rounded-full border border-slate-200"
+                aria-label="Kapat"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {editing === "personal" ? (
+              <div className="mt-6 grid gap-4">
+                <Field
+                  label="Ad Soyad"
+                  value={displayName}
+                  onChange={setDisplayName}
+                />
+
+                <Field
+                  label="Telefon"
+                  value={phoneNumber}
+                  onChange={setPhoneNumber}
+                  inputMode="tel"
+                />
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-bold text-slate-700">
+                    E-posta
+                  </span>
+                  <input
+                    value={user.email}
+                    disabled
+                    className="h-12 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500"
+                  />
+                </label>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-bold text-slate-700">
+                      WhatsApp
+                    </span>
+
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={whatsAppSameAsPhone}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setWhatsAppSameAsPhone(checked);
+
+                          if (checked) {
+                            setWhatsAppNumber(phoneNumber);
+                          }
+                        }}
+                      />
+                      Telefonla aynı
+                    </label>
+                  </div>
+
+                  <input
+                    value={
+                      whatsAppSameAsPhone ? phoneNumber : whatsAppNumber
+                    }
+                    onChange={(event) =>
+                      setWhatsAppNumber(event.target.value)
+                    }
+                    disabled={whatsAppSameAsPhone}
+                    inputMode="tel"
+                    className="mt-3 h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 disabled:bg-slate-100"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2">
+                    <span className="text-sm font-bold text-slate-700">
+                      İl
+                    </span>
+                    <select
+                      value={citySlug}
+                      onChange={(event) => {
+                        setCitySlug(event.target.value);
+                        setDistrictSlug("");
+                      }}
+                      className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400"
+                    >
+                      <option value="">İl seçin</option>
+                      {cities.map((city) => (
+                        <option key={city.id} value={city.slug}>
+                          {city.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="grid gap-2">
+                    <span className="text-sm font-bold text-slate-700">
+                      İlçe
+                    </span>
+                    <select
+                      value={districtSlug}
+                      onChange={(event) =>
+                        setDistrictSlug(event.target.value)
+                      }
+                      disabled={!selectedCity}
+                      className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-orange-400 disabled:bg-slate-50"
+                    >
+                      <option value="">İlçe seçin</option>
+                      {(selectedCity?.districts ?? []).map((district) => (
+                        <option key={district.id} value={district.slug}>
+                          {district.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field
+                    label="Mahalle / Köy"
+                    value={neighborhood}
+                    onChange={setNeighborhood}
+                  />
+                  <Field
+                    label="Cadde / Sokak"
+                    value={street}
+                    onChange={setStreet}
+                  />
+                  <Field
+                    label="Bina No"
+                    value={buildingNo}
+                    onChange={setBuildingNo}
+                  />
+                  <Field
+                    label="Daire No (isteğe bağlı)"
+                    value={apartmentNo}
+                    onChange={setApartmentNo}
+                  />
+                </div>
+
+                <label className="grid gap-2">
+                  <span className="text-sm font-bold text-slate-700">
+                    Açık Adres / Adres Tarifi
+                  </span>
+                  <textarea
+                    value={openAddress}
+                    onChange={(event) =>
+                      setOpenAddress(event.target.value)
+                    }
+                    rows={3}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                    placeholder="Adres tarifi veya ek bilgi"
+                  />
+                </label>
+              </div>
+            )}
 
             <div className="mt-7 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setEditing(false)}
+                onClick={() => setEditing(null)}
                 className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold"
               >
                 Vazgeç

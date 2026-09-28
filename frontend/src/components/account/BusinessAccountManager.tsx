@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Building2, LocateFixed, MapPin, Save, Tags } from "lucide-react";
+import { Building2, LocateFixed, MapPin, Pencil, Save, Tags, X } from "lucide-react";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 
@@ -21,6 +21,16 @@ type ProviderProfile = {
   publicWhatsapp?: string | null; publicAddress?: string | null;
   citySlug?: string | null; districtSlug?: string | null;
   latitude?: number | null; longitude?: number | null; version: number;
+};
+
+type CurrentUser = {
+  id: string;
+  email: string;
+};
+
+type VerificationNotice = {
+  kind: "success" | "error" | "info";
+  text: string;
 };
 
 function slugify(v: string) {
@@ -44,6 +54,15 @@ export default function BusinessAccountManager() {
   const [locating,setLocating]=useState(false);
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
+  const [editingBusiness,setEditingBusiness]=useState(false);
+  const [currentUser,setCurrentUser]=useState<CurrentUser|null>(null);
+
+  const [contactVerificationRequired,setContactVerificationRequired]=useState(false);
+  const [contactVerificationCode,setContactVerificationCode]=useState("");
+  const [contactVerificationCodeSent,setContactVerificationCodeSent]=useState(false);
+  const [contactVerificationRetryAfter,setContactVerificationRetryAfter]=useState(0);
+  const [contactVerificationWorking,setContactVerificationWorking]=useState<""|"send"|"verify">("");
+  const [contactVerificationNotice,setContactVerificationNotice]=useState<VerificationNotice|null>(null);
 
   const [businessName,setBusinessName]=useState("");
   const [description,setDescription]=useState("");
@@ -69,17 +88,19 @@ export default function BusinessAccountManager() {
       const token=getAccessToken();
       if(!token){setLoading(false);return;}
       try{
-        const [pr,lr,cr]=await Promise.all([
+        const [pr,lr,cr,ur]=await Promise.all([
           fetch(`${apiBaseUrl}/api/provider-panel/me`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"}),
           fetch(`${apiBaseUrl}/api/locations`,{cache:"no-store"}),
-          fetch(`${apiBaseUrl}/api/categories`,{cache:"no-store"})
+          fetch(`${apiBaseUrl}/api/categories`,{cache:"no-store"}),
+          fetch(`${apiBaseUrl}/api/auth/me`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"})
         ]);
-        if(!pr.ok||!lr.ok||!cr.ok) throw new Error("Hesap bilgileri yüklenemedi.");
+        if(!pr.ok||!lr.ok||!cr.ok||!ur.ok) throw new Error("Hesap bilgileri yüklenemedi.");
         const p=await pr.json() as ProviderProfile;
         const l=await lr.json() as City[];
         const c=await cr.json() as Category[];
+        const u=await ur.json() as CurrentUser;
         if(!active)return;
-        setProfile(p);setCities(l);setCategories(c);
+        setProfile(p);setCities(l);setCategories(c);setCurrentUser(u);
         setBusinessName(p.businessName??"");setDescription(p.description??"");
         setPublicPhone(p.publicPhone??"");setPublicWhatsapp(p.publicWhatsapp??"");
         setPublicAddress(p.publicAddress??"");setCitySlug(p.citySlug??"");
@@ -95,6 +116,14 @@ export default function BusinessAccountManager() {
     }
     void load(); return()=>{active=false;};
   },[]);
+
+  useEffect(()=>{
+    if(contactVerificationRetryAfter<=0)return;
+    const timer=window.setInterval(()=>{
+      setContactVerificationRetryAfter(v=>Math.max(0,v-1));
+    },1000);
+    return()=>window.clearInterval(timer);
+  },[contactVerificationRetryAfter]);
 
   async function put(path:string,body:object,key:string){
     const token=getAccessToken(); if(!token)throw new Error("Oturum bilgisi bulunamadı.");
@@ -112,11 +141,187 @@ export default function BusinessAccountManager() {
   }
 
   async function saveBusiness(){
-    if(!profile)return;
+    if(!profile)return false;
+
     try{
-      const d=await put("/api/provider-panel/me/business",{expectedVersion:profile.version,businessName:businessName.trim(),description:description.trim()||null,publicPhone:publicPhone.trim()||null,publicWhatsapp:publicWhatsapp.trim()||null},"business");
-      setProfile(o=>o?{...o,businessName:d.businessName??businessName.trim(),description:d.description??null,publicPhone:d.publicPhone??null,publicWhatsapp:d.publicWhatsapp??null,version:d.version??o.version}:o);
-    }catch(e){setError(e instanceof Error?e.message:"İşletme bilgileri kaydedilemedi.");}
+      const d=await put(
+        "/api/provider-panel/me/business",
+        {
+          expectedVersion:profile.version,
+          businessName:businessName.trim(),
+          description:description.trim()||null,
+          publicPhone:publicPhone.trim()||null,
+          publicWhatsapp:publicWhatsapp.trim()||null
+        },
+        "business"
+      );
+
+      setProfile(o=>o?{
+        ...o,
+        businessName:d.businessName??businessName.trim(),
+        description:d.description??null,
+        publicPhone:d.publicPhone??null,
+        publicWhatsapp:d.publicWhatsapp??null,
+        version:d.version??o.version
+      }:o);
+
+      if(d?.providerContactVerificationRequired){
+        setEditingBusiness(false);
+        setContactVerificationRequired(true);
+        setContactVerificationCode("");
+        setContactVerificationCodeSent(false);
+        setContactVerificationRetryAfter(0);
+        setContactVerificationNotice(null);
+
+        await startProviderContactVerification();
+        return true;
+      }
+
+      setEditingBusiness(false);
+      return true;
+    }catch(e){
+      setError(e instanceof Error?e.message:"İşletme bilgileri kaydedilemedi.");
+      return false;
+    }
+  }
+
+  async function startProviderContactVerification(){
+    const token=getAccessToken();
+
+    if(!token||!currentUser){
+      setContactVerificationNotice({
+        kind:"error",
+        text:"Oturum bilgisi bulunamadı. Lütfen yeniden giriş yapın."
+      });
+      return;
+    }
+
+    setContactVerificationWorking("send");
+    setContactVerificationNotice(null);
+
+    try{
+      const response=await fetch(
+        `${apiBaseUrl}/api/auth/verification/resend`,
+        {
+          method:"POST",
+          headers:{
+            Authorization:`Bearer ${token}`,
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            userId:currentUser.id,
+            channel:"email",
+            purpose:"provider-contact-change"
+          })
+        }
+      );
+
+      const payload=await response.json().catch(()=>null);
+
+      if(!response.ok){
+        if(response.status===429&&payload?.retryAfterSeconds){
+          setContactVerificationCodeSent(true);
+          setContactVerificationRetryAfter(Number(payload.retryAfterSeconds));
+          setContactVerificationNotice({
+            kind:"info",
+            text:"Doğrulama kodu daha önce gönderildi. E-postanızı kontrol edin."
+          });
+          return;
+        }
+
+        setContactVerificationNotice({
+          kind:"error",
+          text:payload?.message??"Doğrulama e-postası gönderilemedi. Lütfen tekrar deneyin."
+        });
+        return;
+      }
+
+      setContactVerificationCodeSent(true);
+      setContactVerificationRetryAfter(120);
+      setContactVerificationNotice({
+        kind:"success",
+        text:"6 haneli doğrulama kodu e-posta adresinize gönderildi."
+      });
+    }catch{
+      setContactVerificationNotice({
+        kind:"error",
+        text:"Doğrulama e-postası gönderilemedi. Lütfen tekrar deneyin."
+      });
+    }finally{
+      setContactVerificationWorking("");
+    }
+  }
+
+  async function verifyProviderContact(){
+    if(!currentUser)return;
+
+    if(!/^\d{6}$/.test(contactVerificationCode)){
+      setContactVerificationNotice({
+        kind:"error",
+        text:"6 haneli doğrulama kodunu girin."
+      });
+      return;
+    }
+
+    setContactVerificationWorking("verify");
+    setContactVerificationNotice(null);
+
+    try{
+      const response=await fetch(
+        `${apiBaseUrl}/api/auth/verification/verify`,
+        {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            userId:currentUser.id,
+            channel:"email",
+            code:contactVerificationCode,
+            purpose:"provider-contact-change"
+          })
+        }
+      );
+
+      const payload=await response.json().catch(()=>null);
+
+      if(!response.ok){
+        setContactVerificationNotice({
+          kind:"error",
+          text:payload?.message??"Doğrulama yapılamadı."
+        });
+        return;
+      }
+
+      const verifiedPhone=payload?.publicPhone??null;
+      const verifiedWhatsapp=payload?.publicWhatsapp??null;
+
+      setPublicPhone(verifiedPhone??"");
+      setPublicWhatsapp(verifiedWhatsapp??"");
+
+      setProfile(o=>o?{
+        ...o,
+        publicPhone:verifiedPhone,
+        publicWhatsapp:verifiedWhatsapp,
+        version:typeof payload?.version==="number"?payload.version:o.version
+      }:o);
+
+      setContactVerificationRequired(false);
+      setContactVerificationCode("");
+      setContactVerificationCodeSent(false);
+      setContactVerificationRetryAfter(0);
+      setContactVerificationNotice(null);
+
+      setMessage(
+        payload?.message??
+        "İşletme telefon ve WhatsApp bilgileri başarıyla doğrulandı."
+      );
+    }catch{
+      setContactVerificationNotice({
+        kind:"error",
+        text:"Doğrulama yapılamadı. Lütfen tekrar deneyin."
+      });
+    }finally{
+      setContactVerificationWorking("");
+    }
   }
 
   async function saveCatalog(){
@@ -156,31 +361,47 @@ export default function BusinessAccountManager() {
     {message&&<div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</div>}
     {error&&<div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-    <section className={card}>
-      <Header icon={Building2} title="İşletme Bilgileri" text="Müşterilere görünen temel bilgiler."/>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Field label="İşletme Adı" value={businessName} onChange={setBusinessName}/>
-        <Field label="Telefon" value={publicPhone} onChange={setPublicPhone}/>
-        <Field label="WhatsApp" value={publicWhatsapp} onChange={setPublicWhatsapp}/>
-        <label className="grid gap-1.5 md:col-span-2"><span className="text-sm font-semibold text-slate-700">Açıklama</span>
-          <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"/>
-        </label>
-      </div>
-      <SaveButton busy={saving==="business"} onClick={saveBusiness} text="İşletme Bilgilerini Kaydet"/>
-    </section>
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      <section id="isletme-bilgileri" className={`${card} scroll-mt-24`}>
+        <div className="flex items-start justify-between gap-3">
+          <Header icon={Building2} title="İşletme Bilgileri" text="Müşterilere görünen temel bilgiler."/>
+          <button
+            type="button"
+            onClick={()=>{
+              setBusinessName(profile.businessName??"");
+              setDescription(profile.description??"");
+              setPublicPhone(profile.publicPhone??"");
+              setPublicWhatsapp(profile.publicWhatsapp??"");
+              setEditingBusiness(true);
+            }}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+          >
+            <Pencil className="size-4"/>
+            Düzenle
+          </button>
+        </div>
 
-    <section className={card}>
-      <Header icon={Tags} title="Kategori ve Hizmetler" text="Hizmet alanlarınızı buradan değiştirebilirsiniz."/>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <Select label="Ana Kategori" value={categorySlug} className={selectClass} onChange={v=>{setCategorySlug(v);setServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
-        <Select label="Ana Hizmet" value={serviceSlug} className={selectClass} disabled={!selectedCategory} onChange={setServiceSlug} options={(selectedCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
-        <Select label="2. Kategori (isteğe bağlı)" value={secondCategorySlug} className={selectClass} allowEmpty onChange={v=>{setSecondCategorySlug(v);setSecondServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
-        <Select label="2. Hizmet (isteğe bağlı)" value={secondServiceSlug} className={selectClass} allowEmpty disabled={!selectedSecondCategory} onChange={setSecondServiceSlug} options={(selectedSecondCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
-      </div>
-      <SaveButton busy={saving==="catalog"} onClick={saveCatalog} text="Kategori ve Hizmetleri Kaydet"/>
-    </section>
+        <div className="mt-5 divide-y divide-slate-100">
+          <InfoRow label="İşletme Adı" value={profile.businessName || "Eklenmemiş"}/>
+          <InfoRow label="Telefon" value={profile.publicPhone || "Eklenmemiş"}/>
+          <InfoRow label="WhatsApp" value={profile.publicWhatsapp || "Eklenmemiş"}/>
+          <InfoRow label="Açıklama" value={profile.description || "Eklenmemiş"}/>
+        </div>
+      </section>
 
-    <section className={card}>
+      <section id="hizmetler-kategoriler" className={`${card} scroll-mt-24`}>
+        <Header icon={Tags} title="Kategori ve Hizmetler" text="Hizmet alanlarınızı buradan değiştirebilirsiniz."/>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Select label="Ana Kategori" value={categorySlug} className={selectClass} onChange={v=>{setCategorySlug(v);setServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
+          <Select label="Ana Hizmet" value={serviceSlug} className={selectClass} disabled={!selectedCategory} onChange={setServiceSlug} options={(selectedCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
+          <Select label="2. Kategori (isteğe bağlı)" value={secondCategorySlug} className={selectClass} allowEmpty onChange={v=>{setSecondCategorySlug(v);setSecondServiceSlug("");}} options={categories.map(x=>({value:x.slug,label:x.name}))}/>
+          <Select label="2. Hizmet (isteğe bağlı)" value={secondServiceSlug} className={selectClass} allowEmpty disabled={!selectedSecondCategory} onChange={setSecondServiceSlug} options={(selectedSecondCategory?.services??[]).map(x=>({value:slugify(x),label:x}))}/>
+        </div>
+        <SaveButton busy={saving==="catalog"} onClick={saveCatalog} text="Kategori ve Hizmetleri Kaydet"/>
+      </section>
+    </div>
+
+    <section id="konum-adres" className={`${card} scroll-mt-24`}>
       <Header icon={MapPin} title="Adres ve Konum" text="Adresinizi ve harita konumunuzu güncelleyin."/>
       <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-3">
@@ -201,7 +422,177 @@ export default function BusinessAccountManager() {
       </div>
       <SaveButton busy={saving==="location"} onClick={saveLocation} text="Adres ve Konumu Kaydet"/>
     </section>
+
+    {editingBusiness ? (
+      <div className="fixed inset-0 z-[70] grid place-items-center bg-slate-950/45 p-4">
+        <div className="w-full max-w-2xl rounded-[24px] border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-orange-600">İşletme Hesabı</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">İşletme Bilgilerini Düzenle</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Vitrinde müşterilere gösterilecek bilgileri güncelleyin.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={()=>setEditingBusiness(false)}
+              className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+              aria-label="Kapat"
+            >
+              <X className="size-5"/>
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <Field label="İşletme Adı" value={businessName} onChange={setBusinessName}/>
+            <Field label="Telefon" value={publicPhone} onChange={setPublicPhone}/>
+            <Field label="WhatsApp" value={publicWhatsapp} onChange={setPublicWhatsapp}/>
+            <label className="grid gap-1.5 sm:col-span-2">
+              <span className="text-sm font-semibold text-slate-700">Açıklama</span>
+              <textarea
+                value={description}
+                onChange={e=>setDescription(e.target.value)}
+                rows={4}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              />
+            </label>
+          </div>
+
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={()=>setEditingBusiness(false)}
+              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              Vazgeç
+            </button>
+            <button
+              type="button"
+              disabled={saving==="business"}
+              onClick={()=>void saveBusiness()}
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-orange-600 px-5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50"
+            >
+              <Save className="size-4"/>
+              {saving==="business" ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+            </button>
+          </div>
+
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            Telefon veya WhatsApp değişikliğinde e-posta doğrulaması istenecektir.
+          </p>
+        </div>
+      </div>
+    ) : null}
+
+    {contactVerificationRequired ? (
+      <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/45 p-4">
+        <div className="w-full max-w-lg rounded-[24px] border border-slate-200 bg-white p-5 shadow-2xl sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold text-orange-600">Güvenlik Doğrulaması</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">
+                E-posta Adresini Doğrula
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                İşletme telefon veya WhatsApp bilgisini değiştirmek için
+                <span className="font-bold text-slate-700"> {currentUser?.email}</span>
+                {" "}adresine gönderilen 6 haneli kodu girin.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={()=>{
+                setContactVerificationRequired(false);
+                setContactVerificationCode("");
+                setContactVerificationCodeSent(false);
+                setContactVerificationRetryAfter(0);
+                setContactVerificationNotice(null);
+              }}
+              className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
+              aria-label="Kapat"
+            >
+              <X className="size-5"/>
+            </button>
+          </div>
+
+          {contactVerificationNotice ? (
+            <div className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
+              contactVerificationNotice.kind==="error"
+                ? "border-red-200 bg-red-50 text-red-700"
+                : contactVerificationNotice.kind==="success"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : "border-blue-200 bg-blue-50 text-blue-700"
+            }`}>
+              {contactVerificationNotice.text}
+            </div>
+          ) : null}
+
+          <div className="mt-5">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-semibold text-slate-700">
+                Doğrulama Kodu
+              </span>
+              <input
+                value={contactVerificationCode}
+                onChange={e=>
+                  setContactVerificationCode(
+                    e.target.value.replace(/\D/g,"").slice(0,6)
+                  )
+                }
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                className="h-12 rounded-xl border border-slate-200 px-4 text-center text-xl font-black tracking-[0.35em] outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            disabled={
+              contactVerificationWorking==="verify" ||
+              contactVerificationCode.length!==6
+            }
+            onClick={()=>void verifyProviderContact()}
+            className="mt-5 h-11 w-full rounded-xl bg-orange-600 px-5 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-50"
+          >
+            {contactVerificationWorking==="verify"
+              ? "Doğrulanıyor..."
+              : "Doğrula ve Değişikliği Kaydet"}
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              contactVerificationWorking==="send" ||
+              contactVerificationRetryAfter>0
+            }
+            onClick={()=>void startProviderContactVerification()}
+            className="mt-3 h-11 w-full rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {contactVerificationWorking==="send"
+              ? "Gönderiliyor..."
+              : contactVerificationRetryAfter>0
+                ? `Yeni Kod İste (${contactVerificationRetryAfter} sn)`
+                : contactVerificationCodeSent
+                  ? "Yeni Kod İste"
+                  : "Doğrulama Kodunu Gönder"}
+          </button>
+
+          <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+            Doğrulama kodu 2 dakika geçerlidir.
+          </p>
+        </div>
+      </div>
+    ) : null}
   </div>;
+}
+
+function InfoRow({label,value}:{label:string;value:string}){
+  return <div className="grid gap-1 py-3 sm:grid-cols-[130px_minmax(0,1fr)] sm:items-start"><span className="text-sm font-semibold text-slate-500">{label}</span><span className="break-words text-sm font-bold text-slate-900">{value}</span></div>;
 }
 
 function Header({icon:Icon,title,text}:{icon:typeof Building2;title:string;text:string}){
