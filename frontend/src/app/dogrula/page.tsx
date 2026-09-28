@@ -39,7 +39,7 @@ function VerifyPageContent() {
   const [working, setWorking] = useState<"verify" | "resend" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
+  const [resendSeconds, setResendSeconds] = useState(120);
 
   useEffect(() => {
     let active = true;
@@ -68,24 +68,6 @@ function VerifyPageContent() {
         }
       }
 
-      const raw = sessionStorage.getItem(
-        "neyeihtiyacvar.devVerificationCodes",
-      );
-
-      if (!raw || !active) {
-        return;
-      }
-
-      try {
-        const parsed = JSON.parse(raw) as {
-          email?: string;
-          phone?: string;
-        };
-
-        setDevelopmentCode(parsed[channel] ?? null);
-      } catch {
-        setDevelopmentCode(null);
-      }
     }
 
     void loadAccount();
@@ -119,6 +101,22 @@ function VerifyPageContent() {
       : "Telefon numarana gönderilen 6 haneli doğrulama kodunu gir.";
 
   const Icon = channel === "email" ? Mail : Phone;
+
+  useEffect(() => {
+    if (resendSeconds <= 0) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setResendSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
+
+  const resendTime = `${String(Math.floor(resendSeconds / 60)).padStart(2, "0")}:${String(
+    resendSeconds % 60,
+  ).padStart(2, "0")}`;
 
   async function verify() {
     if (!userId) {
@@ -157,8 +155,6 @@ function VerifyPageContent() {
       if ("accessToken" in data) {
         saveAuth(data as AuthResponse);
       }
-
-      sessionStorage.removeItem("neyeihtiyacvar.devVerificationCodes");
 
       setMessage(
         channel === "email"
@@ -215,10 +211,7 @@ function VerifyPageContent() {
         return;
       }
 
-      if (data?.developmentCode) {
-        setDevelopmentCode(String(data.developmentCode));
-      }
-
+      setResendSeconds(120);
       setMessage(data?.message ?? "Yeni doğrulama kodu oluşturuldu.");
     } catch {
       setError("Sunucuya bağlanılamadı.");
@@ -255,11 +248,7 @@ function VerifyPageContent() {
             <p className="mt-3 text-muted-foreground">{description}</p>
           </div>
 
-          {developmentCode && (
-            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              <strong>Development test kodu:</strong> {developmentCode}
-            </div>
-          )}
+
 
           {message && (
             <div className="mb-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
@@ -347,13 +336,16 @@ function VerifyPageContent() {
                     variant="outline"
                     disabled={
                       working !== null ||
+                      resendSeconds > 0 ||
                       (channel === "phone" && !destination)
                     }
                     onClick={() => void resend()}
                   >
                     {working === "resend"
                       ? "Kod isteniyor..."
-                      : "Yeni Kod İste"}
+                      : resendSeconds > 0
+                        ? `Yeni Kod İste (${resendTime})`
+                        : "Yeni Kod İste"}
                   </Button>
                 </div>
               </>
@@ -361,8 +353,8 @@ function VerifyPageContent() {
           </div>
 
           <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-            Kodlar 2 dakika geçerlidir. Yeni kod isteme işlemleri arasında
-            güvenlik nedeniyle kısa bir bekleme süresi vardır.
+            Kodlar 2 dakika geçerlidir. Yeni kod isteme seçeneği 2 dakika
+            sonra yeniden aktif olur.
           </p>
         </div>
       </section>

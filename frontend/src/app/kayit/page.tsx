@@ -337,15 +337,6 @@ function RegisterPageContent() {
 
       const registerData = data as RegisterResponse;
 
-      if (registerData.developmentCode) {
-        sessionStorage.setItem(
-          "neyeihtiyacvar.devVerificationCodes",
-          JSON.stringify({
-            email: registerData.developmentCode,
-          }),
-        );
-      }
-
       const params = new URLSearchParams({
         userId: registerData.userId,
         email: registerData.email,

@@ -14,7 +14,7 @@ namespace NeyeIhtiyacVar.Api.Endpoints;
 public static class AuthEndpoints
 {
     private static readonly TimeSpan VerificationLifetime = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan ResendCooldown = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan ResendCooldown = TimeSpan.FromMinutes(2);
     private const int MaxVerificationAttempts = 5;
 
     public static IEndpointRouteBuilder MapAuthEndpoints(
