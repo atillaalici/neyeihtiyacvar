@@ -667,51 +667,69 @@ public static class RecommendationEndpoints
                     .Where(x => x.CitySlug == requestedCitySlug)
                     .ToList();
 
-            var exactProviders = serviceSlug is null
+            // Ilk asama: secilen ilcedeki tam hizmet eslesmeleri.
+            var districtExactProviders = serviceSlug is null
+                ? categoryProviders
+                    .Where(x =>
+                        requestedDistrictSlug is null ||
+                        x.DistrictSlug == requestedDistrictSlug)
+                    .ToList()
+                : categoryProviders
+                    .Where(x =>
+                        (requestedDistrictSlug is null ||
+                         x.DistrictSlug == requestedDistrictSlug) &&
+                        (
+                            ServiceSlugsAreCompatible(
+                                x.ServiceSlug,
+                                serviceSlug) ||
+                            x.AdditionalServices.Any(additional =>
+                                ServiceSlugsAreCompatible(
+                                    additional,
+                                    serviceSlug))
+                        ))
+                    .ToList();
+
+            // Ikinci asama: ilcede tam hizmet yoksa ayni ilin diger
+            // ilcelerindeki tam hizmet eslesmeleri.
+            var cityExactProviders = serviceSlug is null
                 ? categoryProviders
                 : categoryProviders
                     .Where(x =>
-                        ServiceSlugsAreCompatible(x.ServiceSlug, serviceSlug) ||
+                        ServiceSlugsAreCompatible(
+                            x.ServiceSlug,
+                            serviceSlug) ||
                         x.AdditionalServices.Any(additional =>
-                            ServiceSlugsAreCompatible(additional, serviceSlug)))
+                            ServiceSlugsAreCompatible(
+                                additional,
+                                serviceSlug)))
                     .ToList();
 
-            var geographicExpansionUsed = false;
-            var geographicExpansionLevel = "requested-area";
+            var districtExactMatchFound =
+                requestedDistrictSlug is null ||
+                districtExactProviders.Count > 0;
 
-            // Once kullanicinin ili taranir. O ilde tam hizmet yoksa ayni hizmeti
-            // veren diger illerdeki isletmeler devreye girer. Boylece kategori
-            // benzerligi, gercek hizmet eslesmesinin onune gecmez.
-            if (serviceSlug is not null &&
-                requestedCitySlug is not null &&
-                exactProviders.Count == 0)
-            {
-                var expandedExactProviders = allCategoryProviders
-                    .Where(x =>
-                        ServiceSlugsAreCompatible(x.ServiceSlug, serviceSlug) ||
-                        x.AdditionalServices.Any(additional =>
-                            ServiceSlugsAreCompatible(additional, serviceSlug)))
-                    .ToList();
+            var geographicExpansionUsed =
+                requestedDistrictSlug is not null &&
+                districtExactProviders.Count == 0 &&
+                cityExactProviders.Count > 0;
 
-                if (expandedExactProviders.Count > 0)
-                {
-                    exactProviders = expandedExactProviders;
-                    geographicExpansionUsed = true;
-                    geographicExpansionLevel = "other-cities";
-                }
-            }
+            var geographicExpansionLevel =
+                districtExactProviders.Count > 0
+                    ? "requested-district"
+                    : cityExactProviders.Count > 0
+                        ? "same-city"
+                        : "no-match";
 
-            // Once tam hizmet eslesmesini kullan. Tam eslesme yoksa ayni kategori ve
-            // ayni ildeki yayinlanmis isletmeleri yakin alternatif olarak getir.
-            var usedFallback =
-                serviceSlug is not null &&
-                exactProviders.Count == 0 &&
-                categorySlug is not null &&
-                categoryProviders.Count > 0;
+            // Baska illere otomatik genisleme ve kategori fallback yok.
+            // Ilcede sonuc varsa sadece ilce; yoksa ayni ildeki tam hizmetler.
+            var exactProviders =
+                districtExactProviders.Count > 0
+                    ? districtExactProviders
+                    : cityExactProviders;
 
-            var providers = usedFallback
-                ? categoryProviders
-                : exactProviders;
+            var usedFallback = false;
+
+            var providers = exactProviders;
 
             var providerIds = providers
                 .Select(x => x.Id)
@@ -805,13 +823,6 @@ public static class RecommendationEndpoints
                     {
                         score += 12;
                         reasons.Add("Aradığın ilde hizmet veriyor");
-                    }
-
-                    if (geographicExpansionUsed &&
-                        requestedCitySlug is not null &&
-                        provider.CitySlug != requestedCitySlug)
-                    {
-                        reasons.Add("Yakın bölgede tam hizmet eşleşmesi");
                     }
 
                     if (normalizedSearch is not null)
@@ -934,9 +945,14 @@ public static class RecommendationEndpoints
                 {
                     exactServiceMatchFound =
                         exactProviders.Count > 0,
+                    districtExactMatchFound,
                     usedCategoryFallback = usedFallback,
                     exactCandidateCount =
                         exactProviders.Count,
+                    districtExactCandidateCount =
+                        districtExactProviders.Count,
+                    cityExactCandidateCount =
+                        cityExactProviders.Count,
                     categoryCandidateCount =
                         categoryProviders.Count
                 },

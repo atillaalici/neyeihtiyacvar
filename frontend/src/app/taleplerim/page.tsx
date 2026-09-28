@@ -24,7 +24,7 @@ type MyNeed = {
   citySlug: string | null;
   districtSlug: string | null;
   status: NeedStatus;
-  trackingExpiresAtUtc: string;
+  trackingExpiresAtUtc: string | null;
   trackingExpired: boolean;
   createdAtUtc: string;
   updatedAtUtc: string;
@@ -386,7 +386,7 @@ export default function MyNeedsPage() {
         return;
       }
 
-      setMessage("Talebin 7 gün daha takip edilecek.");
+      setMessage("Talebin 1 ay daha takip edilecek.");
       setLoading(true);
       await loadData();
     } catch {
@@ -578,27 +578,85 @@ export default function MyNeedsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {needs.map((need) => {
+            {[...needs]
+              .sort((a, b) => {
+                const aCancelled = a.status === "cancelled" ? 1 : 0;
+                const bCancelled = b.status === "cancelled" ? 1 : 0;
+
+                if (aCancelled !== bCancelled) {
+                  return aCancelled - bCancelled;
+                }
+
+                return (
+                  new Date(b.createdAtUtc).getTime() -
+                  new Date(a.createdAtUtc).getTime()
+                );
+              })
+              .map((need) => {
               const offers = offersByNeed[need.id] ?? [];
               const review = reviewsByNeed[need.id] ?? null;
               const acceptedOffer = offers.find(
                 (offer) => offer.status === "accepted",
               );
               const reviewDraft = getReviewDraft(need.id);
-              const trackingExpiry = new Date(need.trackingExpiresAtUtc);
-              const trackingRemainingMs =
-                // eslint-disable-next-line react-hooks/purity
-                trackingExpiry.getTime() - Date.now();
-              const trackingDaysLeft = Math.max(
-                0,
-                Math.ceil(
-                  trackingRemainingMs / (1000 * 60 * 60 * 24),
-                ),
-              );
+              const trackingExpiry = need.trackingExpiresAtUtc
+                ? new Date(need.trackingExpiresAtUtc)
+                : null;
+              const trackingRemainingMs = trackingExpiry
+                ? // eslint-disable-next-line react-hooks/purity
+                  trackingExpiry.getTime() - Date.now()
+                : null;
+              const trackingDaysLeft =
+                trackingRemainingMs === null
+                  ? null
+                  : Math.max(
+                      0,
+                      Math.ceil(
+                        trackingRemainingMs / (1000 * 60 * 60 * 24),
+                      ),
+                    );
               const trackingActive =
                 (need.status === "open" ||
                   need.status === "offerreceived") &&
                 !need.trackingExpired;
+
+              if (need.status === "cancelled") {
+                const repeatParams = new URLSearchParams();
+
+                if (need.title) repeatParams.set("q", need.title);
+                if (need.citySlug) repeatParams.set("il", need.citySlug);
+                if (need.districtSlug) repeatParams.set("ilce", need.districtSlug);
+                if (need.categorySlug) {
+                  repeatParams.set("kategori", need.categorySlug);
+                }
+                if (need.serviceSlug) {
+                  repeatParams.set("hizmet", need.serviceSlug);
+                }
+
+                return (
+                  <article
+                    key={need.id}
+                    className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 text-sm">
+                      <span className="font-semibold text-foreground">
+                        {need.title}
+                      </span>
+                      <span className="mx-2 text-red-300">—</span>
+                      <span className="text-red-700">
+                        Bu ihtiyaç talebi iptal edildi.
+                      </span>
+                    </div>
+
+                    <Link
+                      href={`/ihtiyac-olustur?${repeatParams.toString()}`}
+                      className="shrink-0 text-sm font-semibold text-primary hover:underline"
+                    >
+                      Talebi Tekrar Oluştur
+                    </Link>
+                  </article>
+                );
+              }
 
               return (
                 <article
@@ -661,13 +719,17 @@ export default function MyNeedsPage() {
 
                             <p className="mt-1 text-sm leading-6 text-muted-foreground">
                               {trackingActive
-                                ? `Uygun işletme bulunursa sana haber vereceğiz. Takip süresinin bitmesine ${trackingDaysLeft} gün kaldı.`
-                                : "İhtiyacın devam ediyorsa talebini 7 gün daha takip edebiliriz."}
+                                ? trackingDaysLeft === null
+                                  ? "Uygun işletme bulunursa sana haber vereceğiz. Talebin sen kapatana kadar açık kalacak."
+                                  : `Uygun işletme bulunursa sana haber vereceğiz. Takip süresinin bitmesine ${trackingDaysLeft} gün kaldı.`
+                                : "İhtiyacın devam ediyorsa talebini 1 ay daha takip edebiliriz."}
                             </p>
 
                             <p className="mt-1 text-xs text-muted-foreground">
                               Takip bitişi:{" "}
-                              {trackingExpiry.toLocaleString("tr-TR")}
+                              {trackingExpiry
+                                ? trackingExpiry.toLocaleString("tr-TR")
+                                : "Ben kapatana kadar"}
                             </p>
                           </div>
                         </div>
@@ -689,7 +751,7 @@ export default function MyNeedsPage() {
                             />
                             {workingTrackingNeedId === need.id
                               ? "Uzatılıyor..."
-                              : "7 Gün Daha Takip Et"}
+                              : "1 Ay Daha Takip Et"}
                           </Button>
                         )}
                       </div>
@@ -712,11 +774,6 @@ export default function MyNeedsPage() {
                     </div>
                   )}
 
-                  {need.status === "cancelled" && (
-                    <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                      Bu ihtiyaç talebi iptal edildi.
-                    </div>
-                  )}
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
                     <span className="rounded-full border border-border px-2.5 py-1">
                       {need.category}

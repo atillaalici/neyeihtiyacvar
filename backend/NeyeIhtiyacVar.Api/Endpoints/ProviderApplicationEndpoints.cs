@@ -558,7 +558,7 @@ public static class ProviderApplicationEndpoints
                     x.IsActive &&
                     x.OwnerUserId != null &&
                     x.Status == NeedStatus.Open &&
-                    (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) > publishedAtUtc &&
+                    (x.TrackingExpiresAtUtc == null || x.TrackingExpiresAtUtc > publishedAtUtc) &&
                     x.CitySlug == provider.CitySlug &&
                     x.DistrictSlug == provider.DistrictSlug &&
                     (

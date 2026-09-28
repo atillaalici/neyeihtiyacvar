@@ -350,10 +350,9 @@ x.CreatedAtUtc,
                     x.CitySlug,
                     x.DistrictSlug,
                     status = x.Status.ToString().ToLowerInvariant(),
-                    trackingExpiresAtUtc =
-                        x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7),
+                    trackingExpiresAtUtc = x.TrackingExpiresAtUtc,
                     trackingExpired =
-                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
+                        x.TrackingExpiresAtUtc != null && x.TrackingExpiresAtUtc <= DateTime.UtcNow,
 x.CreatedAtUtc,
                     x.UpdatedAtUtc,
                     offerCount = x.Offers.Count

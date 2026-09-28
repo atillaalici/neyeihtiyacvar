@@ -360,9 +360,12 @@ export function HeroSearch() {
         if (!response.ok) return;
 
         const rows = (await response.json()) as PopularSearchApiItem[];
+        // Mobil/ilk sayfa yukunu sinirla:
+        // Ekranda en fazla 5 populer hizmet kullandigimiz icin
+        // 20 ayri niyet cozme istegi gonderme.
         const sourceRows = rows
           .filter((row) => (row.term?.trim().length ?? 0) >= 2 && row.count > 0)
-          .slice(0, 20);
+          .slice(0, 5);
 
         const resolved = await Promise.all(
           sourceRows.map(async (row) => {

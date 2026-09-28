@@ -39,7 +39,7 @@ public static class NeedRequestEndpoints
                     x.TrackingExpiresAtUtc,
                     x.TrackingReminderSentAtUtc,
                     trackingExpired =
-                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
+                        x.TrackingExpiresAtUtc != null && x.TrackingExpiresAtUtc <= DateTime.UtcNow,
                     x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
@@ -73,7 +73,7 @@ public static class NeedRequestEndpoints
                     x.TrackingExpiresAtUtc,
                     x.TrackingReminderSentAtUtc,
                     trackingExpired =
-                        (x.TrackingExpiresAtUtc ?? x.CreatedAtUtc.AddDays(7)) <= DateTime.UtcNow,
+                        x.TrackingExpiresAtUtc != null && x.TrackingExpiresAtUtc <= DateTime.UtcNow,
                     x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
@@ -308,6 +308,14 @@ public static class NeedRequestEndpoints
 
             var now = DateTime.UtcNow;
 
+            var trackingExpiresAtUtc = request.TrackingDuration switch
+            {
+                "1-month" => now.AddMonths(1),
+                "3-months" => now.AddMonths(3),
+                "until-closed" => (DateTime?)null,
+                _ => now.AddMonths(1)
+            };
+
             var needRequest = new NeedRequest
             {
                 OwnerUserId = ownerUserId,
@@ -326,7 +334,7 @@ public static class NeedRequestEndpoints
                 ContactByEmail = request.ContactByEmail,
                 ContactByPush = request.ContactByPush,
                 Status = NeedStatus.Open,
-                TrackingExpiresAtUtc = now.AddDays(7),
+                TrackingExpiresAtUtc = trackingExpiresAtUtc,
                 TrackingReminderSentAtUtc = null,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
@@ -587,17 +595,8 @@ public static class NeedRequestEndpoints
             }
 
             var now = DateTime.UtcNow;
-            var currentExpiry =
-                need.TrackingExpiresAtUtc ??
-                need.CreatedAtUtc.AddDays(7);
 
-            var renewalBase =
-                currentExpiry > now
-                    ? currentExpiry
-                    : now;
-
-            need.TrackingExpiresAtUtc =
-                renewalBase.AddDays(7);
+            need.TrackingExpiresAtUtc = now.AddMonths(1);
             need.TrackingReminderSentAtUtc = null;
             need.IsActive = true;
             need.UpdatedAtUtc = now;
@@ -609,7 +608,7 @@ public static class NeedRequestEndpoints
                 need.Id,
                 need.TrackingExpiresAtUtc,
                 trackingExpired = false,
-                message = "Talebin 7 gün daha takip edilecek."
+                message = "Talebin 1 ay daha takip edilecek."
             });
         });
 
@@ -696,6 +695,12 @@ public static class NeedRequestEndpoints
         ValidateSlug(errors, "citySlug", request.CitySlug, "İl");
         ValidateSlug(errors, "districtSlug", request.DistrictSlug, "İlçe");
 
+        if (request.TrackingDuration is not ("1-month" or "3-months" or "until-closed"))
+        {
+            errors["trackingDuration"] =
+                ["Talep süresi 1 ay, 3 ay veya ben kapatana kadar seçeneklerinden biri olmalıdır."];
+        }
+
         return errors;
     }
 
@@ -773,6 +778,7 @@ public sealed record CreateNeedRequest(
     string CitySlug,
     string DistrictSlug,
     Guid? TargetProviderId = null,
+    string TrackingDuration = "1-month",
     bool ContactByWhatsapp = false,
     bool ContactByEmail = false,
     bool ContactByPush = false);

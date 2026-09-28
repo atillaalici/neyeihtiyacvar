@@ -117,8 +117,11 @@ type RecommendationResponse = {
   };
   matching: {
     exactServiceMatchFound: boolean;
+    districtExactMatchFound: boolean;
     usedCategoryFallback: boolean;
     exactCandidateCount: number;
+    districtExactCandidateCount: number;
+    cityExactCandidateCount: number;
     categoryCandidateCount: number;
   };
   totalCandidates: number;
@@ -174,6 +177,9 @@ function NeedCreatePageContent() {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searching, setSearching] = useState(false);
   const [tracking, setTracking] = useState(false);
+  const [trackingDuration, setTrackingDuration] = useState<
+    "1-month" | "3-months" | "until-closed"
+  >("1-month");
   const [error, setError] = useState("");
   const [trackingSuccess, setTrackingSuccess] = useState("");
   const searchSourceRef = useRef<"enter" | "button">("button");
@@ -459,6 +465,7 @@ function NeedCreatePageContent() {
           serviceSlug: understoodService,
           citySlug,
           districtSlug,
+          trackingDuration,
         }),
       });
 
@@ -771,9 +778,9 @@ function NeedCreatePageContent() {
                         Sana En Uygun İşletmeler
                       </h2>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        “{query.trim()}” ihtiyacın için {formatSlug(citySlug)} /{" "}
-                        {formatSlug(districtSlug)} bölgesindeki en uygun
-                        işletmeleri sıraladık.
+                        {recommendationData?.matching.districtExactMatchFound
+                          ? `“${query.trim()}” ihtiyacın için ${formatSlug(citySlug)} / ${formatSlug(districtSlug)} bölgesindeki en uygun işletmeleri sıraladık.`
+                          : `“${query.trim()}” ihtiyacın için ${formatSlug(districtSlug)} ilçesinde uygun işletme bulamadık. ${formatSlug(citySlug)} ilindeki uygun işletmeleri gösteriyoruz.`}
                       </p>
                     </div>
                     <div className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
@@ -874,6 +881,61 @@ function NeedCreatePageContent() {
                         Diğer İşletmeleri Gör
                         <ArrowRight className="size-4" />
                       </Link>
+
+                      {!recommendationData?.matching.districtExactMatchFound && (
+                        <div className="mt-4 rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h3 className="font-display text-lg font-bold">
+                                Kendi ilçende işletme bulamadın mı?
+                              </h3>
+                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                {formatSlug(districtSlug)} için talep oluştur.
+                                Uygun bir işletme olduğunda sana haber verelim.
+                              </p>
+                            </div>
+
+                            <div className="shrink-0">
+                              <label
+                                htmlFor="tracking-duration-with-results"
+                                className="mb-1 block text-xs font-semibold text-muted-foreground"
+                              >
+                                Talep süresi
+                              </label>
+                              <select
+                                id="tracking-duration-with-results"
+                                value={trackingDuration}
+                                onChange={(event) =>
+                                  setTrackingDuration(
+                                    event.target.value as
+                                      | "1-month"
+                                      | "3-months"
+                                      | "until-closed",
+                                  )
+                                }
+                                className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm sm:w-44"
+                              >
+                                <option value="1-month">1 Ay</option>
+                                <option value="3-months">3 Ay</option>
+                                <option value="until-closed">
+                                  Ben kapatana kadar
+                                </option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => void createTrackingNeed()}
+                            disabled={tracking}
+                            className="mt-4 inline-flex h-11 items-center justify-center rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+                          >
+                            {tracking
+                              ? "Talep oluşturuluyor..."
+                              : "Talep Oluştur ve Takip Et"}
+                          </button>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="mt-5 rounded-2xl border border-dashed border-border p-7 text-center">
@@ -885,6 +947,34 @@ function NeedCreatePageContent() {
                         Talebini takibe alabiliriz. Uygun bir işletme
                         eklendiğinde sana bildirim göndeririz.
                       </p>
+
+                      <div className="mx-auto mt-5 max-w-md text-left">
+                        <label
+                          htmlFor="tracking-duration"
+                          className="mb-2 block text-sm font-semibold"
+                        >
+                          Talebin ne kadar süre açık kalsın?
+                        </label>
+                        <select
+                          id="tracking-duration"
+                          value={trackingDuration}
+                          onChange={(event) =>
+                            setTrackingDuration(
+                              event.target.value as
+                                | "1-month"
+                                | "3-months"
+                                | "until-closed",
+                            )
+                          }
+                          className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="1-month">1 Ay</option>
+                          <option value="3-months">3 Ay</option>
+                          <option value="until-closed">
+                            Ben kapatana kadar
+                          </option>
+                        </select>
+                      </div>
 
                       <button
                         type="button"
