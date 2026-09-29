@@ -102,6 +102,14 @@ public static class ProviderApplicationEndpoints
                 .Select(x => new
                 {
                     x.Id,
+                    ProviderId = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id)
+                        .Select(p => (Guid?)p.Id)
+                        .FirstOrDefault(),
+                    ProviderSlug = dbContext.Providers
+                        .Where(p => p.SourceApplicationId == x.Id)
+                        .Select(p => p.Slug)
+                        .FirstOrDefault(),
                     x.BusinessName,
                     x.ShortDescription,
                     x.CategorySlug,

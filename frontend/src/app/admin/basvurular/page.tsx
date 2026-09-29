@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -33,13 +34,7 @@ type ProviderApplication = {
   version: number;
 };
 
-type ApproveResponse = {
-  id: string;
-  status: "approved";
-  providerId: string | null;
-  providerSlug: string | null;
-  providerStatus?: string;
-};
+
 
 const statusLabels: Record<ApplicationStatus, string> = {
   pending: "Bekliyor",
@@ -50,9 +45,7 @@ const statusLabels: Record<ApplicationStatus, string> = {
 export default function AdminApplicationsPage() {
   const [applications, setApplications] = useState<ProviderApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -86,62 +79,6 @@ export default function AdminApplicationsPage() {
     return () => window.clearTimeout(timer);
   }, [loadApplications]);
 
-  async function review(
-    application: ProviderApplication,
-    action: "approve" | "reject",
-  ) {
-    const reviewNote =
-      window.prompt(
-        action === "approve"
-          ? "Onay notu (isteğe bağlı)"
-          : "Red nedeni / notu (isteğe bağlı)",
-        "",
-      ) ?? "";
-
-    setBusyId(application.id);
-    setError("");
-    setMessage("");
-
-    try {
-      const response = await adminFetch(
-        `${apiBaseUrl}/api/admin/provider-applications/${application.id}/${action}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            reviewNote: reviewNote.trim() || null,
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data?.message ?? "İşlem tamamlanamadı.");
-        return;
-      }
-
-      if (action === "approve") {
-        const approved = data as ApproveResponse;
-
-        setMessage(
-          approved.providerSlug
-            ? `Başvuru onaylandı. Taslak işletme profili oluşturuldu: ${approved.providerSlug}`
-            : "Başvuru onaylandı.",
-        );
-      } else {
-        setMessage("Başvuru reddedildi.");
-      }
-
-      await loadApplications();
-    } catch {
-      setError("Sunucuya bağlanılamadı.");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   return (
     <SiteLayout>
@@ -153,18 +90,14 @@ export default function AdminApplicationsPage() {
             İşletme Başvuruları
           </h1>
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            Yeni işletme başvurularını incele, onayla veya reddet.
+            Yeni işletme başvurularını dijital vitrin görünümünde inceleyin.
           </p>
 
         </div>
       </section>
 
       <section className="section-shell py-10 sm:py-14">
-        {message && (
-          <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {message}
-          </div>
-        )}
+
 
         {error && (
           <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -270,22 +203,11 @@ export default function AdminApplicationsPage() {
                   </div>
 
                   {application.status === "pending" && (
-                    <div className="flex shrink-0 flex-row gap-2 lg:flex-col">
-                      <Button
-                        type="button"
-                        disabled={busyId === application.id}
-                        onClick={() => void review(application, "approve")}
-                      >
-                        Onayla
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={busyId === application.id}
-                        onClick={() => void review(application, "reject")}
-                      >
-                        Reddet
+                    <div className="flex shrink-0">
+                      <Button asChild>
+                        <Link href={`/admin/basvurular/${application.id}`}>
+                          Başvuruyu İncele
+                        </Link>
                       </Button>
                     </div>
                   )}

@@ -214,6 +214,46 @@ public static class AdminDirectoryEndpoints
             });
         });
 
+        group.MapGet("/providers/{id:guid}", async (
+            Guid id,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .AsNoTracking()
+                .Where(x => x.Id == id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.Slug,
+                    x.BusinessName,
+                    x.ShortDescription,
+                    x.Description,
+                    x.CategorySlug,
+                    x.ServiceSlug,
+                    x.AdditionalServices,
+                    x.CitySlug,
+                    x.DistrictSlug,
+                    x.PublicPhone,
+                    x.PublicWhatsapp,
+                    x.PublicAddress,
+                    x.WorkingHours,
+                    x.Latitude,
+                    x.Longitude,
+                    publicationStatus =
+                        x.PublicationStatus.ToString().ToLowerInvariant(),
+                    x.SourceApplicationId,
+                    x.Version
+                })
+                .FirstOrDefaultAsync();
+
+            return provider is null
+                ? Results.NotFound(new
+                {
+                    message = "İşletme bulunamadı."
+                })
+                : Results.Ok(provider);
+        });
+
         group.MapPost("/providers", async (
             AdminCreateProviderRequest request,
             AppDbContext dbContext) =>
