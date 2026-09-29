@@ -13,7 +13,15 @@ import {
   type AuthUser,
 } from "@/lib/auth";
 
-export function AuthMenu() {
+type AuthMenuProps = {
+  mobile?: boolean;
+  onNavigate?: () => void;
+};
+
+export function AuthMenu({
+  mobile = false,
+  onNavigate,
+}: AuthMenuProps) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -37,7 +45,7 @@ export function AuthMenu() {
   }, []);
 
   useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
+    function handlePointerDown(event: PointerEvent) {
       if (
         accountMenuRef.current &&
         !accountMenuRef.current.contains(event.target as Node)
@@ -46,21 +54,117 @@ export function AuthMenu() {
       }
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown);
     };
   }, []);
+
+  function handleNavigate() {
+    setAccountMenuOpen(false);
+    onNavigate?.();
+  }
 
   function handleLogout() {
     setAccountMenuOpen(false);
     clearAuth();
+    onNavigate?.();
     router.push("/");
     router.refresh();
   }
 
   if (user) {
+    if (mobile) {
+      return (
+        <div className="grid gap-1">
+          {user.role === "provider" && (
+            <Link
+              href="/panel"
+              onClick={handleNavigate}
+              className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
+            >
+              İşletme Paneli
+            </Link>
+          )}
+
+          {user.role === "admin" && (
+            <Link
+              href="/admin"
+              onClick={handleNavigate}
+              className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
+            >
+              Yönetim Paneli
+            </Link>
+          )}
+
+          <div className="px-2 py-1">
+            <NotificationBell />
+          </div>
+
+          <div ref={accountMenuRef}>
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted"
+              aria-haspopup="menu"
+              aria-expanded={accountMenuOpen}
+            >
+              <span>{user.displayName}</span>
+              <ChevronDown
+                className={`size-4 transition-transform ${
+                  accountMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {accountMenuOpen && (
+              <div
+                className="mx-2 mb-1 grid rounded-xl border border-border bg-muted/30 p-1"
+                role="menu"
+              >
+                <Link
+                  href="/hesabim"
+                  onClick={handleNavigate}
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-background"
+                  role="menuitem"
+                >
+                  Hesabım
+                </Link>
+
+                <Link
+                  href="/taleplerim"
+                  onClick={handleNavigate}
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-background"
+                  role="menuitem"
+                >
+                  Taleplerim
+                </Link>
+
+                <div
+                  className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm text-muted-foreground opacity-70"
+                  title="Favoriler özelliği yakında"
+                >
+                  <span>Favorilerim</span>
+                  <span className="text-[10px] font-semibold uppercase">
+                    Yakında
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted"
+          >
+            Çıkış
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center gap-2">
         {user.role === "provider" && (
@@ -142,6 +246,28 @@ export function AuthMenu() {
         >
           Çıkış
         </button>
+      </div>
+    );
+  }
+
+  if (mobile) {
+    return (
+      <div className="grid">
+        <Link
+          href="/giris"
+          onClick={onNavigate}
+          className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
+        >
+          Giriş Yap
+        </Link>
+
+        <Link
+          href="/kayit"
+          onClick={onNavigate}
+          className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
+        >
+          Kayıt Ol
+        </Link>
       </div>
     );
   }

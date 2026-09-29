@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using NeyeIhtiyacVar.Api.Domain;
 
 namespace NeyeIhtiyacVar.Api.Infrastructure;
 
@@ -18,37 +19,28 @@ public static class DbSearchIntentLibrary
 
         var queryTokens = Tokens(cleanQuery);
 
-        var works = await dbContext.CategoryLibraryWorks
-            .AsNoTracking()
-            .Where(x =>
-                x.IsActive &&
-                x.CategoryService.IsActive &&
-                x.CategoryService.Category.IsActive)
-            .Include(x => x.CategoryService)
-                .ThenInclude(x => x.Category)
-            .Include(x => x.Phrases.Where(p => p.IsActive))
-            .ToListAsync(cancellationToken);
+        var cachedPhrases = await LoadPhrasesAsync(
+            dbContext,
+            cancellationToken);
 
         // A = ana kategori
         // B = hizmet
         // C = kullanici cumlesi
         //
         // Eslesme yalnizca C cumlelerinden uretilir.
-        // Ayni B hizmetine ait farkli C cumlelerinin kanitlari B seviyesinde
-        // toplanir. Boylece tek bir tesadufi C eslesmesi, ayni ihtiyaci cok
-        // sayida C cumlesiyle destekleyen hizmetin onune kolayca gecemez.
-        var phraseMatches = works
-            .SelectMany(work => work.Phrases
-                .Where(p => p.IsActive)
-                .Select(p => new
-                {
-                    Work = work,
-                    Phrase = p.Phrase,
-                    Score = PhraseScore(
-                        cleanQuery,
-                        queryTokens,
-                        Normalize(p.Phrase))
-                }))
+        // C cumlelerinin normalize edilmis hali ve tokenlari cache yuklenirken
+        // bir kez hesaplanir; her aramada 100 binden fazla kez tekrarlanmaz.
+        var phraseMatches = cachedPhrases
+            .Select(item => new
+            {
+                Work = item.Work,
+                Phrase = item.Phrase,
+                Score = PhraseScore(
+                    cleanQuery,
+                    queryTokens,
+                    item.NormalizedPhrase,
+                    item.Tokens)
+            })
             .Where(x => x.Score > 0)
             .ToArray();
 
@@ -120,10 +112,78 @@ public static class DbSearchIntentLibrary
         return matches;
     }
 
+    private sealed record CachedPhrase(
+        CategoryLibraryWork Work,
+        string Phrase,
+        string NormalizedPhrase,
+        string[] Tokens);
+
+    private static readonly SemaphoreSlim CacheLock = new(1, 1);
+
+    private static IReadOnlyList<CachedPhrase>? _cachedPhrases;
+    private static DateTime _cacheExpiresAtUtc = DateTime.MinValue;
+
+    private static async Task<IReadOnlyList<CachedPhrase>> LoadPhrasesAsync(
+        AppDbContext dbContext,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        if (_cachedPhrases is not null && now < _cacheExpiresAtUtc)
+            return _cachedPhrases;
+
+        await CacheLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            now = DateTime.UtcNow;
+
+            if (_cachedPhrases is not null && now < _cacheExpiresAtUtc)
+                return _cachedPhrases;
+
+            var works = await dbContext.CategoryLibraryWorks
+                .AsNoTracking()
+                .Where(x =>
+                    x.IsActive &&
+                    x.CategoryService.IsActive &&
+                    x.CategoryService.Category.IsActive)
+                .Include(x => x.CategoryService)
+                    .ThenInclude(x => x.Category)
+                .Include(x => x.Phrases.Where(p => p.IsActive))
+                .AsSplitQuery()
+                .ToListAsync(cancellationToken);
+
+            var cachedPhrases = works
+                .SelectMany(work => work.Phrases
+                    .Where(phrase => phrase.IsActive)
+                    .Select(phrase =>
+                    {
+                        var normalized = Normalize(phrase.Phrase);
+
+                        return new CachedPhrase(
+                            work,
+                            phrase.Phrase,
+                            normalized,
+                            Tokens(normalized));
+                    }))
+                .ToArray();
+
+            _cachedPhrases = cachedPhrases;
+            _cacheExpiresAtUtc = DateTime.UtcNow.AddMinutes(5);
+
+            return cachedPhrases;
+        }
+        finally
+        {
+            CacheLock.Release();
+        }
+    }
+
     private static int PhraseScore(
         string query,
         string[] queryTokens,
-        string phrase)
+        string phrase,
+        string[] phraseTokens)
     {
         if (string.IsNullOrWhiteSpace(phrase)) return 0;
 
@@ -135,8 +195,6 @@ public static class DbSearchIntentLibrary
 
         if (phrase.Contains(query, StringComparison.Ordinal))
             return 96;
-
-        var phraseTokens = Tokens(phrase);
 
         if (queryTokens.Length == 0 || phraseTokens.Length == 0)
             return 0;

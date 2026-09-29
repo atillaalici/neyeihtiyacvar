@@ -154,20 +154,22 @@ public static class SmartSearchEndpoints
 
                         if (!string.IsNullOrWhiteSpace(
                                 intent.ServiceSlug) &&
-                            ServiceSlugsAreCompatible(
+                            string.Equals(
                                 provider.ServiceSlug,
-                                intent.ServiceSlug))
+                                intent.ServiceSlug,
+                                StringComparison.OrdinalIgnoreCase))
                         {
                             score += 110;
                             matchLevel =
                                 "main-service";
                         }
                         else if (
-                            related.Contains(provider.ServiceSlug) ||
-                            related.Any(relatedSlug =>
-                                ServiceSlugsAreCompatible(
-                                    provider.ServiceSlug,
-                                    relatedSlug)))
+                            string.IsNullOrWhiteSpace(intent.ServiceSlug) &&
+                            (related.Contains(provider.ServiceSlug) ||
+                             related.Any(relatedSlug =>
+                                 ServiceSlugsAreCompatible(
+                                     provider.ServiceSlug,
+                                     relatedSlug))))
                         {
                             score += 88;
                             matchLevel =
@@ -178,14 +180,17 @@ public static class SmartSearchEndpoints
                                 x =>
                                     (!string.IsNullOrWhiteSpace(
                                         intent.ServiceSlug) &&
-                                     ServiceSlugsAreCompatible(
+                                     string.Equals(
                                          x,
-                                         intent.ServiceSlug)) ||
-                                    related.Contains(x) ||
-                                    related.Any(relatedSlug =>
-                                        ServiceSlugsAreCompatible(
-                                            x,
-                                            relatedSlug))))
+                                         intent.ServiceSlug,
+                                         StringComparison.OrdinalIgnoreCase)) ||
+                                    (string.IsNullOrWhiteSpace(
+                                         intent.ServiceSlug) &&
+                                     (related.Contains(x) ||
+                                      related.Any(relatedSlug =>
+                                          ServiceSlugsAreCompatible(
+                                              x,
+                                              relatedSlug))))))
                         {
                             score += 82;
                             matchLevel =

@@ -1,10 +1,45 @@
-import { BrandLogo } from "@/components/site/BrandLogo";
-import Link from "next/link";
-import { Menu } from "lucide-react";
+"use client";
 
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Menu, X } from "lucide-react";
+
+import { BrandLogo } from "@/components/site/BrandLogo";
 import { AuthMenu } from "@/components/site/AuthMenu";
 
 export function Navbar() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target as Node)
+      ) {
+        setMobileMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  function closeMobileMenu() {
+    setMobileMenuOpen(false);
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur responsive-site-navbar">
       <div className="section-shell flex h-16 items-center justify-between gap-4">
@@ -28,43 +63,74 @@ export function Navbar() {
           </Link>
         </div>
 
-        <details className="group relative md:hidden">
-          <summary
-            className="grid size-10 cursor-pointer list-none place-items-center rounded-lg border border-border [&::-webkit-details-marker]:hidden"
-            aria-label="Menü"
+        <div ref={mobileMenuRef} className="relative md:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="grid size-10 place-items-center rounded-lg border border-border"
+            aria-label={mobileMenuOpen ? "Menüyü kapat" : "Menüyü aç"}
+            aria-expanded={mobileMenuOpen}
           >
-            <Menu className="size-5" />
-          </summary>
+            {mobileMenuOpen ? (
+              <X className="size-5" />
+            ) : (
+              <Menu className="size-5" />
+            )}
+          </button>
 
-          <div className="absolute right-0 top-12 z-[60] w-[min(19rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-border bg-background p-2 shadow-xl">
-            <nav className="grid text-sm font-medium">
-              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/">
-                Ana Sayfa
-              </Link>
-              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/kesfet">
-                Keşfet
-              </Link>
-              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/kategoriler">
-                Kategoriler
-              </Link>
-              <Link className="rounded-xl px-4 py-3 hover:bg-muted" href="/nasil-calisir">
-                Nasıl Çalışır
-              </Link>
-            </nav>
+          {mobileMenuOpen && (
+            <div className="absolute right-0 top-12 z-[60] max-h-[calc(100vh-5rem)] w-[min(19rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-border bg-background p-2 shadow-xl">
+              <nav className="grid text-sm font-medium">
+                <Link
+                  onClick={closeMobileMenu}
+                  className="rounded-xl px-4 py-3 hover:bg-muted"
+                  href="/"
+                >
+                  Ana Sayfa
+                </Link>
 
-            <div className="mt-2 border-t border-border pt-2">
-              <div className="px-2 py-1">
-                <AuthMenu />
+                <Link
+                  onClick={closeMobileMenu}
+                  className="rounded-xl px-4 py-3 hover:bg-muted"
+                  href="/kesfet"
+                >
+                  Keşfet
+                </Link>
+
+                <Link
+                  onClick={closeMobileMenu}
+                  className="rounded-xl px-4 py-3 hover:bg-muted"
+                  href="/kategoriler"
+                >
+                  Kategoriler
+                </Link>
+
+                <Link
+                  onClick={closeMobileMenu}
+                  className="rounded-xl px-4 py-3 hover:bg-muted"
+                  href="/nasil-calisir"
+                >
+                  Nasıl Çalışır
+                </Link>
+              </nav>
+
+              <div className="mt-2 border-t border-border pt-2">
+                <AuthMenu
+                  mobile
+                  onNavigate={closeMobileMenu}
+                />
+
+                <Link
+                  href="/ihtiyac-olustur"
+                  onClick={closeMobileMenu}
+                  className="mt-2 block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  İhtiyaç Oluştur
+                </Link>
               </div>
-              <Link
-                href="/ihtiyac-olustur"
-                className="mt-2 block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-              >
-                İhtiyaç Oluştur
-              </Link>
             </div>
-          </div>
-        </details>
+          )}
+        </div>
       </div>
     </header>
   );
