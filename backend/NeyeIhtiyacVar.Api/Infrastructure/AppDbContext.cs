@@ -190,6 +190,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .HasMaxLength(150)
                 .IsRequired();
 
+            entity.Property(x => x.AdditionalCategorySlug)
+                .HasMaxLength(100);
+
             entity.Property(x => x.CitySlug)
                 .HasMaxLength(100)
                 .IsRequired();

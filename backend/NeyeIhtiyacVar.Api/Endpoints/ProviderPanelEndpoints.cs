@@ -37,7 +37,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Bu hesaba baÄŸlÄ± iÅŸletme bulunamadÄ±."
+                    message = "Bu hesaba bağlı işletme bulunamadı."
                 });
             }
 
@@ -68,7 +68,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Bu hesaba baÄŸlÄ± iÅŸletme bulunamadÄ±."
+                    message = "Bu hesaba bağlı işletme bulunamadı."
                 });
             }
 
@@ -76,7 +76,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Ä°ÅŸletme profili baÅŸka bir iÅŸlemde deÄŸiÅŸti. SayfayÄ± yenileyip tekrar deneyin.",
+                    message = "İşletme profili başka bir işlemde değişti. Sayfayı yenileyip tekrar deneyin.",
                     currentVersion = provider.Version
                 });
             }
@@ -100,7 +100,7 @@ public static class ProviderPanelEndpoints
             if (category is null)
             {
                 errors["categorySlug"] =
-                    ["GeÃ§erli bir ana kategori seÃ§in."];
+                    ["Geçerli bir ana kategori seçin."];
             }
 
             var categoryServiceSlugs = category is null
@@ -116,7 +116,7 @@ public static class ProviderPanelEndpoints
                 !categoryServiceSlugs.Contains(serviceSlug))
             {
                 errors["serviceSlug"] =
-                    ["Ana hizmet seÃ§ilen kategoriye ait olmalÄ±dÄ±r."];
+                    ["Ana hizmet seçilen kategoriye ait olmalıdır."];
             }
             var normalizedAdditionalServices =
                 (request.AdditionalServices ?? [])
@@ -130,7 +130,7 @@ public static class ProviderPanelEndpoints
             if (normalizedAdditionalServices.Length > 1)
             {
                 errors["additionalServices"] =
-                    ["En fazla 1 adet 2. Hizmet seÃ§ebilirsiniz."];
+                    ["En fazla 1 adet 2. Hizmet seçebilirsiniz."];
             }
 
             var secondCategorySlug =
@@ -146,7 +146,7 @@ public static class ProviderPanelEndpoints
             if (hasSecondCategory != hasSecondService)
             {
                 errors["additionalServices"] =
-                    ["2. Hizmet iÃ§in hem ana kategori hem ana hizmet seÃ§ilmelidir."];
+                    ["2. Hizmet için hem ana kategori hem ana hizmet seçilmelidir."];
             }
             else if (hasSecondService)
             {
@@ -160,7 +160,7 @@ public static class ProviderPanelEndpoints
                 if (secondCategory is null)
                 {
                     errors["additionalCategorySlug"] =
-                        ["2. Hizmet iÃ§in geÃ§erli bir ana kategori seÃ§in."];
+                        ["2. Hizmet için geçerli bir ana kategori seçin."];
                 }
                 else
                 {
@@ -172,7 +172,7 @@ public static class ProviderPanelEndpoints
                     if (!secondServiceSlugs.Contains(secondServiceSlug))
                     {
                         errors["additionalServices"] =
-                            ["2. Hizmet seÃ§ilen 2. kategoriye ait olmalÄ±dÄ±r."];
+                            ["2. Hizmet seçilen 2. kategoriye ait olmalıdır."];
                     }
                 }
 
@@ -182,7 +182,7 @@ public static class ProviderPanelEndpoints
                         StringComparison.OrdinalIgnoreCase))
                 {
                     errors["additionalServices"] =
-                        ["1. Hizmet ile 2. Hizmet aynÄ± olamaz."];
+                        ["1. Hizmet ile 2. Hizmet aynı olamaz."];
                 }
             }
 
@@ -190,7 +190,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "GÃ¶nderilen bilgiler geÃ§erli deÄŸil.",
+                    message = "Gönderilen bilgiler geçerli değil.",
                     errors
                 });
             }
@@ -495,7 +495,10 @@ public static class ProviderPanelEndpoints
             var previous = provider.AdditionalServices.ToHashSet(StringComparer.OrdinalIgnoreCase);
             provider.CategorySlug = categorySlug;
             provider.ServiceSlug = serviceSlug;
-            provider.AdditionalServices = string.IsNullOrWhiteSpace(secondServiceSlug) ? [] : [secondServiceSlug];
+            provider.AdditionalCategorySlug =
+                string.IsNullOrWhiteSpace(secondServiceSlug) ? null : secondCategorySlug;
+            provider.AdditionalServices =
+                string.IsNullOrWhiteSpace(secondServiceSlug) ? [] : [secondServiceSlug];
             provider.UpdatedAtUtc = DateTime.UtcNow;
             provider.Version++;
 
@@ -506,7 +509,11 @@ public static class ProviderPanelEndpoints
             await dbContext.SaveChangesAsync();
             return Results.Ok(new {
                 message = "Kategori ve hizmetler kaydedildi.",
-                provider.CategorySlug, provider.ServiceSlug, provider.AdditionalServices, provider.Version
+                provider.CategorySlug,
+                provider.ServiceSlug,
+                provider.AdditionalCategorySlug,
+                provider.AdditionalServices,
+                provider.Version
             });
         });
 
@@ -618,7 +625,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Bu hesaba baÄŸlÄ± iÅŸletme bulunamadÄ±."
+                    message = "Bu hesaba bağlı işletme bulunamadı."
                 });
             }
 
@@ -683,7 +690,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Bu hesaba baÄŸlÄ± iÅŸletme bulunamadÄ±."
+                    message = "Bu hesaba bağlı işletme bulunamadı."
                 });
             }
 
@@ -738,7 +745,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "KullanÄ±cÄ± bulunamadÄ±."
+                    message = "Kullanıcı bulunamadı."
                 });
             }
 
@@ -749,7 +756,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme profili bulunamadÄ±."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
@@ -763,7 +770,7 @@ public static class ProviderPanelEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Bu kullanÄ±cÄ± baÅŸka bir iÅŸletmeye baÄŸlÄ±."
+                    message = "Bu kullanıcı başka bir işletmeye bağlı."
                 });
             }
 
@@ -803,6 +810,7 @@ public static class ProviderPanelEndpoints
             provider.Description,
             provider.CategorySlug,
             provider.ServiceSlug,
+            provider.AdditionalCategorySlug,
             provider.AdditionalServices,
             provider.CitySlug,
             provider.DistrictSlug,
@@ -837,7 +845,7 @@ public static class ProviderPanelEndpoints
         if (request.Description?.Trim().Length > 4000)
         {
             errors["description"] =
-                ["DetaylÄ± aÃ§Ä±klama en fazla 4000 karakter olabilir."];
+                ["Detaylı açıklama en fazla 4000 karakter olabilir."];
         }
 
         if (request.PublicPhone?.Trim().Length > 30)
@@ -849,7 +857,7 @@ public static class ProviderPanelEndpoints
         if (request.PublicWhatsapp?.Trim().Length > 30)
         {
             errors["publicWhatsapp"] =
-                ["WhatsApp numarasÄ± en fazla 30 karakter olabilir."];
+                ["WhatsApp numarası en fazla 30 karakter olabilir."];
         }
 
         if (request.PublicAddress?.Trim().Length > 500)
@@ -876,13 +884,13 @@ public static class ProviderPanelEndpoints
         if (request.WorkingHours?.Trim().Length > 500)
         {
             errors["workingHours"] =
-                ["Ã‡alÄ±ÅŸma saatleri en fazla 500 karakter olabilir."];
+                ["Çalışma saatleri en fazla 500 karakter olabilir."];
         }
 
         if (request.ExperienceYears is < 0 or > 100)
         {
             errors["experienceYears"] =
-                ["Deneyim yÄ±lÄ± 0 ile 100 arasÄ±nda olmalÄ±dÄ±r."];
+                ["Deneyim yılı 0 ile 100 arasında olmalıdır."];
         }
 
         var additionalServices = request.AdditionalServices ?? [];
@@ -890,7 +898,7 @@ public static class ProviderPanelEndpoints
         if (additionalServices.Count > 1)
         {
             errors["additionalServices"] =
-                ["En fazla 1 ek hizmet seÃ§ebilirsiniz."];
+                ["En fazla 1 ek hizmet seçebilirsiniz."];
         }
 
         if (additionalServices.Any(x =>

@@ -409,11 +409,11 @@ export default function ProviderProfileView({
                   </span>
                 )}
               </div>
-              <p className="mt-4 max-w-2xl leading-6 text-slate-600">
-                {provider.shortDescription ||
-                  provider.description ||
-                  "İşletme bilgilerini, hizmetlerini, fotoğraflarını ve konumunu inceleyebilirsiniz."}
-              </p>
+              {provider.shortDescription ? (
+                <p className="mt-3 max-w-2xl leading-6 text-slate-600">
+                  {provider.shortDescription}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-3">
@@ -653,6 +653,27 @@ export default function ProviderProfileView({
             </div>
           </section>
 
+          ) : null}
+
+          {provider.description ? (
+            <section
+              id="hakkimizda"
+              className="scroll-mt-20 rounded-2xl border bg-white p-6 shadow-sm"
+            >
+              <div>
+                <h2 className="flex items-center gap-2 text-xl font-black">
+                  <Building2 className="text-emerald-600" />
+                  Hakkımızda
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  İşletmemiz hakkında detaylı bilgi
+                </p>
+              </div>
+
+              <p className="mt-4 whitespace-pre-line leading-7 text-slate-700">
+                {provider.description}
+              </p>
+            </section>
           ) : null}
 
           <section

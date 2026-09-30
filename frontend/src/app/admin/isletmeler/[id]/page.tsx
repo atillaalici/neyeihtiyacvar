@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
+import { AdminBusinessPhotoManager } from "@/components/admin/AdminBusinessPhotoManager";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ type AdminProvider = {
   description: string | null;
   categorySlug: string;
   serviceSlug: string;
+  additionalCategorySlug: string | null;
   additionalServices: string[];
   citySlug: string;
   districtSlug: string;
@@ -65,6 +67,7 @@ type FormState = {
   description: string;
   categorySlug: string;
   serviceSlug: string;
+  additionalCategorySlug: string;
   additionalServices: string[];
   citySlug: string;
   districtSlug: string;
@@ -83,6 +86,7 @@ const emptyForm: FormState = {
   description: "",
   categorySlug: "",
   serviceSlug: "",
+  additionalCategorySlug: "",
   additionalServices: [],
   citySlug: "",
   districtSlug: "",
@@ -102,6 +106,7 @@ function formFromProvider(provider: AdminProvider): FormState {
     description: provider.description ?? "",
     categorySlug: provider.categorySlug,
     serviceSlug: provider.serviceSlug,
+    additionalCategorySlug: provider.additionalCategorySlug ?? "",
     additionalServices: provider.additionalServices,
     citySlug: provider.citySlug,
     districtSlug: provider.districtSlug,
@@ -149,6 +154,14 @@ export default function AdminProviderDetailPage() {
     [categories, form.categorySlug],
   );
 
+  const selectedAdditionalCategory = useMemo(
+    () =>
+      categories.find(
+        (item) => item.slug === form.additionalCategorySlug,
+      ) ?? null,
+    [categories, form.additionalCategorySlug],
+  );
+
   const selectedCity = useMemo(
     () => cities.find((item) => item.slug === form.citySlug) ?? null,
     [cities, form.citySlug],
@@ -186,24 +199,11 @@ export default function AdminProviderDetailPage() {
         return;
       }
 
-      const currentCategory =
-        categoryData.find((item) => item.slug === current.categorySlug) ?? null;
-
-      const validAdditionalServiceSlugs = new Set(
-        (currentCategory?.services ?? [])
-          .map(toSlug)
-          .filter((slug) => slug !== current.serviceSlug),
-      );
-
-      const sanitizedAdditionalServices = current.additionalServices
-        .filter((item) => validAdditionalServiceSlugs.has(item))
-        .slice(0, 1);
-
       setProvider(current);
       setForm(
         formFromProvider({
           ...current,
-          additionalServices: sanitizedAdditionalServices,
+          additionalServices: current.additionalServices.slice(0, 1),
         }),
       );
       setCategories(categoryData);
@@ -230,35 +230,6 @@ export default function AdminProviderDetailPage() {
     }));
   }
 
-  function toggleAdditionalService(serviceSlug: string) {
-    setForm((current) => {
-      const exists = current.additionalServices.includes(serviceSlug);
-
-      if (exists) {
-        return {
-          ...current,
-          additionalServices: current.additionalServices.filter(
-            (item) => item !== serviceSlug,
-          ),
-        };
-      }
-
-      if (current.additionalServices.length >= 1) {
-        setError("En fazla 1 ek hizmet seçebilirsiniz.");
-        return current;
-      }
-
-      setError("");
-
-      return {
-        ...current,
-        additionalServices: [
-          ...current.additionalServices,
-          serviceSlug,
-        ],
-      };
-    });
-  }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -297,6 +268,10 @@ export default function AdminProviderDetailPage() {
             description: form.description.trim() || null,
             categorySlug: form.categorySlug,
             serviceSlug: form.serviceSlug,
+            additionalCategorySlug:
+              form.additionalServices.length > 0
+                ? form.additionalCategorySlug || null
+                : null,
             additionalServices: form.additionalServices,
             citySlug: form.citySlug,
             districtSlug: form.districtSlug,
@@ -321,9 +296,8 @@ export default function AdminProviderDetailPage() {
       const updated = data as AdminProvider;
       setProvider(updated);
       setForm(formFromProvider(updated));
-      router.push("/admin/isletmeler");
       router.refresh();
-      setMessage("İşletme profili kaydedildi.");
+      setMessage("Değişiklikler Kaydedildi ✓");
     } catch {
       setError("Sunucuya bağlanılamadı.");
     } finally {
@@ -409,7 +383,7 @@ export default function AdminProviderDetailPage() {
     );
   }
 
-  const editable = provider.publicationStatus !== "published";
+  const editable = true;
 
   return (
     <SiteLayout>
@@ -428,9 +402,6 @@ export default function AdminProviderDetailPage() {
               <h1 className="font-display text-3xl font-bold sm:text-4xl">
                 {provider.businessName}
               </h1>
-              <p className="mt-2 text-muted-foreground">
-                Slug: {provider.slug}
-              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -480,11 +451,10 @@ export default function AdminProviderDetailPage() {
           </div>
         )}
 
-        {!editable && (
-          <div className="mb-5 rounded-xl border border-border bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
-            Bu profil yayında. Düzenlemek için önce yayından kaldır.
-          </div>
-        )}
+        <AdminBusinessPhotoManager
+          providerId={provider.id}
+          businessName={provider.businessName}
+        />
 
         <form
           onSubmit={save}
@@ -532,22 +502,23 @@ export default function AdminProviderDetailPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">Kategori</label>
+              <label className="mb-2 block text-sm font-medium">
+                Kategori 1
+              </label>
               <Select
                 value={form.categorySlug}
                 onValueChange={(value: string) => {
                   update("categorySlug", value);
                   update("serviceSlug", "");
-                  update("additionalServices", []);
                 }}
                 disabled={!editable}
               >
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Kategori seç" />
+                  <SelectValue placeholder="1. kategoriyi seç" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.slug}>
+                    <SelectItem key={category.slug} value={category.slug}>
                       {category.name}
                     </SelectItem>
                   ))}
@@ -556,20 +527,18 @@ export default function AdminProviderDetailPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium">Ana hizmet</label>
+              <label className="mb-2 block text-sm font-medium">
+                Hizmet 1
+              </label>
               <Select
                 value={form.serviceSlug}
-                onValueChange={(value: string) => {
-                  update("serviceSlug", value);
-                  update(
-                    "additionalServices",
-                    form.additionalServices.filter((item) => item !== value),
-                  );
-                }}
+                onValueChange={(value: string) =>
+                  update("serviceSlug", value)
+                }
                 disabled={!editable || !selectedCategory}
               >
                 <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Hizmet seç" />
+                  <SelectValue placeholder="1. hizmeti seç" />
                 </SelectTrigger>
                 <SelectContent>
                   {(selectedCategory?.services ?? []).map((service) => (
@@ -577,6 +546,74 @@ export default function AdminProviderDetailPage() {
                       {service}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Kategori 2
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (isteğe bağlı)
+                </span>
+              </label>
+              <Select
+                value={form.additionalCategorySlug || "none"}
+                onValueChange={(value: string) => {
+                  if (value === "none") {
+                    update("additionalCategorySlug", "");
+                    update("additionalServices", []);
+                    return;
+                  }
+
+                  update("additionalCategorySlug", value);
+                  update("additionalServices", []);
+                }}
+                disabled={!editable}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="2. kategoriyi seç" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">2. hizmet yok</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.slug} value={category.slug}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Hizmet 2
+                <span className="ml-1 font-normal text-muted-foreground">
+                  (isteğe bağlı)
+                </span>
+              </label>
+              <Select
+                value={form.additionalServices[0] ?? "none"}
+                onValueChange={(value: string) =>
+                  update(
+                    "additionalServices",
+                    value === "none" ? [] : [value],
+                  )
+                }
+                disabled={!editable || !selectedAdditionalCategory}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="2. hizmeti seç" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">2. hizmet yok</SelectItem>
+                  {(selectedAdditionalCategory?.services ?? []).map(
+                    (service) => (
+                      <SelectItem key={service} value={toSlug(service)}>
+                        {service}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -622,54 +659,6 @@ export default function AdminProviderDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between gap-3">
-                <label className="block text-sm font-medium">
-                  Ek hizmetler
-                </label>
-                <span className="text-xs text-muted-foreground">
-                  {form.additionalServices.length}/1 seçildi
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {(selectedCategory?.services ?? [])
-                  .filter((service) => toSlug(service) !== form.serviceSlug)
-                  .map((service) => {
-                    const slug = toSlug(service);
-                    const checked = form.additionalServices.includes(slug);
-                    const disabled =
-                      !editable ||
-                      (!checked && form.additionalServices.length >= 1);
-
-                    return (
-                      <label
-                        key={service}
-                        className={[
-                          "flex items-center gap-3 rounded-xl border p-3 text-sm",
-                          checked
-                            ? "border-primary/40 bg-primary/5"
-                            : "border-border bg-background",
-                          disabled ? "opacity-60" : "cursor-pointer",
-                        ].join(" ")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={disabled}
-                          onChange={() => toggleAdditionalService(slug)}
-                        />
-                        <span>{service}</span>
-                      </label>
-                    );
-                  })}
-              </div>
-
-              <p className="mt-2 text-xs text-muted-foreground">
-                Ana hizmete ek olarak en fazla 1 hizmet seçebilirsin.
-              </p>
             </div>
 
             <div>

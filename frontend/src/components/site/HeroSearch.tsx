@@ -605,7 +605,23 @@ export function HeroSearch() {
                   }
                 }}
                 onChange={(event) => setQuery(event.target.value)}
-                onFocus={() => setFocused(true)}
+                onFocus={() => {
+                  setFocused(true);
+
+                  if (window.matchMedia("(max-width: 639px)").matches) {
+                    window.setTimeout(() => {
+                      inputRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+
+                      window.scrollBy({
+                        top: -16,
+                        behavior: "smooth",
+                      });
+                    }, 250);
+                  }
+                }}
                 onBlur={() => {
                   window.setTimeout(() => setFocused(false), 150);
                 }}
@@ -627,7 +643,7 @@ export function HeroSearch() {
 
             {showSuggestions ? (
               <div
-                className="absolute inset-x-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-2xl border border-border bg-background text-left shadow-2xl"
+                className="absolute inset-x-0 top-[calc(100%+10px)] z-50 max-h-[calc(100dvh-190px)] overflow-y-auto overscroll-contain rounded-2xl border border-border bg-background text-left shadow-2xl sm:max-h-none sm:overflow-hidden"
                 role="listbox"
                 aria-label="İhtiyaç önerileri"
               >

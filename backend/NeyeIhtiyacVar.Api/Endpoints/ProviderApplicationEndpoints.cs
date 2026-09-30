@@ -25,7 +25,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "GÃ¶nderilen baÅŸvuru bilgileri geÃ§erli deÄŸil.",
+                    message = "Gönderilen başvuru bilgileri geçerli değil.",
                     errors
                 });
             }
@@ -172,7 +172,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme baÅŸvurusu bulunamadÄ±."
+                    message = "İşletme başvurusu bulunamadı."
                 });
             }
 
@@ -195,7 +195,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "ReddedilmiÅŸ baÅŸvuru doÄŸrudan onaylanamaz."
+                    message = "Reddedilmiş başvuru doğrudan onaylanamaz."
                 });
             }
 
@@ -271,7 +271,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme baÅŸvurusu bulunamadÄ±."
+                    message = "İşletme başvurusu bulunamadı."
                 });
             }
 
@@ -279,7 +279,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "OnaylanmÄ±ÅŸ baÅŸvuru reddedilemez."
+                    message = "Onaylanmış başvuru reddedilemez."
                 });
             }
 
@@ -329,6 +329,7 @@ public static class ProviderApplicationEndpoints
                     x.Description,
                     x.CategorySlug,
                     x.ServiceSlug,
+                    x.AdditionalCategorySlug,
                     x.AdditionalServices,
                     x.CitySlug,
                     x.DistrictSlug,
@@ -363,7 +364,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme profili bulunamadÄ±."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
@@ -371,15 +372,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti. SayfayÄ± yenileyip tekrar deneyin."
-                });
-            }
-
-            if (provider.PublicationStatus == PublicationStatus.Published)
-            {
-                return Results.BadRequest(new
-                {
-                    message = "YayÄ±ndaki profil Ã¶nce yayÄ±ndan kaldÄ±rÄ±lmalÄ±dÄ±r."
+                    message = "Profil başka bir işlemle değişti. Sayfayı yenileyip tekrar deneyin."
                 });
             }
 
@@ -393,7 +386,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "En fazla 1 ek hizmet seÃ§ebilirsiniz."
+                    message = "En fazla 1 ek hizmet seçebilirsiniz."
                 });
             }
 
@@ -405,8 +398,39 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.BadRequest(new
                 {
-                    message = "Ana hizmet ek hizmet olarak tekrar seÃ§ilemez."
+                    message = "Ana hizmet ek hizmet olarak tekrar seçilemez."
                 });
+            }
+
+            var additionalCategorySlug = Optional(request.AdditionalCategorySlug);
+
+            if (normalizedAdditionalServices.Length == 0)
+            {
+                additionalCategorySlug = null;
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(additionalCategorySlug))
+                {
+                    return Results.BadRequest(new
+                    {
+                        message = "2. hizmet için kategori seçmelisiniz."
+                    });
+                }
+
+                var additionalCategoryExists = await dbContext.Categories
+                    .AsNoTracking()
+                    .AnyAsync(x =>
+                        x.Slug == additionalCategorySlug &&
+                        x.IsActive);
+
+                if (!additionalCategoryExists)
+                {
+                    return Results.BadRequest(new
+                    {
+                        message = "2. hizmet için geçerli bir kategori seçmelisiniz."
+                    });
+                }
             }
 
             provider.BusinessName = request.BusinessName.Trim();
@@ -414,6 +438,7 @@ public static class ProviderApplicationEndpoints
             provider.Description = Optional(request.Description);
             provider.CategorySlug = request.CategorySlug.Trim();
             provider.ServiceSlug = request.ServiceSlug.Trim();
+            provider.AdditionalCategorySlug = additionalCategorySlug;
             provider.AdditionalServices = normalizedAdditionalServices;
             provider.CitySlug = request.CitySlug.Trim();
             provider.DistrictSlug = request.DistrictSlug.Trim();
@@ -445,7 +470,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme profili bulunamadÄ±."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
@@ -493,7 +518,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme profili bulunamadÄ±."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
@@ -501,7 +526,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti."
+                    message = "Profil başka bir işlemle değişti."
                 });
             }
 
@@ -530,7 +555,7 @@ public static class ProviderApplicationEndpoints
                     return Results.BadRequest(new
                     {
                         code = "business_verification_required",
-                        message = "Ä°ÅŸletme yayÄ±na alÄ±nmadan Ã¶nce hesap sahibinin e-posta doÄŸrulamasÄ±nÄ± tamamlamasÄ± gerekir."
+                        message = "İşletme yayına alınmadan önce hesap sahibinin e-posta doğrulamasını tamamlaması gerekir."
                     });
                 }
             }
@@ -627,9 +652,9 @@ public static class ProviderApplicationEndpoints
                     {
                         UserId = need.UserId,
                         EventType = eventType,
-                        Title = "Talebine uygun iÅŸletme bulundu",
+                        Title = "Talebine uygun işletme bulundu",
                         Message =
-                            $"{provider.BusinessName} \"{need.Title}\" talebinizi karÅŸÄ±layabilir. Uygun iÅŸletmeleri gÃ¶rmek iÃ§in dokunun.",
+                            $"{provider.BusinessName} \"{need.Title}\" talebinizi karşılayabilir. Uygun işletmeleri görmek için dokunun.",
                         Link = link,
                         IsRead = false,
                         CreatedAtUtc = publishedAtUtc
@@ -656,7 +681,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.NotFound(new
                 {
-                    message = "Ä°ÅŸletme profili bulunamadÄ±."
+                    message = "İşletme profili bulunamadı."
                 });
             }
 
@@ -664,7 +689,7 @@ public static class ProviderApplicationEndpoints
             {
                 return Results.Conflict(new
                 {
-                    message = "Profil baÅŸka bir iÅŸlemle deÄŸiÅŸti."
+                    message = "Profil başka bir işlemle değişti."
                 });
             }
 
@@ -686,13 +711,13 @@ public static class ProviderApplicationEndpoints
     {
         var errors = new Dictionary<string, string[]>();
 
-        Required(errors, "businessName", request.BusinessName, 200, "Ä°ÅŸletme adÄ±");
-        Required(errors, "shortDescription", request.ShortDescription, 300, "KÄ±sa aÃ§Ä±klama");
+        Required(errors, "businessName", request.BusinessName, 200, "İşletme adı");
+        Required(errors, "shortDescription", request.ShortDescription, 300, "Kısa açıklama");
         Required(errors, "categorySlug", request.CategorySlug, 100, "Kategori");
         Required(errors, "serviceSlug", request.ServiceSlug, 150, "Hizmet");
-Required(errors, "citySlug", request.CitySlug, 100, "Ä°l");
-        Required(errors, "districtSlug", request.DistrictSlug, 100, "Ä°lÃ§e");
-        Required(errors, "applicantName", request.ApplicantName, 150, "BaÅŸvuran adÄ±");
+Required(errors, "citySlug", request.CitySlug, 100, "İl");
+        Required(errors, "districtSlug", request.DistrictSlug, 100, "İlçe");
+        Required(errors, "applicantName", request.ApplicantName, 150, "Başvuran adı");
         Required(errors, "phone", request.Phone, 30, "Telefon");
 
         if (errors.Count > 0)
@@ -706,7 +731,7 @@ Required(errors, "citySlug", request.CitySlug, 100, "Ä°l");
 
         if (!categoryExists)
         {
-            errors["categorySlug"] = ["GeÃ§erli bir kategori seÃ§in."];
+            errors["categorySlug"] = ["Geçerli bir kategori seçin."];
         }
 
         var city = await dbContext.Cities
@@ -716,13 +741,13 @@ Required(errors, "citySlug", request.CitySlug, 100, "Ä°l");
 
         if (city is null)
         {
-            errors["citySlug"] = ["GeÃ§erli bir il seÃ§in."];
+            errors["citySlug"] = ["Geçerli bir il seçin."];
         }
         else if (!city.Districts.Any(x =>
                      x.Slug == request.DistrictSlug &&
                      x.IsActive))
         {
-            errors["districtSlug"] = ["SeÃ§ilen ilÃ§enin ile ait olduÄŸunu kontrol edin."];
+            errors["districtSlug"] = ["Seçilen ilçenin ile ait olduğunu kontrol edin."];
         }
 
         return errors;
@@ -820,6 +845,7 @@ Required(errors, "citySlug", request.CitySlug, 100, "Ä°l");
             provider.Description,
             provider.CategorySlug,
             provider.ServiceSlug,
+            provider.AdditionalCategorySlug,
             provider.AdditionalServices,
             provider.CitySlug,
             provider.DistrictSlug,
@@ -867,6 +893,7 @@ public sealed record UpdateProvider(
     string? Description,
     string CategorySlug,
     string ServiceSlug,
+    string? AdditionalCategorySlug,
     string[] AdditionalServices,
     string CitySlug,
     string DistrictSlug,

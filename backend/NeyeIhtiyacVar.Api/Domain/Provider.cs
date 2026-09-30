@@ -22,6 +22,10 @@ public sealed class Provider
 
     public string ServiceSlug { get; set; } = string.Empty;
 
+    // İsteğe bağlı 2. hizmetin kategorisi.
+    // 2. hizmetin kendisi AdditionalServices[0] içinde tutulur.
+    public string? AdditionalCategorySlug { get; set; }
+
     public string[] AdditionalServices { get; set; } = [];
 
     public string CitySlug { get; set; } = string.Empty;

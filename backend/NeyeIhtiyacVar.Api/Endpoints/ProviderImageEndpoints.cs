@@ -98,6 +98,170 @@ public static class ProviderImageEndpoints
             });
         });
 
+        // Admin: herhangi bir işletmenin vitrin fotoğraflarını yönetir.
+        // /api/admin yolu Program.cs middleware'i tarafından Admin rolü ile korunur.
+        var adminImages = app.MapGroup("/api/admin/providers/{providerId:guid}/images");
+
+        adminImages.MapGet("/", async (
+            Guid providerId,
+            AppDbContext db,
+            IWebHostEnvironment env) =>
+        {
+            var exists = await db.Providers
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == providerId);
+
+            if (!exists)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            EnsureLegacyImageInGallery(env, providerId);
+            var coverIndex = GetCoverIndex(env, providerId);
+
+            return Results.Ok(GetImageSlots(env, providerId).Select(x => new
+            {
+                index = x.Index,
+                imageUrl = $"/api/providers/{providerId}/images/{x.Index}",
+                isCover = x.Index == coverIndex
+            }));
+        });
+
+        adminImages.MapPost("/", async (
+            Guid providerId,
+            HttpRequest request,
+            AppDbContext db,
+            IWebHostEnvironment env) =>
+        {
+            var exists = await db.Providers
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == providerId);
+
+            if (!exists)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (!request.HasFormContentType)
+                return Results.BadRequest(new
+                {
+                    message = "Görsel multipart/form-data olarak gönderilmelidir."
+                });
+
+            var form = await request.ReadFormAsync();
+            var file = form.Files.GetFile("file");
+
+            if (file is null || file.Length == 0)
+                return Results.BadRequest(new { message = "Bir görsel seçmelisiniz." });
+
+            if (file.Length > MaxFileSize)
+                return Results.BadRequest(new { message = "Görsel en fazla 5 MB olabilir." });
+
+            if (!AllowedTypes.TryGetValue(file.ContentType, out var ext))
+                return Results.BadRequest(new
+                {
+                    message = "Yalnızca JPG, PNG veya WebP görsel yükleyebilirsiniz."
+                });
+
+            EnsureLegacyImageInGallery(env, providerId);
+
+            var slots = GetImageSlots(env, providerId);
+            if (slots.Count >= MaxImages)
+                return Results.BadRequest(new
+                {
+                    message = "Bir işletme en fazla 5 fotoğraf yükleyebilir."
+                });
+
+            var slot = Enumerable.Range(1, MaxImages)
+                .First(i => !SlotExists(env, providerId, i));
+
+            var folder = GetImageFolder(env);
+            Directory.CreateDirectory(folder);
+
+            var target = Path.Combine(folder, $"{providerId:N}-{slot}{ext}");
+            var hadNoCover = GetCoverIndex(env, providerId) == 0;
+
+            await using (var stream = File.Create(target))
+                await file.CopyToAsync(stream);
+
+            if (hadNoCover)
+                SetCoverIndex(env, providerId, slot);
+
+            return Results.Ok(new
+            {
+                providerId,
+                index = slot,
+                imageUrl = $"/api/providers/{providerId}/images/{slot}",
+                count = GetImageSlots(env, providerId).Count,
+                max = MaxImages,
+                message = "İşletme fotoğrafı kaydedildi."
+            });
+        });
+
+        adminImages.MapDelete("/{index:int}", async (
+            Guid providerId,
+            int index,
+            AppDbContext db,
+            IWebHostEnvironment env) =>
+        {
+            if (index < 1 || index > MaxImages)
+                return Results.BadRequest(new { message = "Geçersiz fotoğraf." });
+
+            var exists = await db.Providers
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == providerId);
+
+            if (!exists)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            var oldCover = GetCoverIndex(env, providerId);
+            var deleted = DeleteSlot(env, providerId, index);
+
+            if (deleted && oldCover == index)
+            {
+                var next = GetImageSlots(env, providerId)
+                    .Select(x => x.Index)
+                    .FirstOrDefault();
+
+                if (next > 0)
+                    SetCoverIndex(env, providerId, next);
+                else
+                    DeleteCoverFile(env, providerId);
+            }
+
+            return Results.Ok(new
+            {
+                deleted,
+                message = deleted
+                    ? "İşletme fotoğrafı silindi."
+                    : "Silinecek fotoğraf bulunamadı."
+            });
+        });
+
+        adminImages.MapPut("/cover/{index:int}", async (
+            Guid providerId,
+            int index,
+            AppDbContext db,
+            IWebHostEnvironment env) =>
+        {
+            if (index < 1 || index > MaxImages)
+                return Results.BadRequest(new { message = "Geçersiz fotoğraf." });
+
+            var exists = await db.Providers
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == providerId);
+
+            if (!exists)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (!SlotExists(env, providerId, index))
+                return Results.NotFound(new { message = "Fotoğraf bulunamadı." });
+
+            SetCoverIndex(env, providerId, index);
+
+            return Results.Ok(new
+            {
+                coverIndex = index,
+                message = "Kapak fotoğrafı değiştirildi."
+            });
+        });
+
         app.MapGet("/api/providers/{providerId:guid}/image", (Guid providerId, IWebHostEnvironment env) =>
         {
             EnsureLegacyImageInGallery(env, providerId);

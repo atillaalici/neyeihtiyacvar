@@ -34,6 +34,7 @@ type ProviderPanelProfile = {
   description: string | null;
   categorySlug: string;
   serviceSlug: string;
+  additionalCategorySlug: string | null;
   additionalServices: string[];
   citySlug: string;
   districtSlug: string;
@@ -848,19 +849,23 @@ function ProviderPanelPageContent() {
 
               <div className="mt-3 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full border border-border bg-background px-3 py-1.5">
-                  Kategori: {profile.categorySlug}
+                  Kategori 1: {profile.categorySlug}
                 </span>
                 <span className="rounded-full border border-border bg-background px-3 py-1.5">
-                  Ana hizmet: {profile.serviceSlug}
+                  Hizmet 1: {profile.serviceSlug}
                 </span>
-                {profile.additionalServices.map((service) => (
-                  <span
-                    key={service}
-                    className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-primary"
-                  >
-                    Ek hizmet: {service}
-                  </span>
-                ))}
+
+                {profile.additionalCategorySlug &&
+                  profile.additionalServices.length > 0 && (
+                    <>
+                      <span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-primary">
+                        Kategori 2: {profile.additionalCategorySlug}
+                      </span>
+                      <span className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-primary">
+                        Hizmet 2: {profile.additionalServices[0]}
+                      </span>
+                    </>
+                  )}
               </div>
 
               <p className="mt-3 max-w-2xl text-muted-foreground">
@@ -1589,29 +1594,24 @@ function ProviderPanelPageContent() {
 
                   <div>
                     <div className="text-xs text-muted-foreground">
-                      Ana hizmet
+                      1. Hizmet
                     </div>
                     <div className="mt-1 font-medium">
-                      {profile.serviceSlug}
+                      {profile.categorySlug} → {profile.serviceSlug}
                     </div>
 
-                    <div className="mt-3 text-xs text-muted-foreground">
-                      Kategori
-                    </div>
-                    <div className="mt-1 font-medium">
-                      {profile.categorySlug}
-                    </div>
-
-                    {profile.additionalServices.length > 0 && (
-                      <>
-                        <div className="mt-3 text-xs text-muted-foreground">
-                          Ek hizmet
-                        </div>
-                        <div className="mt-1 font-medium">
-                          {profile.additionalServices.join(", ")}
-                        </div>
-                      </>
-                    )}
+                    {profile.additionalCategorySlug &&
+                      profile.additionalServices.length > 0 && (
+                        <>
+                          <div className="mt-3 text-xs text-muted-foreground">
+                            2. Hizmet
+                          </div>
+                          <div className="mt-1 font-medium">
+                            {profile.additionalCategorySlug} →{" "}
+                            {profile.additionalServices[0]}
+                          </div>
+                        </>
+                      )}
                   </div>
                 </div>
 

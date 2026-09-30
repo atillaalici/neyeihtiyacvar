@@ -511,19 +511,19 @@ function chooseProviderKind(kind: ProviderKind) {
     if (!existingAccountMode) {
       if (password !== passwordAgain) {
         setError(
-          "Åifreler birbiriyle aynÄ± olmalÄ±dÄ±r.",
+          "Şifreler birbiriyle aynı olmalıdır.",
         );
         return;
       }
 
       if (
         password.length < 8 ||
-        !/[A-ZÃ‡ÄÄ°Ã–ÅÃœ]/.test(password) ||
+        !/[A-ZÇĞİÖŞÜ]/.test(password) ||
         !/[a-zçğıöşü]/.test(password) ||
         !/\d/.test(password)
       ) {
         setError(
-          "Åifre en az 8 karakter olmalÄ±; bÃ¼yÃ¼k harf, kÃ¼Ã§Ã¼k harf ve rakam iÃ§ermelidir.",
+          "Şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermelidir.",
         );
         return;
       }
@@ -1675,7 +1675,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Åifre *
+            Şifre *
           </label>
           <input
             type="password"
@@ -1694,7 +1694,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            Åifre Tekrar *
+            Şifre Tekrar *
           </label>
           <input
             type="password"
