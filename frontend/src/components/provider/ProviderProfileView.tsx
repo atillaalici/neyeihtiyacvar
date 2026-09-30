@@ -12,6 +12,8 @@ import {
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
+import { trackPlatformAnalytics } from "@/lib/platform-analytics";
+import { trackProviderInteraction } from "@/lib/provider-interactions";
 
 const DetailMap = dynamic(
   () => import("@/components/location/ProviderDetailMap"),
@@ -451,13 +453,45 @@ export default function ProviderProfileView({
               ) : (
                 <>
                   {phone && (
-                    <a href={`tel:+${phone}`} className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 font-bold text-white">
+                    <a
+                      href={`tel:+${phone}`}
+                      onClick={() => {
+                        trackPlatformAnalytics({
+                          eventType: "phone_click",
+                          providerSlug: provider.slug,
+                          source: "profile",
+                        });
+                        void trackProviderInteraction({
+                          providerSlug: provider.slug,
+                          channel: "phone",
+                          source: "profile",
+                        });
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3.5 font-bold text-white"
+                    >
                       <Phone size={19} />
                       {provider.publicPhone}
                     </a>
                   )}
                   {whatsapp && (
-                    <a target="_blank" rel="noreferrer" href={`https://wa.me/${whatsapp}`} className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3.5 font-bold text-white">
+                    <a
+                      target="_blank"
+                      rel="noreferrer"
+                      href={`https://wa.me/${whatsapp}`}
+                      onClick={() => {
+                        trackPlatformAnalytics({
+                          eventType: "whatsapp_click",
+                          providerSlug: provider.slug,
+                          source: "profile",
+                        });
+                        void trackProviderInteraction({
+                          providerSlug: provider.slug,
+                          channel: "whatsapp",
+                          source: "profile",
+                        });
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3.5 font-bold text-white"
+                    >
                       <MessageCircle size={20} />
                       WhatsApp&apos;tan Yaz
                     </a>

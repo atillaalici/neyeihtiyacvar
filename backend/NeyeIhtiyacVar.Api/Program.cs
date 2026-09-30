@@ -194,6 +194,7 @@ app.MapProviderImageEndpoints();
 app.MapUserProfileImageEndpoints();
 app.MapOfferEndpoints();
 app.MapReviewEndpoints();
+app.MapProviderInteractionEndpoints();
 app.MapNotificationEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminModerationEndpoints();

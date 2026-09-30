@@ -4,6 +4,7 @@ import Script from "next/script";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { LocationPermissionPrompt } from "@/components/location/LocationPermissionPrompt";
 import { CookieConsent } from "@/components/consent/CookieConsent";
+import { InteractionReviewPrompt } from "@/components/reviews/InteractionReviewPrompt";
 
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
@@ -96,6 +97,7 @@ export default function RootLayout({
         <CookieConsent />
         <GoogleAnalytics />
         <LocationPermissionPrompt />
+        <InteractionReviewPrompt />
         <Script
           id="organization-jsonld"
           type="application/ld+json"

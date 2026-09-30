@@ -4,9 +4,16 @@ public sealed class ProviderReview
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public Guid NeedRequestId { get; set; }
+    // Talep/teklif akışından gelen değerlendirmelerde kullanılır.
+    public Guid? NeedRequestId { get; set; }
 
-    public NeedRequest NeedRequest { get; set; } = null!;
+    public NeedRequest? NeedRequest { get; set; }
+
+    // Telefon / WhatsApp / e-posta gibi doğrudan işletme
+    // etkileşimlerinden gelen değerlendirmelerde kullanılır.
+    public Guid? ProviderInteractionId { get; set; }
+
+    public ProviderInteraction? ProviderInteraction { get; set; }
 
     public Guid ProviderId { get; set; }
 

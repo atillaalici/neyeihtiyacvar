@@ -283,7 +283,13 @@ public static class ReviewEndpoints
                 {
                     x.Id,
                     x.NeedRequestId,
-                    needTitle = x.NeedRequest.Title,
+                    x.ProviderInteractionId,
+                    needTitle = x.NeedRequest != null
+                        ? x.NeedRequest.Title
+                        : "Doğrudan iletişim",
+                    interactionChannel = x.ProviderInteraction != null
+                        ? x.ProviderInteraction.Channel
+                        : null,
                     x.Rating,
                     x.Comment,
                     reviewerName = x.User.DisplayName,

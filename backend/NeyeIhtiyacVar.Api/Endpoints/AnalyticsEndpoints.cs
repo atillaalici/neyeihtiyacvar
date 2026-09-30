@@ -148,10 +148,14 @@ public static class AnalyticsEndpoints
                 .AsNoTracking()
                 .Where(x => x.ProviderId == provider.Id);
 
-            var weekly = await BuildPeriod(query, now.AddDays(-7), now);
-            var monthly = await BuildPeriod(query, now.AddDays(-30), now);
-            var yearly = await BuildPeriod(query, now.AddDays(-365), now);
-            var total = await BuildPeriod(query, null, now);
+            var weekly = await BuildPeriod(
+                dbContext, provider.Id, query, now.AddDays(-7), now);
+            var monthly = await BuildPeriod(
+                dbContext, provider.Id, query, now.AddDays(-30), now);
+            var yearly = await BuildPeriod(
+                dbContext, provider.Id, query, now.AddDays(-365), now);
+            var total = await BuildPeriod(
+                dbContext, provider.Id, query, null, now);
 
             return Results.Ok(new
             {
@@ -202,32 +206,117 @@ public static class AnalyticsEndpoints
     }
 
     private static async Task<object> BuildPeriod(
-        IQueryable<AnalyticsEvent> query,
+        AppDbContext dbContext,
+        Guid providerId,
+        IQueryable<AnalyticsEvent> analyticsQuery,
         DateTime? startUtc,
         DateTime endUtc)
     {
         if (startUtc is not null)
         {
-            query = query.Where(x => x.CreatedAtUtc >= startUtc.Value);
+            analyticsQuery = analyticsQuery.Where(
+                x => x.CreatedAtUtc >= startUtc.Value);
         }
 
-        query = query.Where(x => x.CreatedAtUtc <= endUtc);
+        analyticsQuery = analyticsQuery.Where(
+            x => x.CreatedAtUtc <= endUtc);
 
-        var profileViews = await query.CountAsync(
+        var profileViews = await analyticsQuery.CountAsync(
             x => x.EventType == "provider_view");
 
-        var phoneClicks = await query.CountAsync(
+        var phoneClicks = await analyticsQuery.CountAsync(
             x => x.EventType == "phone_click");
 
-        var whatsappClicks = await query.CountAsync(
+        var whatsappClicks = await analyticsQuery.CountAsync(
             x => x.EventType == "whatsapp_click");
+
+        var interactionQuery = dbContext.ProviderInteractions
+            .AsNoTracking()
+            .Where(x =>
+                x.ProviderId == providerId &&
+                x.CreatedAtUtc <= endUtc);
+
+        if (startUtc is not null)
+        {
+            interactionQuery = interactionQuery.Where(
+                x => x.CreatedAtUtc >= startUtc.Value);
+        }
+
+        var trackedPhoneContacts = await interactionQuery.CountAsync(
+            x => x.Channel == "phone");
+
+        var trackedWhatsappContacts = await interactionQuery.CountAsync(
+            x => x.Channel == "whatsapp");
+
+        var emailContacts = await interactionQuery.CountAsync(
+            x => x.Channel == "email");
+
+        var offerContacts = await interactionQuery.CountAsync(
+            x => x.Channel == "offer");
+
+        var serviceReceived = await interactionQuery.CountAsync(
+            x => x.Status == "service_received");
+
+        var noService = await interactionQuery.CountAsync(
+            x => x.Status == "no_service");
+
+        var considering = await interactionQuery.CountAsync(
+            x => x.Status == "considering");
+
+        var notContacted = await interactionQuery.CountAsync(
+            x => x.Status == "not_contacted");
+
+        var pending = await interactionQuery.CountAsync(
+            x => x.Status == "pending");
+
+        var offerQuery = dbContext.ProviderOffers
+            .AsNoTracking()
+            .Where(x =>
+                x.ProviderId == providerId &&
+                x.CreatedAtUtc <= endUtc);
+
+        if (startUtc is not null)
+        {
+            offerQuery = offerQuery.Where(
+                x => x.CreatedAtUtc >= startUtc.Value);
+        }
+
+        var offersGiven = await offerQuery.CountAsync();
+
+        var offersAccepted = await offerQuery.CountAsync(
+            x => x.Status == OfferStatus.Accepted);
+
+        var totalTrackedContacts =
+            trackedPhoneContacts +
+            trackedWhatsappContacts +
+            emailContacts +
+            offerContacts;
 
         return new
         {
             profileViews,
+
+            // Eski anonim tıklama istatistikleri korunur.
             phoneClicks,
             whatsappClicks,
             totalContactClicks = phoneClicks + whatsappClicks,
+
+            // Giriş yapmış kullanıcıların gerçek etkileşimleri.
+            trackedPhoneContacts,
+            trackedWhatsappContacts,
+            emailContacts,
+            offerContacts,
+            totalTrackedContacts,
+
+            serviceReceived,
+            noService,
+            considering,
+            notContacted,
+            pending,
+
+            offersGiven,
+            offersAccepted,
+
             startUtc,
             endUtc
         };

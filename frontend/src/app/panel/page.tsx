@@ -100,8 +100,9 @@ type OfferDraft = {
 
 type ProviderReview = {
   id: string;
-  needRequestId: string;
+  needRequestId: string | null;
   needTitle: string;
+  interactionChannel?: string | null;
   rating: number;
   comment: string;
   reviewerName: string;
@@ -117,9 +118,30 @@ type ProviderReviewSummary = {
 
 type ProviderAnalyticsPeriod = {
   profileViews: number;
+
+  // Genel tıklama istatistikleri
   phoneClicks: number;
   whatsappClicks: number;
   totalContactClicks: number;
+
+  // Giriş yapmış kullanıcıların izlenebilir etkileşimleri
+  trackedPhoneContacts: number;
+  trackedWhatsappContacts: number;
+  emailContacts: number;
+  offerContacts: number;
+  totalTrackedContacts: number;
+
+  // Etkileşim sonuçları
+  serviceReceived: number;
+  noService: number;
+  considering: number;
+  notContacted: number;
+  pending: number;
+
+  // Gerçek teklif kayıtları
+  offersGiven: number;
+  offersAccepted: number;
+
   startUtc: string | null;
   endUtc: string;
 };
@@ -194,6 +216,8 @@ function ProviderPanelPageContent() {
     useState<ProviderAnalyticsSummary | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState("");
+  const [analyticsPeriod, setAnalyticsPeriod] =
+    useState<"weekly" | "monthly" | "yearly" | "total">("monthly");
 
   const [drafts, setDrafts] = useState<Record<string, OfferDraft>>({});
   const [sendingNeedId, setSendingNeedId] = useState<string | null>(null);
@@ -948,66 +972,173 @@ function ProviderPanelPageContent() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
-          <div>
-            <h2 className="font-display text-xl font-semibold">
-              İşletme İstatistikleri
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Profil görüntülenmesi ve kullanıcıların işletmenizle iletişime geçmek için yaptığı tıklamalar.
-            </p>
+        <div className="mt-8 rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="font-display text-xl font-semibold">
+                Müşteri Etkileşimleri ve Sonuçlar
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                İşletmenizin görünürlüğünü, müşteri iletişimlerini, hizmet sonuçlarını
+                ve teklif performansını seçtiğiniz döneme göre takip edin.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                ["weekly", "Haftalık"],
+                ["monthly", "Aylık"],
+                ["yearly", "Yıllık"],
+                ["total", "Toplam"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setAnalyticsPeriod(
+                      value as "weekly" | "monthly" | "yearly" | "total",
+                    )
+                  }
+                  className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+                    analyticsPeriod === value
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                      : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted/40"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {analyticsLoading ? (
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className="h-40 animate-pulse rounded-xl border border-border bg-muted/40"
-                />
-              ))}
-            </div>
+            <div className="mt-5 h-80 animate-pulse rounded-xl border border-border bg-muted/40" />
           ) : analytics ? (
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Haftalık", analytics.periods.weekly],
-                ["Aylık", analytics.periods.monthly],
-                ["Yıllık", analytics.periods.yearly],
-                ["Toplam", analytics.periods.total],
-              ].map(([label, period]) => {
-                const data = period as ProviderAnalyticsPeriod;
+            (() => {
+              const data = analytics.periods[analyticsPeriod];
+              const unresolved =
+                data.pending + data.considering + data.notContacted;
 
-                return (
-                  <div
-                    key={label as string}
-                    className="rounded-xl border border-border bg-background p-4"
-                  >
-                    <div className="text-sm font-semibold text-primary">
-                      {label as string}
+              const periodLabel = {
+                weekly: "Son 7 Gün",
+                monthly: "Son 30 Gün",
+                yearly: "Son 1 Yıl",
+                total: "Tüm Zamanlar",
+              }[analyticsPeriod];
+
+              return (
+                <div className="mt-5 overflow-hidden rounded-xl border border-border bg-background">
+                  <div className="flex flex-col gap-1 border-b border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="font-semibold">{periodLabel}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Seçili dönem performansı
+                    </div>
+                  </div>
+
+                  <div className="p-4 sm:p-5">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-xl bg-muted/35 p-4">
+                        <div className="text-xs text-muted-foreground">
+                          Profil Görüntülenme
+                        </div>
+                        <div className="mt-1 text-3xl font-bold">
+                          {data.profileViews}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-muted/35 p-4">
+                        <div className="text-xs text-muted-foreground">
+                          İletişim Tıklaması
+                        </div>
+                        <div className="mt-1 text-3xl font-bold">
+                          {data.totalContactClicks}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-muted/35 p-4">
+                        <div className="text-xs text-muted-foreground">
+                          Kayıtlı İletişim
+                        </div>
+                        <div className="mt-1 text-3xl font-bold">
+                          {data.totalTrackedContacts}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl bg-muted/35 p-4">
+                        <div className="text-xs text-muted-foreground">
+                          Hizmet Alan
+                        </div>
+                        <div className="mt-1 text-3xl font-bold">
+                          {data.serviceReceived}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <div className="text-xs text-muted-foreground">Profil Görüntülenme</div>
-                        <div className="mt-1 text-2xl font-bold">{data.profileViews}</div>
+                    <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="text-sm font-semibold">
+                          Müşteri İletişimi
+                        </div>
+                        <div className="mt-3 space-y-3 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Telefon</span>
+                            <strong>{data.trackedPhoneContacts}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">WhatsApp</span>
+                            <strong>{data.trackedWhatsappContacts}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">E-posta</span>
+                            <strong>{data.emailContacts}</strong>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Toplam İletişim</div>
-                        <div className="mt-1 text-2xl font-bold">{data.totalContactClicks}</div>
+
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="text-sm font-semibold">
+                          Hizmet Sonucu
+                        </div>
+                        <div className="mt-3 space-y-3 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Hizmet Aldı</span>
+                            <strong>{data.serviceReceived}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Hizmet Almadı</span>
+                            <strong>{data.noService}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Sonuç Bekleniyor</span>
+                            <strong>{unresolved}</strong>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Telefon</div>
-                        <div className="mt-1 font-semibold">{data.phoneClicks}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">WhatsApp</div>
-                        <div className="mt-1 font-semibold">{data.whatsappClicks}</div>
+
+                      <div className="rounded-xl border border-border p-4">
+                        <div className="text-sm font-semibold">
+                          Teklif Performansı
+                        </div>
+                        <div className="mt-3 space-y-3 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Verilen Teklif</span>
+                            <strong>{data.offersGiven}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Kabul Edilen</span>
+                            <strong>{data.offersAccepted}</strong>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Teklif İletişimi</span>
+                            <strong>{data.offerContacts}</strong>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })()
           ) : (
             <div className="mt-5 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
               {analyticsError || "Henüz görüntülenecek istatistik bulunmuyor."}

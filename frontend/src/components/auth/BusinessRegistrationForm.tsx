@@ -700,20 +700,64 @@ function chooseProviderKind(kind: ProviderKind) {
       setSubmitting(false);
     }
   }
-  function verifyNow(channel: "email" | "phone") {
-    if (!registered) {
+  async function verifyNow(channel: "email" | "phone") {
+    if (!registered || verifyWorking) {
       return;
     }
 
-    const params = new URLSearchParams({
-      userId: registered.user.id,
-      email: registered.user.email,
-      phone: registered.user.phoneNumber ?? "",
-      channel,
-      returnUrl: "/uyelik/odeme",
-    });
+    if (channel === "phone" && !registered.user.phoneNumber) {
+      setError("Hesabınızda doğrulanacak telefon numarası bulunmuyor.");
+      return;
+    }
 
-    router.push(`/dogrula?${params.toString()}`);
+    setVerifyWorking(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/auth/verification/resend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: registered.user.id,
+            channel,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data?.message ??
+            (channel === "email"
+              ? "E-posta doğrulama kodu gönderilemedi."
+              : "Telefon doğrulama kodu gönderilemedi."),
+        );
+        return;
+      }
+
+      const params = new URLSearchParams({
+        userId: registered.user.id,
+        email: registered.user.email,
+        phone: registered.user.phoneNumber ?? "",
+        channel,
+        returnUrl: "/uyelik/odeme",
+      });
+
+      router.push(`/dogrula?${params.toString()}`);
+    } catch {
+      setError(
+        channel === "email"
+          ? "Doğrulama e-postası gönderilirken sunucuya bağlanılamadı."
+          : "Doğrulama kodu gönderilirken sunucuya bağlanılamadı.",
+      );
+    } finally {
+      setVerifyWorking(false);
+    }
   }
 
   if (registered) {

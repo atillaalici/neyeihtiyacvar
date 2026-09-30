@@ -47,6 +47,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProviderReview> ProviderReviews => Set<ProviderReview>();
 
+    public DbSet<ProviderInteraction> ProviderInteractions => Set<ProviderInteraction>();
+
     public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
@@ -717,6 +719,7 @@ entity.Property(x => x.Message)
         modelBuilder.Entity<ProviderReview>(entity =>
         {
             entity.HasIndex(x => x.NeedRequestId).IsUnique();
+            entity.HasIndex(x => x.ProviderInteractionId).IsUnique();
             entity.HasIndex(x => x.ProviderId);
             entity.HasIndex(x => x.UserId);
 
@@ -731,6 +734,61 @@ entity.Property(x => x.Message)
                 .WithMany()
                 .HasForeignKey(x => x.NeedRequestId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.ProviderInteraction)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderInteractionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProviderInteraction>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Channel)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.Source)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.NoServiceReason)
+                .HasMaxLength(80);
+
+            entity.HasIndex(x => new
+            {
+                x.UserId,
+                x.CreatedAtUtc
+            });
+
+            entity.HasIndex(x => new
+            {
+                x.ProviderId,
+                x.CreatedAtUtc
+            });
+
+            entity.HasIndex(x => new
+            {
+                x.UserId,
+                x.ProviderId,
+                x.Status,
+                x.CreatedAtUtc
+            });
 
             entity.HasOne(x => x.Provider)
                 .WithMany()

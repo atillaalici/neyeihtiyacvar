@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NeyeIhtiyacVar.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930172126_AddProviderInteractions")]
+    partial class AddProviderInteractions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1440,13 +1443,10 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("NeedRequestId")
+                    b.Property<Guid>("NeedRequestId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("ProviderId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("ProviderInteractionId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Rating")
@@ -1464,9 +1464,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .IsUnique();
 
                     b.HasIndex("ProviderId");
-
-                    b.HasIndex("ProviderInteractionId")
-                        .IsUnique();
 
                     b.HasIndex("UserId");
 
@@ -1759,18 +1756,14 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.NeedRequest", "NeedRequest")
                         .WithMany()
                         .HasForeignKey("NeedRequestId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", "Provider")
                         .WithMany()
                         .HasForeignKey("ProviderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("NeyeIhtiyacVar.Api.Domain.ProviderInteraction", "ProviderInteraction")
-                        .WithMany()
-                        .HasForeignKey("ProviderInteractionId")
-                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "User")
                         .WithMany()
@@ -1781,8 +1774,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Navigation("NeedRequest");
 
                     b.Navigation("Provider");
-
-                    b.Navigation("ProviderInteraction");
 
                     b.Navigation("User");
                 });
