@@ -40,8 +40,11 @@ public static class BillingInformationEndpoints
                 string.IsNullOrWhiteSpace(taxOffice))
                 return Results.BadRequest(new { message = "İsim Soyisim / Unvan, T.C. / Vergi No, telefon ve vergi dairesi zorunludur." });
 
-            if (taxOrIdentityNumber.Length != 11)
-                return Results.BadRequest(new { message = "T.C. / Vergi No 11 haneli olmalıdır." });
+            if (type == "individual" && taxOrIdentityNumber.Length != 11)
+                return Results.BadRequest(new { message = "T.C. Kimlik No 11 haneli olmalıdır." });
+
+            if (type == "corporate" && taxOrIdentityNumber.Length != 10)
+                return Results.BadRequest(new { message = "Vergi Kimlik No 10 haneli olmalıdır." });
 
             var now = DateTime.UtcNow;
             var item = await db.BillingInformations.FirstOrDefaultAsync(x => x.UserId == userId);

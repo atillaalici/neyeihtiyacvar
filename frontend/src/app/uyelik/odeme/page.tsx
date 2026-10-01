@@ -443,7 +443,14 @@ function MembershipPaymentContent() {
   async function saveBillingInformation() {
     const taxDigits = billing.taxOrIdentityNumber.replace(/\D/g, "");
     if (!billing.nameOrTitle.trim()) { setBillingError("İsim Soyisim / Unvan zorunludur."); return false; }
-    if (taxDigits.length !== 11) { setBillingError("T.C. / Vergi No 11 haneli olmalıdır."); return false; }
+    if (billing.billingType === "individual" && taxDigits.length !== 11) {
+      setBillingError("T.C. Kimlik No 11 haneli olmalıdır.");
+      return false;
+    }
+    if (billing.billingType === "corporate" && taxDigits.length !== 10) {
+      setBillingError("Vergi Kimlik No 10 haneli olmalıdır.");
+      return false;
+    }
     if (!billing.phone.trim()) { setBillingError("Telefon zorunludur."); return false; }
     if (!billing.taxOffice.trim()) { setBillingError("Vergi dairesi zorunludur."); return false; }
     const token = getAccessToken();
@@ -735,14 +742,18 @@ function MembershipPaymentContent() {
                   <input
                     className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
                     inputMode="numeric"
-                    placeholder="T.C. / Vergi No * (11 hane)"
+                    placeholder={
+                      billing.billingType === "corporate"
+                        ? "Vergi Kimlik No * (10 hane)"
+                        : "T.C. Kimlik No * (11 hane)"
+                    }
                     value={billing.taxOrIdentityNumber}
                     onChange={(event) =>
                       setBilling((current) => ({
                         ...current,
                         taxOrIdentityNumber: event.target.value
                           .replace(/\D/g, "")
-                          .slice(0, 11),
+                          .slice(0, billing.billingType === "corporate" ? 10 : 11),
                       }))
                     }
                   />

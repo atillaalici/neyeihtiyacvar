@@ -15,7 +15,7 @@ export function Footer() {
           <div>
             <BrandLogo />
             <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
-              İhtiyacını anlat, doğru işletmeyi bul. neyeihtiyacvar.com, Teknonet Yazılım tarafından işletilir.
+              İhtiyacını anlat, doğru işletmeyi bul. neyeihtiyacvar.com, Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM tarafından işletilir.
             </p>
           </div>
           <div className="grid gap-7 sm:grid-cols-3">
@@ -35,7 +35,7 @@ export function Footer() {
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 neyeihtiyacvar.com. Tüm hakları saklıdır.</p>
-          <p>Teknonet Yazılım · Merkez / Osmaniye</p>
+          <p>Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM · Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye</p>
         </div>
       </div>
     </footer>

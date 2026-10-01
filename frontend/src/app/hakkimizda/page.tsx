@@ -309,9 +309,7 @@ export default function AboutPage() {
               <div className="mt-7 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300">
                 <strong className="text-white">Merkez:</strong>
                 <br />
-                Ahmet Yesevi Mahallesi, 16723 Sokak No:10
-                <br />
-                Merkez / Osmaniye
+                Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye
               </div>
             </div>
           </div>

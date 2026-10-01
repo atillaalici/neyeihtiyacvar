@@ -13,8 +13,18 @@ export function LegalDocument({ document }: { document: LegalDocumentData }) {
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">{document.summary}</p>
         <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-500">
-          <span className="rounded-full border bg-white px-3 py-1.5">Sürüm 1.0</span>
-          <span className="rounded-full border bg-white px-3 py-1.5">Son Güncelleme: 11 Eylül 2026</span>
+          <span className="rounded-full border bg-white px-3 py-1.5">
+            {document.slug === "ucretli-isletme-uyeligi" ||
+            document.slug === "iptal-iade-politikasi"
+              ? "Sürüm 2026-10-01"
+              : "Sürüm 1.0"}
+          </span>
+          <span className="rounded-full border bg-white px-3 py-1.5">
+            {document.slug === "ucretli-isletme-uyeligi" ||
+            document.slug === "iptal-iade-politikasi"
+              ? "Son Güncelleme: 1 Ekim 2026"
+              : "Son Güncelleme: 11 Eylül 2026"}
+          </span>
         </div>
 
         <article className="mt-8 space-y-7 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
@@ -29,11 +39,11 @@ export function LegalDocument({ document }: { document: LegalDocumentData }) {
         </article>
 
         <div className="mt-8 rounded-2xl border border-orange-200 bg-orange-50 p-5 text-sm leading-6 text-slate-700">
-          <strong>Platform İşletmecisi:</strong> Teknonet Yazılım
+          <strong>Platform İşletmecisi:</strong> Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM
           <br />
           <strong>Platform:</strong> Neye İhtiyaç Var – neyeihtiyacvar.com
           <br />
-          <strong>Adres:</strong> Merkez / OSMANİYE
+          <strong>Adres:</strong> Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye
         </div>
       </div>
     </main>

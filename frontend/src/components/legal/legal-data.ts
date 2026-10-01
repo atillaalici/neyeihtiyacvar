@@ -200,7 +200,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "KVKK'nın 11. maddesi kapsamında kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, amacını öğrenme, aktarılan üçüncü kişileri bilme, yanlış verilerin düzeltilmesini isteme, şartları varsa silme/yok etme talep etme, otomatik analiz sonucuna itiraz etme ve kanuna aykırı işleme nedeniyle zararın giderilmesini isteme haklarına sahipsiniz."
       ]},
       { title: "10. Başvuru Yöntemi", paragraphs: [
-        "KVKK kapsamındaki taleplerinizi veri sorumlusu Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM'a; Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye adresine yazılı olarak, atilla.alici@hs01.kep.tr KEP adresine veya mevzuatta öngörülen diğer başvuru yöntemleriyle iletebilirsiniz. Genel iletişim için destek@neyeihtiyacvar.com adresi kullanılabilir."
+        "KVKK kapsamındaki taleplerinizi veri sorumlusu Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM'a; Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye adresine yazılı olarak, atilla.alici@hs01.kep.tr KEP adresine veya mevzuatta öngörülen diğer başvuru yöntemleriyle iletebilirsiniz. Genel iletişim için destek@neyeihtiyacvar.com adresi kullanılabilir."
       ]},
       { title: "11. Aydınlatma ve Açık Rızanın Ayrılığı", paragraphs: [
         "Bu metin bilgilendirme amacı taşıyan bir aydınlatma metnidir. Genel bir kişisel veri işleme rızası yerine, açık rıza gerçekten gereken ayrı bir işlem varsa bu işlem özelinde ayrıca rıza alınır."
@@ -300,7 +300,7 @@ export const legalDocuments: LegalDocumentData[] = [
       {
         title: "1. Taraflar",
         paragraphs: [
-          "İşbu sözleşmenin hizmet sağlayıcısı Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM'dır. İşletme adresi Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye'dir. Elektronik posta adresi destek@neyeihtiyacvar.com, KEP adresi atilla.alici@hs01.kep.tr'dir. Esnaf Sicil No: 44745, Oda Sicil No: 1537'dir.",
+          "İşbu sözleşmenin hizmet sağlayıcısı Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM'dır. İşletme adresi Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye'dir. Elektronik posta adresi destek@neyeihtiyacvar.com, KEP adresi atilla.alici@hs01.kep.tr'dir. Esnaf Sicil No: 44745, Oda Sicil No: 1537'dir.",
           "Sözleşmenin diğer tarafı, neyeihtiyacvar.com üzerinden ücretli veya promosyonlu işletme üyeliği başlatan gerçek veya tüzel kişi işletme ya da hizmet sağlayıcıdır. Bu metinde kısaca İşletme olarak anılır."
         ]
       },
@@ -406,7 +406,7 @@ export const legalDocuments: LegalDocumentData[] = [
       {
         title: "15. İletişim",
         paragraphs: [
-          "Hizmet sağlayıcı: Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM",
+          "Hizmet sağlayıcı: Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM",
           "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
           "E-posta: destek@neyeihtiyacvar.com",
           "KEP: atilla.alici@hs01.kep.tr",
@@ -494,7 +494,7 @@ export const legalDocuments: LegalDocumentData[] = [
       {
         title: "10. İletişim",
         paragraphs: [
-          "Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM",
+          "Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM",
           "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
           "E-posta: destek@neyeihtiyacvar.com",
           "KEP: atilla.alici@hs01.kep.tr",
