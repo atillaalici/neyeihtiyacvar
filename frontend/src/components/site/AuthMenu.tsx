@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
 import { NotificationBell } from "@/components/site/NotificationBell";
+import { MessageBell } from "@/components/site/MessageBell";
 import {
   clearAuth,
   getAccessToken,
@@ -98,7 +99,8 @@ export function AuthMenu({
             </Link>
           )}
 
-          <div className="px-2 py-1">
+          <div className="flex items-center gap-1 px-2 py-1">
+            <MessageBell />
             <NotificationBell />
           </div>
 
@@ -185,6 +187,7 @@ export function AuthMenu({
           </Link>
         )}
 
+        <MessageBell />
         <NotificationBell />
 
         <div ref={accountMenuRef} className="relative">

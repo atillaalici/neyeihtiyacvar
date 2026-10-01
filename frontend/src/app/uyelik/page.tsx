@@ -97,6 +97,16 @@ function money(value: number) {
   });
 }
 
+function regularAnnualPrice(planCode: string) {
+  const prices: Record<string, number> = {
+    kobi: 2400,
+    avantaj: 5000,
+    profesyonel: 12000,
+  };
+
+  return prices[planCode] ?? null;
+}
+
 function fallbackPlans(): MembershipPlan[] {
   return [
     {
@@ -239,7 +249,7 @@ export default function MembershipPage() {
                 <article
                   key={plan.id}
                   className={[
-                    "relative flex min-h-full min-w-0 flex-col overflow-hidden rounded-[18px] border bg-card p-2.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:rounded-[24px] sm:p-5 xl:rounded-[28px] xl:p-7",
+                    "relative flex min-h-full min-w-0 flex-col overflow-hidden rounded-[18px] border bg-card p-2.5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:rounded-[22px] sm:p-4 xl:rounded-[24px] xl:p-5",
                     isProfessional ? "col-span-2 w-[calc(50%-0.3125rem)] justify-self-center md:col-span-1 md:w-auto md:justify-self-stretch" : "",
                     plan.isRecommended
                       ? "border-orange-400 ring-2 ring-orange-200/70"
@@ -252,60 +262,98 @@ export default function MembershipPage() {
                     </div>
                   ) : null}
 
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div
+                      className={[
+                        "grid size-11 shrink-0 place-items-center rounded-xl sm:size-14 sm:rounded-2xl",
+                        plan.isRecommended
+                          ? "bg-orange-100 text-orange-600"
+                          : isProfessional
+                            ? "bg-violet-100 text-violet-700"
+                            : "bg-sky-100 text-sky-700",
+                      ].join(" ")}
+                    >
+                      {plan.isRecommended ? (
+                        <Crown className="size-5 sm:size-7" />
+                      ) : isProfessional ? (
+                        <Sparkles className="size-5 sm:size-7" />
+                      ) : (
+                        <Building2 className="size-5 sm:size-7" />
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <h2 className="pr-14 font-display text-base font-extrabold leading-tight sm:text-xl">
+                        {plan.name}
+                      </h2>
+
+                      <p className="mt-1 text-[10px] leading-4 text-muted-foreground sm:min-h-10 sm:text-xs sm:leading-5">
+                        {plan.description}
+                      </p>
+                    </div>
+                  </div>
+
                   <div
                     className={[
-                      "grid size-9 place-items-center rounded-xl sm:size-12 sm:rounded-2xl",
+                      "mt-2.5 rounded-xl border p-2.5 sm:rounded-2xl sm:p-3",
                       plan.isRecommended
-                        ? "bg-orange-100 text-orange-600"
+                        ? "border-orange-200 bg-orange-50/60"
                         : isProfessional
-                          ? "bg-violet-100 text-violet-700"
-                          : "bg-sky-100 text-sky-700",
+                          ? "border-violet-200 bg-violet-50/60"
+                          : "border-sky-200 bg-sky-50/60",
                     ].join(" ")}
                   >
-                    {plan.isRecommended ? (
-                      <Crown className="size-4 sm:size-6" />
-                    ) : isProfessional ? (
-                      <Sparkles className="size-4 sm:size-6" />
-                    ) : (
-                      <Building2 className="size-4 sm:size-6" />
-                    )}
-                  </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-emerald-700 sm:text-[11px]">
+                        Birinci Yıla Özel
+                      </span>
 
-                  <div className="mt-3">
-                    <h2 className="font-display text-base font-bold sm:text-xl xl:text-2xl">{plan.name}</h2>
-                    <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground sm:mt-2 sm:min-h-16 sm:text-sm sm:leading-6">
-                      {plan.description}
-                    </p>
-                  </div>
+                      {regularAnnualPrice(plan.code) ? (
+                        <span className="whitespace-nowrap text-base font-extrabold text-slate-600 line-through decoration-2 sm:text-lg">
+                          {money(regularAnnualPrice(plan.code)!)} TL
+                        </span>
+                      ) : null}
+                    </div>
 
-                  <div className="mt-3 border-y border-border/70 py-2.5">
-                    <div className="flex items-end gap-2">
-                      <span className="text-xl font-black tracking-tight sm:text-3xl xl:text-4xl">
+                    <div className="mt-1 flex items-end gap-1.5">
+                      <span
+                        className={[
+                          "text-2xl font-black tracking-tight sm:text-3xl",
+                          plan.isRecommended
+                            ? "text-orange-600"
+                            : isProfessional
+                              ? "text-violet-700"
+                              : "text-sky-700",
+                        ].join(" ")}
+                      >
                         {money(plan.annualPrice)} TL
                       </span>
-                      <span className="pb-0.5 text-[10px] text-muted-foreground sm:pb-1 sm:text-sm">/ yıl</span>
+                      <span className="pb-1 text-[10px] font-medium text-muted-foreground sm:text-xs">
+                        / yıl
+                      </span>
                     </div>
-                    <p className="mt-1.5 text-[10px] leading-4 text-muted-foreground sm:mt-2 sm:text-sm">
-                      Aylık karşılığı yaklaşık{" "}
+
+                    <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground sm:text-xs">
+                      Aylık yaklaşık{" "}
                       <strong className="text-foreground">
                         {money(plan.monthlyEquivalent)} TL
                       </strong>
                     </p>
                   </div>
 
-                  <div className="mt-3 rounded-xl bg-muted/50 p-2 sm:mt-4 sm:rounded-2xl sm:p-3 xl:mt-5 xl:p-4">
+                  <div className="mt-2 rounded-xl bg-muted/50 p-2 sm:mt-2.5 sm:p-2.5">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Hizmet kapasitesi
                     </div>
-                    <div className="mt-1 text-lg font-bold sm:text-2xl">
+                    <div className="mt-0.5 text-lg font-bold sm:text-xl">
                       {plan.serviceLimit} hizmet
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground sm:text-xs">
                       Tüm hizmet haklarını ilk gün kullanmak zorunda değilsiniz.
                     </p>
                   </div>
 
-                  <div className="mt-3 flex-1 space-y-1.5 sm:mt-5 sm:space-y-2.5 xl:mt-6 xl:space-y-3">
+                  <div className="mt-2 flex-1 space-y-1 sm:mt-2.5 sm:space-y-1">
                     {featureRows.map((feature) => {
                       const enabled = feature.enabled(plan);
 
@@ -313,13 +361,13 @@ export default function MembershipPage() {
                         <div
                           key={feature.label}
                           className={[
-                            "flex min-w-0 items-center gap-1.5 text-[10px] sm:gap-2.5 sm:text-sm",
+                            "flex min-w-0 items-center gap-1.5 text-[10px] sm:gap-2 sm:text-xs",
                             enabled ? "text-foreground" : "text-muted-foreground/55",
                           ].join(" ")}
                         >
                           <span
                             className={[
-                              "grid size-5 shrink-0 place-items-center rounded-full sm:size-6",
+                              "grid size-5 shrink-0 place-items-center rounded-full",
                               enabled
                                 ? "bg-emerald-50 text-emerald-600"
                                 : "bg-muted text-muted-foreground/50",
@@ -336,7 +384,7 @@ export default function MembershipPage() {
                   <Link
                     href={`/kayit?hesap=isletme&paket=${encodeURIComponent(plan.code)}`}
                     className={[
-                      "mt-4 inline-flex h-10 items-center justify-center rounded-xl px-2 text-[10px] font-bold transition sm:mt-7 sm:h-12 sm:px-5 sm:text-sm",
+                      "mt-2.5 inline-flex h-10 items-center justify-center rounded-xl px-2 text-[10px] font-bold transition sm:mt-3 sm:h-11 sm:px-4 sm:text-sm",
                       plan.isRecommended
                         ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20 hover:bg-orange-600"
                         : isKobi

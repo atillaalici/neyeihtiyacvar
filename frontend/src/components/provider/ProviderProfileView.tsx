@@ -48,6 +48,22 @@ export type GalleryPhoto = {
   isCover?: boolean;
 };
 
+type ProviderReview = {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  reviewerName?: string | null;
+  createdAtUtc: string;
+};
+
+type ReviewSummary = {
+  providerId: string;
+  providerSlug: string;
+  averageRating: number;
+  reviewCount: number;
+  reviews: ProviderReview[];
+};
+
 type NearbyProvider = {
   id: string;
   slug: string;
@@ -130,6 +146,9 @@ export default function ProviderProfileView({
   const [photo, setPhoto] = useState(0);
   const [lightbox, setLightbox] = useState(false);
   const [favorite, setFavorite] = useState(false);
+  const [startingMessage, setStartingMessage] = useState(false);
+  const [messageError, setMessageError] = useState("");
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
   const [nearbyProviders, setNearbyProviders] = useState<NearbyProvider[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
 
@@ -182,6 +201,37 @@ export default function ProviderProfileView({
       active = false;
     };
   }, [slug, providerOverride, galleryOverride]);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    let active = true;
+
+    async function loadReviews() {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/providers/${encodeURIComponent(slug)}/reviews`,
+          { cache: "no-store" },
+        );
+
+        if (!response.ok) {
+          if (active) setReviewSummary(null);
+          return;
+        }
+
+        const data = (await response.json()) as ReviewSummary;
+        if (active) setReviewSummary(data);
+      } catch {
+        if (active) setReviewSummary(null);
+      }
+    }
+
+    void loadReviews();
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
 
   useEffect(() => {
     let active = true;
@@ -293,6 +343,63 @@ export default function ProviderProfileView({
     const returnUrl = `/isletme/${slug}?contact=1`;
     router.push(`/giris?returnUrl=${encodeURIComponent(returnUrl)}`);
   }
+
+  async function startMessaging() {
+    if (!provider || startingMessage) return;
+
+    const token = getAccessToken();
+
+    if (!token) {
+      const returnUrl = `/isletme/${provider.slug}?message=1`;
+      router.push(`/giris?returnUrl=${encodeURIComponent(returnUrl)}`);
+      return;
+    }
+
+    setStartingMessage(true);
+    setMessageError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/messages/conversations`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            providerSlug: provider.slug,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        throw new Error(
+          payload?.message ?? "Mesajlaşma başlatılamadı.",
+        );
+      }
+
+      const conversation = (await response.json()) as {
+        id: string;
+      };
+
+      router.push(
+        `/mesajlarim?conversation=${encodeURIComponent(conversation.id)}`,
+      );
+    } catch (error) {
+      setMessageError(
+        error instanceof Error
+          ? error.message
+          : "Mesajlaşma başlatılamadı.",
+      );
+    } finally {
+      setStartingMessage(false);
+    }
+  }
   const hasMap =
     provider?.latitude != null &&
     provider?.longitude != null &&
@@ -391,12 +498,20 @@ export default function ProviderProfileView({
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <Star className="fill-amber-400 text-amber-400" size={20} />
-                <b>{provider.rating ?? "Yeni"}</b>
-                {provider.reviewCount != null && (
-                  <span className="text-sm text-slate-500">
-                    ({provider.reviewCount} değerlendirme)
-                  </span>
-                )}
+                <b>
+                  {(reviewSummary?.reviewCount ?? 0) > 0
+                    ? reviewSummary!.averageRating.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })
+                    : "Yeni"}
+                </b>
+                <a
+                  href="#degerlendirmeler"
+                  className="text-sm font-medium text-slate-500 underline-offset-4 transition hover:text-emerald-700 hover:underline"
+                >
+                  ({reviewSummary?.reviewCount ?? 0} değerlendirme)
+                </a>
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-bold text-emerald-700">
@@ -495,6 +610,24 @@ export default function ProviderProfileView({
                       <MessageCircle size={20} />
                       WhatsApp&apos;tan Yaz
                     </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => void startMessaging()}
+                    disabled={startingMessage}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-orange-500 bg-white px-4 py-3.5 font-bold text-orange-600 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <MessageCircle size={20} />
+                    {startingMessage
+                      ? "Mesajlaşma Açılıyor..."
+                      : "Mesaj Gönder"}
+                  </button>
+
+                  {messageError && (
+                    <p className="text-center text-sm font-medium text-red-600">
+                      {messageError}
+                    </p>
                   )}
                 </>
               )}
@@ -738,19 +871,53 @@ export default function ProviderProfileView({
               </div>
               <div className="rounded-xl bg-slate-50 px-5 py-3 text-center">
                 <div className="text-2xl font-black">
-                  {provider.rating ?? "Yeni"}
+                  {(reviewSummary?.reviewCount ?? 0) > 0
+                    ? reviewSummary!.averageRating.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1,
+                      })
+                    : "Yeni"}
                 </div>
                 <div className="text-xs text-slate-500">
-                  {provider.reviewCount ?? 0} değerlendirme
+                  {reviewSummary?.reviewCount ?? 0} değerlendirme
                 </div>
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-dashed p-8 text-center text-slate-500">
-              {(provider.reviewCount ?? 0) > 0
-                ? "Değerlendirmeler burada listelenecek."
-                : "Bu işletme için henüz değerlendirme yapılmamış."}
-            </div>
+            {(reviewSummary?.reviewCount ?? 0) > 0 ? (
+              <div className="mt-5 space-y-3">
+                {reviewSummary!.reviews.map((review) => (
+                  <div key={review.id} className="rounded-xl border p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-bold text-slate-900">
+                        {review.reviewerName || "Kullanıcı"}
+                      </div>
+                      <div className="flex items-center gap-1 font-bold text-amber-600">
+                        <Star
+                          size={17}
+                          className="fill-amber-400 text-amber-400"
+                        />
+                        {review.rating}/5
+                      </div>
+                    </div>
+
+                    {review.comment ? (
+                      <p className="mt-2 leading-6 text-slate-600">
+                        {review.comment}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-2 text-xs text-slate-400">
+                      {new Date(review.createdAtUtc).toLocaleDateString("tr-TR")}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-xl border border-dashed p-8 text-center text-slate-500">
+                Bu işletme için henüz değerlendirme yapılmamış.
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border bg-white p-5 shadow-sm">

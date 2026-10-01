@@ -108,6 +108,7 @@ function MembershipPaymentContent() {
   const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeError, setUpgradeError] = useState("");
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const [billing, setBilling] = useState({
     billingType: "individual",
@@ -341,6 +342,13 @@ function MembershipPaymentContent() {
       return;
     }
 
+    if (!legalAccepted) {
+      setPromoError(
+        "Devam etmek için Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesini kabul etmelisin.",
+      );
+      return;
+    }
+
     const token = getAccessToken();
 
     if (!token) {
@@ -396,6 +404,7 @@ function MembershipPaymentContent() {
             promotionCode: promoResult.code,
             planCode,
             ...draft,
+            legalAccepted: true,
           }),
         },
       );
@@ -478,6 +487,13 @@ function MembershipPaymentContent() {
   async function continueToPayment() {
     if (!billingSaved) {
       setBillingError("Önce fatura bilgilerini kaydetmelisin.");
+      return;
+    }
+
+    if (!legalAccepted) {
+      setPromoError(
+        "Devam etmek için Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesini kabul etmelisin.",
+      );
       return;
     }
 
@@ -878,6 +894,42 @@ function MembershipPaymentContent() {
             </div>
             ) : null}
 
+            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={legalAccepted}
+                  onChange={(event) => {
+                    setLegalAccepted(event.target.checked);
+                    if (event.target.checked) {
+                      setPromoError("");
+                    }
+                  }}
+                  className="mt-1 h-4 w-4 shrink-0 accent-orange-600"
+                />
+                <span className="text-sm leading-6 text-muted-foreground">
+                  <a
+                    href="/sozlesmeler/ucretli-isletme-uyeligi"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-foreground underline underline-offset-2"
+                  >
+                    Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesi
+                  </a>
+                  &apos;ni okudum ve kabul ediyorum.{" "}
+                  <a
+                    href="/sozlesmeler/iptal-iade-politikasi"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-foreground underline underline-offset-2"
+                  >
+                    İptal ve İade Politikası
+                  </a>
+                  &apos;nı inceledim.
+                </span>
+              </label>
+            </div>
+
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
               <button
                 type="button"
@@ -891,7 +943,11 @@ function MembershipPaymentContent() {
                 <button
                   type="button"
                   onClick={() => void completeFreeRegistration()}
-                  disabled={completingRegistration || !billingSaved}
+                  disabled={
+                    completingRegistration ||
+                    !billingSaved ||
+                    !legalAccepted
+                  }
                   className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {completingRegistration
@@ -904,6 +960,8 @@ function MembershipPaymentContent() {
                   onClick={() => void continueToPayment()}
                   disabled={
                     billingSaving ||
+                    !billingSaved ||
+                    !legalAccepted ||
                     (isUpgrade && (upgradeLoading || !upgradeQuote))
                   }
                   className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"

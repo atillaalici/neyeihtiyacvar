@@ -265,6 +265,12 @@ public static class BusinessRegistrationEndpoints
             if (NormalizePhone(request.PhoneNumber) is null)
                 return Results.BadRequest(new { message = "Telefon +90 5XX XXX XX XX formatında olmalıdır." });
 
+            if (!request.LegalAccepted)
+                return Results.BadRequest(new
+                {
+                    message = "Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesi kabul edilmelidir."
+                });
+
             var planCode = request.PlanCode.Trim().ToLowerInvariant();
             var plan = await dbContext.MembershipPlans.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Code == planCode && x.IsActive);
@@ -366,6 +372,22 @@ public static class BusinessRegistrationEndpoints
             };
             dbContext.PromotionUsages.Add(usage);
 
+            var legalAcceptance = new LegalAcceptance
+            {
+                UserId = userId,
+                DocumentCode = "ucretli-isletme-uyeligi",
+                DocumentVersion = "2026-10-01",
+                ActionType = "initial_membership",
+                PlanCode = plan.Code,
+                PlanName = plan.Name,
+                OriginalPrice = plan.AnnualPrice,
+                DiscountAmount = discountAmount,
+                FinalPrice = finalPrice,
+                PromotionCode = promo.Code,
+                AcceptedAtUtc = now
+            };
+            dbContext.LegalAcceptances.Add(legalAcceptance);
+
             user.Role = UserRole.Provider;
             user.UpdatedAtUtc = now;
 
@@ -376,6 +398,7 @@ public static class BusinessRegistrationEndpoints
             {
                 completed = true, applicationId = application.Id, providerId = provider.Id,
                 providerSlug = provider.Slug, membershipId = membership.Id, promotionUsageId = usage.Id,
+                legalAcceptanceId = legalAcceptance.Id,
                 planCode = plan.Code, originalPrice = plan.AnnualPrice, discountAmount, finalPrice,
                 applicationStatus = "pending", publicationStatus = "draft",
                 message = "İşletme kaydın tamamlandı. İşletmen yönetim panelinde hazır; yayınlanması yönetici onayından sonra gerçekleşecek."
@@ -774,7 +797,8 @@ public sealed record CompleteFreeBusinessRegistrationRequest(
     string CategorySlug,
     string ServiceSlug,
     string? AdditionalCategorySlug,
-    string? AdditionalServiceSlug);
+    string? AdditionalServiceSlug,
+    bool LegalAccepted);
 
 public sealed record BusinessRegisterRequest(
     string BusinessName,

@@ -41,7 +41,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "İşletmeler, aksi açıkça belirtilmedikçe TEKNONET'in çalışanı, şubesi, temsilcisi veya acentesi değildir. Gerekli ruhsat, izin, yetki ve mesleki yeterliliklerin bulunmasından ilgili İşletme sorumludur."
       ]},
       { title: "8. Fiyat ve Ödeme", paragraphs: [
-        "Mevcut yapıda Kullanıcı ile İşletme arasındaki hizmet bedeli ve ödeme şartları taraflar arasında belirlenebilir. Platform üzerinden doğrudan ödeme özelliği sunulmaya başlanırsa gerekli ön bilgilendirme, ödeme, iptal ve tüketici haklarına ilişkin koşullar ayrıca düzenlenir."
+        "Kullanıcı ile İşletme arasındaki asıl hizmetin bedeli ve ödeme şartları ilgili taraflar arasında belirlenir. Neye İhtiyaç Var tarafından tahsil edilen veya tahsil edilecek işletme üyelik bedelleri, İşletmenin Platformdan satın aldığı dijital üyelik, dijital vitrin ve ilgili platform hizmetlerine ilişkindir; Kullanıcı ile İşletme arasındaki asıl hizmet bedelinin tahsili kapsamında değildir."
       ]},
       { title: "9. Değerlendirme ve Yorumlar", paragraphs: [
         "Değerlendirmelerin gerçek deneyime dayanması esastır. Sahte değerlendirme, manipülasyon, hakaret, tehdit, kişisel veri paylaşımı, reklam veya spam içerikleri yasaktır. Olumsuz olması tek başına bir yorumun kaldırılması nedeni değildir."
@@ -65,7 +65,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "Hesap, güvenlik, doğrulama ve işlem bildirimleri ile reklam ve pazarlama iletileri birbirinden ayrılır. Pazarlama amacıyla izin gereken iletiler için ilgili mevzuata uygun ayrıca izin süreçleri uygulanır."
       ]},
       { title: "16. Ücretli ve Premium Hizmetler", paragraphs: [
-        "Platform gelecekte premium üyelik, öne çıkarma, reklam, görünürlük artırma ve benzeri ücretli hizmetler sunabilir. Ücretli hizmet alınmadan önce kapsam, bedel ve koşullar ayrıca gösterilir; bu metin tek başına ödeme yükümlülüğü doğurmaz."
+        "Platform, işletmelere yıllık dijital üyelik ve dijital vitrin paketleri ile ayrıca sunulması halinde öne çıkarma, reklam, görünürlük artırma ve benzeri ücretli hizmetler sağlayabilir. Ücretli bir hizmet alınmadan önce ilgili hizmetin kapsamı, bedeli ve uygulanabilir koşulları İşletmeye gösterilir; bu Kullanım ve Üyelik Koşulları tek başına herhangi bir ücretli hizmet satın alma yükümlülüğü doğurmaz."
       ]},
       // NIHV-HUKUK-GUNCELLEME-2026-09-23
       { title: "17. Kullanıcı ile İşletme Arasındaki Hukuki ve Ticari İlişki", paragraphs: [
@@ -120,7 +120,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "Gerçek hizmet deneyimine dayalı kullanıcı değerlendirmeleri yalnızca olumsuz oldukları için kaldırılamaz. Sahte yorum, manipülasyon, hakaret, kişisel veri açıklama veya hukuka aykırı içerik incelemeye alınabilir."
       ]},
       { title: "8. Sıralama, Reklam ve Ücretli Hizmetler", paragraphs: [
-        "Görünürlük; uygunluk, konum, profil bilgileri, kullanıcı değerlendirmeleri ve Platformun objektif kriterlerinden etkilenebilir. Platform gelecekte premium paket, öne çıkarma, sponsorlu listeleme, reklam alanı, gelişmiş araç ve istatistik gibi ücretli hizmetler sunabilir.",
+        "Görünürlük; uygunluk, konum, profil bilgileri, kullanıcı değerlendirmeleri ve Platformun objektif kriterlerinden etkilenebilir. Platform işletmelere yıllık dijital üyelik ve dijital vitrin paketleri sunar; ayrıca sunulması halinde öne çıkarma, sponsorlu listeleme, reklam alanı, gelişmiş araç ve istatistik gibi ücretli özellikler ilgili kapsam ve koşullarla sağlanabilir.",
         "Ücretli olarak öne çıkarılan içerikler kullanıcı açısından yanıltıcı olmayacak biçimde belirtilir. İşletmenin açıkça satın almadığı ücretli bir hizmet için kendiliğinden ödeme yükümlülüğü oluşturulmaz."
       ]},
       { title: "9. Yasaklanan Davranışlar", paragraphs: [
@@ -191,7 +191,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "Gerekli olduğu ölçüde ilgili Kullanıcı veya İşletmelere, barındırma, e-posta, güvenlik ve yedekleme gibi teknik hizmet sağlayıcılara, hukuki ve mali hizmet sağlayıcılara ve kanuni yükümlülük halinde yetkili kamu kurumlarına aktarım yapılabilir."
       ]},
       { title: "7. Yurt Dışı Aktarımı", paragraphs: [
-        "Kullanılan teknik hizmet sağlayıcının altyapısının yurt dışında bulunması veya aktarım gerektirmesi halinde yürürlükteki KVKK yurt dışı aktarım hükümleri uygulanır. Production altyapısındaki gerçek servisler ve veri akışları ayrıca doğrulanır."
+        "Kullanılan teknik hizmet sağlayıcıların altyapısının yurt dışında bulunması veya kişisel verilerin yurt dışına aktarılmasının söz konusu olması halinde, yürürlükteki KVKK'nın yurt dışına veri aktarımına ilişkin hükümleri ve uygulanabilir diğer mevzuat hükümleri doğrultusunda hareket edilir."
       ]},
       { title: "8. Saklama ve Güvenlik", paragraphs: [
         "Veriler işleme amacının gerektirdiği ve mevzuatın öngördüğü süre boyunca saklanır; amaç ve hukuki gereklilik ortadan kalktığında silinir, yok edilir veya anonimleştirilir. Erişim yetkileri, kimlik doğrulama, güvenli bağlantı, loglama, güncelleme ve yedekleme gibi tedbirler uygulanabilir."
@@ -200,7 +200,7 @@ export const legalDocuments: LegalDocumentData[] = [
         "KVKK'nın 11. maddesi kapsamında kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, amacını öğrenme, aktarılan üçüncü kişileri bilme, yanlış verilerin düzeltilmesini isteme, şartları varsa silme/yok etme talep etme, otomatik analiz sonucuna itiraz etme ve kanuna aykırı işleme nedeniyle zararın giderilmesini isteme haklarına sahipsiniz."
       ]},
       { title: "10. Başvuru Yöntemi", paragraphs: [
-        "Taleplerinizi Teknonet Yazılım'ya, Merkez / OSMANİYE adresinden iletebilirsiniz. Elektronik KVKK başvuru kanalı Platformun iletişim alanında ayrıca yayımlanacaktır."
+        "KVKK kapsamındaki taleplerinizi veri sorumlusu Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM'a; Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye adresine yazılı olarak, atilla.alici@hs01.kep.tr KEP adresine veya mevzuatta öngörülen diğer başvuru yöntemleriyle iletebilirsiniz. Genel iletişim için destek@neyeihtiyacvar.com adresi kullanılabilir."
       ]},
       { title: "11. Aydınlatma ve Açık Rızanın Ayrılığı", paragraphs: [
         "Bu metin bilgilendirme amacı taşıyan bir aydınlatma metnidir. Genel bir kişisel veri işleme rızası yerine, açık rıza gerçekten gereken ayrı bir işlem varsa bu işlem özelinde ayrıca rıza alınır."
@@ -265,10 +265,10 @@ export const legalDocuments: LegalDocumentData[] = [
         "Mevcut politika Google Analytics, Meta Pixel veya benzeri reklam/davranışsal takip teknolojilerinin kullanıldığını varsaymaz. İleride zorunlu olmayan analitik veya reklam teknolojileri kullanılırsa gerekli bilgilendirme yapılır ve mevzuat gerektiriyorsa kullanıcı tercihi alınır."
       ]},
       { title: "5. Birinci ve Üçüncü Taraf Teknolojiler", paragraphs: [
-        "Birinci taraf teknolojiler doğrudan neyeihtiyacvar.com tarafından, üçüncü taraf teknolojiler ise Platformda kullanılan başka hizmet sağlayıcılarca oluşturulabilir. Production ortamındaki gerçek servisler teknik olarak doğrulanarak nihai çerez envanteri güncellenir."
+        "Birinci taraf teknolojiler doğrudan neyeihtiyacvar.com tarafından, üçüncü taraf teknolojiler ise Platformda kullanılan hizmet sağlayıcılar tarafından oluşturulabilir. Kullanılan teknolojiler değiştiğinde bu politika ve gerekli olduğu ölçüde ilgili çerez veya depolama bilgileri güncellenir."
       ]},
       { title: "6. Çerez Envanteri", paragraphs: [
-        "Production sürümünde kullanılan gerçek çerez ve depolama kayıtları; ad, sağlayıcı, amaç, tür, saklama süresi ve hukuki dayanak bilgileriyle envanter halinde tutulacaktır. Kullanılmayan tahmini çerez isimleri bu politikaya eklenmez."
+        "Platformda kullanılan çerez ve benzeri tarayıcı depolama teknolojileri, kullanım amaçları ve gerekli olduğu ölçüde saklama süreleri bakımından takip edilir. Yeni bir teknoloji kullanılmaya başlanması veya mevcut kullanımın değişmesi halinde ilgili bilgilendirmeler güncellenir."
       ]},
       { title: "7. Tercihlerin Yönetilmesi", paragraphs: [
         "Kullanıcılar tarayıcı ayarlarından çerezleri görüntüleyebilir, silebilir veya engelleyebilir. Açık rıza gerektiren zorunlu olmayan çerezler kullanılmaya başlanırsa Platform üzerinden kabul, ret ve tercihleri değiştirme imkanı sağlanır."
@@ -282,6 +282,225 @@ export const legalDocuments: LegalDocumentData[] = [
       { title: "10. Güncelleme", paragraphs: [
         "Teknik altyapı veya kullanılan teknolojiler değiştikçe Çerez Politikası ve çerez envanteri güncellenir."
       ]}
+    ]
+  },
+  {
+    slug: "ucretli-isletme-uyeligi",
+    title: "Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesi",
+    summary:
+      "Neye İhtiyaç Var işletme paketlerinin satın alınması, kullanımı, süresi ve tarafların hak ve yükümlülükleri.",
+    sections: [
+      {
+        title: "Sürüm Bilgisi",
+        paragraphs: [
+          "Sözleşme sürümü: 2026-10-01",
+          "Yürürlük tarihi: 1 Ekim 2026"
+        ]
+      },
+      {
+        title: "1. Taraflar",
+        paragraphs: [
+          "İşbu sözleşmenin hizmet sağlayıcısı Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM'dır. İşletme adresi Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye'dir. Elektronik posta adresi destek@neyeihtiyacvar.com, KEP adresi atilla.alici@hs01.kep.tr'dir. Esnaf Sicil No: 44745, Oda Sicil No: 1537'dir.",
+          "Sözleşmenin diğer tarafı, neyeihtiyacvar.com üzerinden ücretli veya promosyonlu işletme üyeliği başlatan gerçek veya tüzel kişi işletme ya da hizmet sağlayıcıdır. Bu metinde kısaca İşletme olarak anılır."
+        ]
+      },
+      {
+        title: "2. Sözleşmenin Konusu",
+        paragraphs: [
+          "Bu sözleşmenin konusu, İşletmenin seçtiği yıllık Neye İhtiyaç Var dijital üyelik ve dijital vitrin paketinin sunulmasına ilişkin tarafların hak ve yükümlülüklerinin belirlenmesidir.",
+          "Satın alınan paket; İşletmenin Platformda dijital vitrin oluşturması, paket kapsamında tanımlanan hizmet veya kategori alanlarında görünürlük kazanması ve Platformun ilgili işletme özelliklerinden yararlanması için sunulan dijital platform hizmetidir."
+        ]
+      },
+      {
+        title: "3. Platformun Rolü ve Tahsil Edilen Bedelin Niteliği",
+        paragraphs: [
+          "Neye İhtiyaç Var, kullanıcıların ihtiyaçlarına uygun işletmeleri keşfetmesini ve işletmelerle iletişim kurmasını kolaylaştıran dijital bir platformdur.",
+          "Neye İhtiyaç Var tarafından tahsil edilen üyelik bedeli yalnızca İşletmenin satın aldığı dijital üyelik, dijital vitrin ve ilgili platform hizmetlerinin bedelidir.",
+          "Kullanıcı ile İşletme arasında gerçekleştirilecek asıl hizmetin bedeli Neye İhtiyaç Var tarafından bu üyelik sözleşmesi kapsamında tahsil edilmez. Kullanıcı ile İşletme arasındaki hizmet ilişkisinin fiyatı, kapsamı, ifası, faturası, garantisi ve diğer ticari koşulları ilgili tarafların sorumluluğundadır."
+        ]
+      },
+      {
+        title: "4. Paket, Kapsam ve Fiyat",
+        paragraphs: [
+          "İşletme, satın alma işlemini tamamlamadan önce seçtiği paketin adını, yıllık bedelini, paket kapsamında tanımlanan hizmet hakkını ve varsa uygulanmış promosyon veya indirimi ödeme veya kayıt tamamlama ekranında görür.",
+          "Platformda farklı kapsam ve fiyatlara sahip paketler sunulabilir. İşletme için geçerli paket ve bedel, işlemin tamamlandığı anda satın alma ekranında gösterilen ve işlem kaydında yer alan paket ve bedeldir.",
+          "Promosyon kodu veya kampanya uygulanması halinde indirim tutarı ve ödenecek nihai tutar işlem tamamlanmadan önce gösterilir."
+        ]
+      },
+      {
+        title: "5. Üyelik Süresi ve Aktivasyon",
+        paragraphs: [
+          "İşletme paketleri, satın alma veya promosyon kapsamında aksi açıkça belirtilmedikçe yıllık olarak sunulur.",
+          "Üyelik dönemi, ilgili paket üyeliğinin sistemde aktive edildiği tarihten itibaren başlar. İşletme başvurusunun mevzuat, güvenlik, doğrulama veya Platform kuralları kapsamında incelemeye tabi tutulması halinde dijital vitrinin herkese açık yayımlanması ayrıca onay sürecine bağlı olabilir.",
+          "Ücretin ödenmiş veya promosyonla sıfırlanmış olması, gerçeğe aykırı bilgi içeren ya da Platform kurallarına veya mevzuata aykırı bir işletme profilinin yayımlanmasını zorunlu kılmaz."
+        ]
+      },
+      {
+        title: "6. Promosyonlu ve 0 TL Üyelikler",
+        paragraphs: [
+          "Bir promosyon veya kampanya sonucunda paket bedelinin tamamen indirilerek 0 TL olması halinde İşletme ödeme kuruluşuna yönlendirilmeden üyelik başvurusunu tamamlayabilir.",
+          "Bedelin 0 TL olması, paket kapsamında sunulan dijital hizmetin veya bu sözleşmenin uygulanmasını ortadan kaldırmaz. Parasal olarak tahsil edilmemiş bir tutar için nakdi iade hakkı doğmaz."
+        ]
+      },
+      {
+        title: "7. Paket Yükseltme",
+        paragraphs: [
+          "Platformun paket yükseltmeye izin verdiği durumlarda İşletmeye mevcut paketi, hedef paketi, kullanılmamış üyelik döneminden hesaplanan kredi veya mahsup tutarı ve ödenecek nihai fark işlem tamamlanmadan önce gösterilir.",
+          "Paket yükseltme işleminin mali ve süreye ilişkin sonucu, yükseltme ekranında İşletmeye gösterilen güncel hesaplamaya göre belirlenir."
+        ]
+      },
+      {
+        title: "8. İşletmenin Yükümlülükleri",
+        paragraphs: [
+          "İşletme; kayıt, fatura, iletişim, yetki, ruhsat, belge, hizmet ve profil bilgilerinin doğru, güncel ve hukuka uygun olmasından sorumludur.",
+          "İşletme, yalnızca sunmaya yetkili olduğu hizmetleri yayımlamalı ve faaliyeti için mevzuat gereği zorunlu izin, ruhsat veya yetki belgelerini geçerli şekilde bulundurmalıdır.",
+          "Yanıltıcı bilgi, sahte belge, üçüncü kişilerin haklarını ihlal eden içerik, hukuka aykırı hizmet veya Platformun güvenliğini tehlikeye düşüren kullanım yasaktır."
+        ]
+      },
+      {
+        title: "9. Faturalandırma ve Ödeme",
+        paragraphs: [
+          "İşletme, ödeme veya üyelik işlemi için talep edilen fatura bilgilerinin doğru ve güncel olduğunu kabul eder. Düzenlenecek mali belgeler İşletmenin sisteme kaydettiği bilgilere göre oluşturulabilir.",
+          "Ücretli paketlerde ödeme, Platformda kullanıma sunulan yetkili ödeme kuruluşu veya ödeme kanalı üzerinden gerçekleştirilir. Kart bilgilerinin işlenmesi ödeme hizmeti sağlayıcısının güvenli altyapısı üzerinden yürütülebilir.",
+          "Ödeme işleminin başarısız olması veya ödeme sağlayıcısı tarafından onaylanmaması halinde ücretli üyelik işlemi tamamlanmış sayılmaz."
+        ]
+      },
+      {
+        title: "10. İptal, Fesih ve İade",
+        paragraphs: [
+          "İptal ve iade talepleri destek@neyeihtiyacvar.com adresine, atilla.alici@hs01.kep.tr KEP adresine veya Platformda ilan edilen diğer destek kanallarına iletilebilir.",
+          "İade değerlendirmesinde üyeliğin aktive edilip edilmediği, hizmetin sunulmaya başlanıp başlanmadığı, talebin nedeni, kullanılan üyelik dönemi, varsa kampanya veya promosyon koşulları ve emredici mevzuat hükümleri dikkate alınır.",
+          "Neye İhtiyaç Var'ın kendi kusuru nedeniyle satın alınan dijital üyelik hizmetini sunamaması halinde sunulamayan hizmete ilişkin uygun iade veya düzeltme sağlanır.",
+          "İşletmenin ciddi veya tekrarlanan mevzuat, güvenlik ya da sözleşme ihlali nedeniyle üyeliğinin sona erdirilmesi halinde kullanılmayan döneme ilişkin iade, olayın niteliği ve uygulanması zorunlu mevzuat hükümleri dikkate alınarak değerlendirilir.",
+          "Bu madde, emredici mevzuattan doğan ve sözleşmeyle sınırlandırılması mümkün olmayan hakları ortadan kaldırmaz. Ayrıntılı esaslar İptal ve İade Politikası'nda açıklanır."
+        ]
+      },
+      {
+        title: "11. Otomatik Yenileme",
+        paragraphs: [
+          "İşbu sözleşme, Platformda ayrıca açıkça sunulup İşletme tarafından onaylanmış bir otomatik yenileme talimatı bulunmadıkça otomatik yenileme taahhüdü oluşturmaz.",
+          "Yeni üyelik dönemi için uygulanacak paket kapsamı ve ücret, yenileme işlemi öncesinde İşletmeye gösterilir."
+        ]
+      },
+      {
+        title: "12. Hizmetin Askıya Alınması veya Sonlandırılması",
+        paragraphs: [
+          "Mevzuata aykırılık, sahte veya yanıltıcı bilgi, güvenlik riski, üçüncü kişi haklarının ihlali, zorunlu yetki veya belgelerin bulunmaması ya da sözleşmenin ciddi veya tekrarlanan ihlali halinde işletme profili veya üyelik gerekli ölçüde askıya alınabilir veya sonlandırılabilir.",
+          "Teknik bakım, güvenlik çalışması, mücbir sebep veya Platformun kontrolü dışındaki altyapı sorunları nedeniyle geçici hizmet kesintileri yaşanabilir. Makul olarak mümkün olan durumlarda hizmetin yeniden sağlanması için gerekli çalışmalar yürütülür."
+        ]
+      },
+      {
+        title: "13. Sözleşmenin Kurulması ve Kayıt",
+        paragraphs: [
+          "İşletmenin bu sözleşmeye erişebilmesi ve satın alma veya promosyonlu üyelik işlemini tamamlamadan önce sözleşmeyi kabul etmesi sağlanır.",
+          "Elektronik ortamda gerçekleştirilen üyelik işlemine ilişkin paket, işlem zamanı, nihai tutar, promosyon bilgisi ve sözleşme kabulü gibi işlem kayıtları yürürlükteki mevzuat ve meşru ispat/güvenlik ihtiyaçları çerçevesinde saklanabilir."
+        ]
+      },
+      {
+        title: "14. Uyuşmazlık ve Uygulanacak Hukuk",
+        paragraphs: [
+          "Bu sözleşmeye Türkiye Cumhuriyeti hukuku uygulanır.",
+          "Tarafların uyuşmazlık halinde kanunen yetkili mercilere başvuru hakları saklıdır. İşletmenin somut işlem bakımından tüketici sayıldığı istisnai durumlarda tüketici mevzuatından doğan emredici görev ve yetki kuralları ayrıca uygulanır."
+        ]
+      },
+      {
+        title: "15. İletişim",
+        paragraphs: [
+          "Hizmet sağlayıcı: Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM",
+          "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
+          "E-posta: destek@neyeihtiyacvar.com",
+          "KEP: atilla.alici@hs01.kep.tr",
+          "Esnaf Sicil No: 44745 — Oda Sicil No: 1537"
+        ]
+      }
+    ]
+  },
+  {
+    slug: "iptal-iade-politikasi",
+    title: "İptal ve İade Politikası",
+    summary:
+      "Yıllık işletme üyeliklerinde iptal, fesih ve ücret iadesi taleplerinin değerlendirilmesine ilişkin esaslar.",
+    sections: [
+      {
+        title: "Sürüm Bilgisi",
+        paragraphs: [
+          "Politika sürümü: 2026-10-01",
+          "Yürürlük tarihi: 1 Ekim 2026"
+        ]
+      },
+      {
+        title: "1. Kapsam",
+        paragraphs: [
+          "Bu politika, Neye İhtiyaç Var tarafından işletmelere sunulan ücretli veya promosyonlu yıllık dijital üyelik, dijital vitrin ve ilgili platform paketlerine ilişkin iptal ve iade süreçlerini açıklar.",
+          "Kullanıcı ile Platformdaki bir işletme arasında gerçekleştirilen asıl hizmete ilişkin ücret, kapora, iptal veya iade işlemleri bu politikanın kapsamında değildir; bunlar ilgili kullanıcı ile işletme arasındaki hukuki ve ticari ilişkiye tabidir."
+        ]
+      },
+      {
+        title: "2. İptal veya İade Talebi Nasıl Yapılır?",
+        paragraphs: [
+          "İşletme iptal veya iade talebini destek@neyeihtiyacvar.com adresine ya da atilla.alici@hs01.kep.tr KEP adresine iletebilir.",
+          "Talebin hızlı değerlendirilebilmesi için işletme adı, hesapta kayıtlı e-posta veya telefon bilgisi, ilgili paket ve talebin kısa gerekçesi belirtilmelidir."
+        ]
+      },
+      {
+        title: "3. Değerlendirme Esasları",
+        paragraphs: [
+          "Her iptal veya iade talebi; üyeliğin aktivasyon durumu, hizmetin sunulmaya başlanıp başlanmadığı, kullanılan süre, talebin nedeni, varsa promosyon veya kampanya, tarafların kusuru ve uygulanması zorunlu mevzuat hükümleri dikkate alınarak değerlendirilir.",
+          "Bu politika, kanunen vazgeçilmesi mümkün olmayan bir hakkı kaldıracak veya sınırlandıracak şekilde uygulanmaz."
+        ]
+      },
+      {
+        title: "4. Neye İhtiyaç Var Kaynaklı Hizmet Sunulamaması",
+        paragraphs: [
+          "Satın alınan dijital üyelik hizmetinin Neye İhtiyaç Var'ın kendi kusuru nedeniyle hiç sunulamaması halinde ilgili hizmet bedeli için uygun iade veya düzeltme yapılır.",
+          "Hizmetin yalnızca bir bölümünün sunulabildiği durumlarda olayın niteliğine göre sunulamayan bölüm veya süre dikkate alınarak uygun çözüm belirlenir."
+        ]
+      },
+      {
+        title: "5. İşletmenin Talebiyle Erken Sonlandırma",
+        paragraphs: [
+          "İşletme üyeliğinin sona erdirilmesini talep edebilir. Üyeliğin erken sonlandırılması, her durumda kullanılmayan sürenin tamamının otomatik olarak nakden iade edileceği anlamına gelmez.",
+          "Varsa iade tutarı; hizmetin aktivasyonu, kullanılan dönem, sağlanan dijital hizmetler, kampanya veya promosyon koşulları ve uygulanması zorunlu mevzuat dikkate alınarak değerlendirilir."
+        ]
+      },
+      {
+        title: "6. Sözleşme veya Mevzuat İhlali",
+        paragraphs: [
+          "Sahte veya yanıltıcı bilgi, hukuka aykırı faaliyet, zorunlu yetki veya belge eksikliği, üçüncü kişi haklarının ihlali, güvenlik ihlali veya sözleşmenin ciddi ya da tekrarlanan ihlali nedeniyle üyeliğin askıya alınması veya sona erdirilmesi halinde iade talebi olayın niteliğine göre değerlendirilir.",
+          "Bu hüküm, emredici mevzuattan doğan hak ve sorumlulukları ortadan kaldırmaz."
+        ]
+      },
+      {
+        title: "7. Promosyon ve 0 TL Paketler",
+        paragraphs: [
+          "Promosyon sonucunda ödenecek tutarın 0 TL olduğu üyeliklerde İşletmeden tahsil edilmiş bir üyelik bedeli bulunmadığından nakdi ücret iadesi yapılmaz.",
+          "Kısmi indirim uygulanmış ücretli işlemlerde varsa iade değerlendirmesi, İşletmenin fiilen ödediği nihai tutar ve ilgili kampanya koşulları esas alınarak yapılır."
+        ]
+      },
+      {
+        title: "8. İadenin Yapılma Yöntemi",
+        paragraphs: [
+          "İade kararı verilmesi halinde, teknik ve hukuki olarak mümkün olduğu ölçüde ödeme yapılan kanal esas alınır. Ödeme kuruluşu veya bankanın işlem süreleri Neye İhtiyaç Var'ın doğrudan kontrolü dışında olabilir.",
+          "İade işleminin durumu hakkında İşletmeye kayıtlı iletişim kanalları üzerinden bilgi verilebilir."
+        ]
+      },
+      {
+        title: "9. Ödeme İtirazları",
+        paragraphs: [
+          "İşletmenin ödeme, üyelik veya iade konusunda bir sorun yaşaması halinde öncelikle destek kanallarımız üzerinden bize ulaşması, işlemin hızlı biçimde araştırılmasına yardımcı olur.",
+          "Bu hüküm İşletmenin bankasına, ödeme kuruluşuna, mahkemeye veya kanunen başvurabileceği diğer mercilere müracaat hakkını ortadan kaldırmaz."
+        ]
+      },
+      {
+        title: "10. İletişim",
+        paragraphs: [
+          "Atilla Alıcı – TEKNO-NET BİLGİSAYAR YAZILIM",
+          "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
+          "E-posta: destek@neyeihtiyacvar.com",
+          "KEP: atilla.alici@hs01.kep.tr",
+          "Esnaf Sicil No: 44745 — Oda Sicil No: 1537"
+        ]
+      }
     ]
   }
 ];

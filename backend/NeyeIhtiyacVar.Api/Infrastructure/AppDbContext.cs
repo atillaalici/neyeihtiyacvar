@@ -39,6 +39,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<BillingInformation> BillingInformations => Set<BillingInformation>();
 
+    public DbSet<LegalAcceptance> LegalAcceptances => Set<LegalAcceptance>();
+
     public DbSet<AppUser> Users => Set<AppUser>();
 
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
@@ -49,12 +51,52 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProviderInteraction> ProviderInteractions => Set<ProviderInteraction>();
 
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+
+    public DbSet<Message> Messages => Set<Message>();
+
     public DbSet<Notification> Notifications => Set<Notification>();
 
     public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // NIV-MESSAGING
+        modelBuilder.Entity<Conversation>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Message>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Body)
+                .HasMaxLength(4000)
+                .IsRequired();
+
+            entity.HasOne(x => x.Conversation)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.ConversationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.SenderUser)
+                .WithMany()
+                .HasForeignKey(x => x.SenderUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        // NIV-MESSAGING-END
+
         // NIV-V71-CATEGORY-LIBRARY
         modelBuilder.Entity<CategoryLibraryWork>(entity =>
         {
@@ -309,6 +351,50 @@ modelBuilder.Entity<ProviderApplication>(entity =>
             entity.HasOne(x => x.User)
                 .WithOne()
                 .HasForeignKey<BillingInformation>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<LegalAcceptance>(entity =>
+        {
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.AcceptedAtUtc);
+            entity.HasIndex(x => new { x.UserId, x.DocumentCode });
+
+            entity.Property(x => x.DocumentCode)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.DocumentVersion)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.ActionType)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.PlanCode)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.PlanName)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.OriginalPrice)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.DiscountAmount)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.FinalPrice)
+                .HasPrecision(12, 2);
+
+            entity.Property(x => x.PromotionCode)
+                .HasMaxLength(100);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
