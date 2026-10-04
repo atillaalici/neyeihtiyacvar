@@ -3,11 +3,13 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Auth;
 using NeyeIhtiyacVar.Api.Infrastructure.Email;
+using NeyeIhtiyacVar.Api.Infrastructure.Sms;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
@@ -504,7 +506,8 @@ public static class AuthEndpoints
             AppDbContext dbContext,
             IConfiguration configuration,
             IWebHostEnvironment environment,
-            IEmailSender emailSender) =>
+            IEmailSender emailSender,
+            ISmsSender smsSender) =>
         {
             if (!TryParseChannel(request.Channel, out var channel))
             {
@@ -642,6 +645,34 @@ public static class AuthEndpoints
                         statusCode: StatusCodes.Status502BadGateway);
                 }
             }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(user.PhoneNumber))
+                {
+                    return Results.BadRequest(new
+                    {
+                        message = "Telefon doğrulaması için kayıtlı bir telefon numarası bulunamadı."
+                    });
+                }
+
+                var smsDelivery = await smsSender.SendVerificationCodeAsync(
+                    user.PhoneNumber,
+                    code);
+
+                if (!smsDelivery.Success)
+                {
+                    dbContext.AccountVerificationCodes.Remove(verification);
+                    await dbContext.SaveChangesAsync();
+
+                    return Results.Json(
+                        new
+                        {
+                            message = "Doğrulama SMS'i gönderilemedi. Lütfen biraz sonra yeniden dene.",
+                            developmentCode = environment.IsDevelopment() ? code : null
+                        },
+                        statusCode: StatusCodes.Status502BadGateway);
+                }
+            }
 
             return Results.Ok(new
             {
@@ -652,7 +683,7 @@ public static class AuthEndpoints
                             ? "Yeni iletişim bilgileri için doğrulama kodu e-postanıza gönderildi."
                             : channel == VerificationChannel.Email
                                 ? "Yeni e-posta doğrulama kodu oluşturuldu."
-                                : "Yeni telefon doğrulama kodu oluşturuldu.",
+                                : "Telefon doğrulama kodu SMS ile gönderildi.",
                 developmentCode = environment.IsDevelopment()
                     ? code
                     : null
@@ -847,6 +878,201 @@ public static class AuthEndpoints
             {
                 message = "Hesabınız yeniden etkinleştirildi."
             });
+        });
+
+        group.MapPost("/social/google", async (
+            SocialGoogleLoginRequest request,
+            AppDbContext dbContext,
+            IPasswordHasher<AppUser> passwordHasher,
+            JwtTokenService tokenService,
+            IConfiguration configuration) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Google kimlik doğrulama bilgisi eksik."
+                });
+            }
+
+            var clientId = configuration["SocialAuth:Google:ClientId"];
+
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
+                return Results.Problem(
+                    title: "Google ile giriş yapılandırılmamış.",
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            GoogleJsonWebSignature.Payload payload;
+
+            try
+            {
+                payload = await GoogleJsonWebSignature.ValidateAsync(
+                    request.IdToken,
+                    new GoogleJsonWebSignature.ValidationSettings
+                    {
+                        Audience = [clientId]
+                    });
+            }
+            catch (InvalidJwtException)
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(payload.Subject) ||
+                string.IsNullOrWhiteSpace(payload.Email) ||
+                payload.EmailVerified != true)
+            {
+                return Results.Json(
+                    new
+                    {
+                        message = "Google hesabının doğrulanmış e-posta bilgisi alınamadı."
+                    },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            const string provider = "google";
+            var now = DateTime.UtcNow;
+            var providerUserId = payload.Subject.Trim();
+            var email = payload.Email.Trim().ToLowerInvariant();
+            var normalizedEmail = email.ToUpperInvariant();
+
+            var externalLogin = await dbContext.UserExternalLogins
+                .Include(x => x.User)
+                .FirstOrDefaultAsync(x =>
+                    x.Provider == provider &&
+                    x.ProviderUserId == providerUserId);
+
+            AppUser? user;
+
+            if (externalLogin is not null)
+            {
+                user = externalLogin.User;
+
+                if (user.DeletedAtUtc is not null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!user.IsActive)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            code = "account_frozen",
+                            message = "Hesabınız dondurulmuş.",
+                            userId = user.Id,
+                            user.Email
+                        },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                externalLogin.ProviderEmail = email;
+                externalLogin.LastLoginAtUtc = now;
+
+                if (user.EmailVerifiedAtUtc is null &&
+                    string.Equals(
+                        user.NormalizedEmail,
+                        normalizedEmail,
+                        StringComparison.Ordinal))
+                {
+                    user.EmailVerifiedAtUtc = now;
+                    user.UpdatedAtUtc = now;
+                }
+
+                await dbContext.SaveChangesAsync();
+
+                var existingToken = tokenService.CreateToken(user);
+                return Results.Ok(ToAuthResponse(user, existingToken));
+            }
+
+            user = await dbContext.Users
+                .FirstOrDefaultAsync(x =>
+                    x.NormalizedEmail == normalizedEmail);
+
+            if (user is not null)
+            {
+                if (user.DeletedAtUtc is not null)
+                {
+                    return Results.Unauthorized();
+                }
+
+                if (!user.IsActive)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            code = "account_frozen",
+                            message = "Hesabınız dondurulmuş.",
+                            userId = user.Id,
+                            user.Email
+                        },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                var alreadyLinked = await dbContext.UserExternalLogins
+                    .AnyAsync(x =>
+                        x.UserId == user.Id &&
+                        x.Provider == provider);
+
+                if (alreadyLinked)
+                {
+                    return Results.Conflict(new
+                    {
+                        message = "Bu kullanıcı hesabına farklı bir Google hesabı zaten bağlı."
+                    });
+                }
+
+                user.EmailVerifiedAtUtc ??= now;
+                user.UpdatedAtUtc = now;
+            }
+            else
+            {
+                var displayName = string.IsNullOrWhiteSpace(payload.Name)
+                    ? email.Split('@')[0]
+                    : payload.Name!.Trim();
+
+                if (displayName.Length > 150)
+                {
+                    displayName = displayName[..150];
+                }
+
+                user = new AppUser
+                {
+                    Email = email,
+                    NormalizedEmail = normalizedEmail,
+                    DisplayName = displayName,
+                    EmailVerifiedAtUtc = now,
+                    IsActive = true,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                };
+
+                // Sosyal hesap kullanıcısının parola ile giriş yapamaması için
+                // tahmin edilemez bir dahili parola karması oluştur.
+                user.PasswordHash = passwordHasher.HashPassword(
+                    user,
+                    Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+
+                dbContext.Users.Add(user);
+            }
+
+            dbContext.UserExternalLogins.Add(new UserExternalLogin
+            {
+                UserId = user.Id,
+                User = user,
+                Provider = provider,
+                ProviderUserId = providerUserId,
+                ProviderEmail = email,
+                CreatedAtUtc = now,
+                LastLoginAtUtc = now
+            });
+
+            await dbContext.SaveChangesAsync();
+
+            var token = tokenService.CreateToken(user);
+            return Results.Ok(ToAuthResponse(user, token));
         });
 
         group.MapPost("/login", async (
@@ -1721,6 +1947,9 @@ public sealed record RegisterRequest(
     string PhoneNumber,
     string Email,
     string Password);
+
+public sealed record SocialGoogleLoginRequest(
+    string IdToken);
 
 public sealed record LoginRequest(
     string Email,

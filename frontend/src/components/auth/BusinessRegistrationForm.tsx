@@ -811,7 +811,7 @@ function chooseProviderKind(kind: ProviderKind) {
               Telefon Doğrulaması
             </h3>
             <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
-              Telefon doğrulaması şimdilik isteğe bağlıdır. SMS doğrulama hizmeti etkinleştirildiğinde bu alanı kullanabilirsiniz.
+              Telefon numaranıza SMS ile 6 haneli doğrulama kodu gönderilir. Telefon doğrulaması şimdilik isteğe bağlıdır.
             </p>
             <div className="mt-4 rounded-xl border border-input bg-background px-4 py-3 text-sm font-medium">
               {registered.user.phoneNumber || "Telefon numarası bulunamadı"}

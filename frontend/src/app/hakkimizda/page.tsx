@@ -310,6 +310,24 @@ export default function AboutPage() {
                 <strong className="text-white">Merkez:</strong>
                 <br />
                 Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye
+                <div className="mt-4">
+                  <strong className="text-white">Telefon:</strong>{" "}
+                  <a
+                    href="tel:+905325665899"
+                    className="transition hover:text-orange-400"
+                  >
+                    0532 566 58 99
+                  </a>
+                </div>
+                <div className="mt-1">
+                  <strong className="text-white">E-posta:</strong>{" "}
+                  <a
+                    href="mailto:destek@neyeihtiyacvar.com"
+                    className="transition hover:text-orange-400"
+                  >
+                    destek@neyeihtiyacvar.com
+                  </a>
+                </div>
               </div>
             </div>
           </div>

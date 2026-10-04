@@ -408,6 +408,7 @@ export const legalDocuments: LegalDocumentData[] = [
         paragraphs: [
           "Hizmet sağlayıcı: Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM",
           "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
+          "Telefon: 0532 566 58 99",
           "E-posta: destek@neyeihtiyacvar.com",
           "KEP: atilla.alici@hs01.kep.tr",
           "Esnaf Sicil No: 44745 — Oda Sicil No: 1537"
@@ -496,6 +497,7 @@ export const legalDocuments: LegalDocumentData[] = [
         paragraphs: [
           "Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM",
           "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",
+          "Telefon: 0532 566 58 99",
           "E-posta: destek@neyeihtiyacvar.com",
           "KEP: atilla.alici@hs01.kep.tr",
           "Esnaf Sicil No: 44745 — Oda Sicil No: 1537"

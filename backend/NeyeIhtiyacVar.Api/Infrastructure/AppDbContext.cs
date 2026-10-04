@@ -43,6 +43,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AppUser> Users => Set<AppUser>();
 
+    public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
+
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
 
     public DbSet<ProviderOffer> ProviderOffers => Set<ProviderOffer>();
@@ -61,6 +63,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // NIV-EXTERNAL-LOGIN
+        modelBuilder.Entity<UserExternalLogin>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Provider)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.ProviderUserId)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.Property(x => x.ProviderEmail)
+                .HasMaxLength(254);
+
+            entity.HasIndex(x => new { x.Provider, x.ProviderUserId })
+                .IsUnique();
+
+            entity.HasIndex(x => new { x.UserId, x.Provider })
+                .IsUnique();
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        // NIV-EXTERNAL-LOGIN-END
+
         // NIV-MESSAGING
         modelBuilder.Entity<Conversation>(entity =>
         {

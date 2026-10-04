@@ -8,11 +8,13 @@ using NeyeIhtiyacVar.Api.Endpoints;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Auth;
 using NeyeIhtiyacVar.Api.Infrastructure.Email;
+using NeyeIhtiyacVar.Api.Infrastructure.Sms;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
+builder.Services.AddHttpClient<ISmsSender, VerimorSmsSender>();
 
 builder.Services.AddOpenApi();
 

@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { apiBaseUrl } from "@/lib/api";
@@ -180,6 +181,17 @@ function LoginPageContent() {
             <Button type="submit" size="lg" className="w-full" disabled={loading}>
               {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
             </Button>
+
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-xs text-muted-foreground">veya</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <GoogleSignInButton
+              returnUrl={returnUrl}
+              onError={(message) => setError(message)}
+            />
 
             <p className="text-center text-sm text-muted-foreground">
               Hesabın yok mu?{" "}

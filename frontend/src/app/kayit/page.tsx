@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { BusinessRegistrationForm } from "@/components/auth/BusinessRegistrationForm";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { RegistrationProgress } from "@/components/auth/RegistrationProgress";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,6 @@ function RegisterPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [socialMessage, setSocialMessage] = useState("");
 
   const passwordRules = useMemo(
     () => ({
@@ -258,7 +258,6 @@ function RegisterPageContent() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSocialMessage("");
 
     if (!validateClient()) return;
 
@@ -353,13 +352,6 @@ function RegisterPageContent() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleSocial(provider: "Google" | "Apple") {
-    setError("");
-    setSocialMessage(
-      `${provider} ile kayıt arayüzü hazır. Gerçek OAuth bağlantısı için ${provider} uygulama anahtarlarını bağlamamız gerekiyor.`,
-    );
   }
 
   const accountChoice = searchParams.get("hesap");
@@ -612,6 +604,10 @@ function RegisterPageContent() {
             noValidate
             className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-7"
           >
+            <GoogleSignInButton
+              returnUrl={returnUrl}
+              onError={(message) => setError(message)}
+            />
 
             <div className="my-6 flex items-center gap-3">
               <div className="h-px flex-1 bg-border" />

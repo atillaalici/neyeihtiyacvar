@@ -250,6 +250,7 @@ export function HeroSearch() {
   const searchApiBaseUrl = apiBaseUrl;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const searchSourceRef = useRef<"enter" | "button" | "typing">("button");
 
   const [query, setQuery] = useState("");
@@ -581,6 +582,7 @@ export function HeroSearch() {
           </p>
 
           <form
+            ref={formRef}
             role="search"
             onSubmit={submit}
             className="relative mx-auto mt-5 max-w-[1120px] sm:mt-10"
@@ -610,13 +612,19 @@ export function HeroSearch() {
 
                   if (window.matchMedia("(max-width: 639px)").matches) {
                     window.setTimeout(() => {
-                      inputRef.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: "start",
-                      });
+                      const form = formRef.current;
+                      if (!form) return;
 
-                      window.scrollBy({
-                        top: -16,
+                      const navbarHeight = 64;
+                      const gap = 8;
+                      const targetTop =
+                        window.scrollY +
+                        form.getBoundingClientRect().top -
+                        navbarHeight -
+                        gap;
+
+                      window.scrollTo({
+                        top: Math.max(0, targetTop),
                         behavior: "smooth",
                       });
                     }, 250);
