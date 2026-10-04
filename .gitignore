@@ -127,3 +127,14 @@ backend/NeyeIhtiyacVar.Api/appsettings.Production.local.json
 /frontend/test-results/
 /deploy/_publish-check/
 /backend/NeyeIhtiyacVar.Api/c
+
+# Assistant/local source snapshots
+*.before-*
+*.safe-*
+
+# Local catalog maintenance files
+/catalog-*.csv
+/catalog-*.sql
+
+# Temporary compiled deployment package
+/deploy-catalog-fix/
