@@ -8,6 +8,7 @@ import {
   ClipboardList,
   History,
   LayoutDashboard,
+  Mail,
   Store,
   ShieldAlert,
   TicketPercent,
@@ -31,6 +32,11 @@ const items = [
     href: "/admin/basvurular",
     label: "İşletme Başvuruları",
     icon: Building2,
+  },
+  {
+    href: "/admin/iletisim-talepleri",
+    label: "İletişim Talepleri",
+    icon: Mail,
   },
   {
     href: "/admin/isletmeler",

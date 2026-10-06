@@ -372,7 +372,7 @@ public static class BusinessRegistrationEndpoints
             };
             dbContext.PromotionUsages.Add(usage);
 
-            var legalAcceptance = new LegalAcceptance
+            var membershipAgreementAcceptance = new LegalAcceptance
             {
                 UserId = userId,
                 DocumentCode = "ucretli-isletme-uyeligi",
@@ -386,7 +386,25 @@ public static class BusinessRegistrationEndpoints
                 PromotionCode = promo.Code,
                 AcceptedAtUtc = now
             };
-            dbContext.LegalAcceptances.Add(legalAcceptance);
+
+            var refundPolicyAcceptance = new LegalAcceptance
+            {
+                UserId = userId,
+                DocumentCode = "iptal-iade-politikasi",
+                DocumentVersion = "2026-10-01",
+                ActionType = "initial_membership",
+                PlanCode = plan.Code,
+                PlanName = plan.Name,
+                OriginalPrice = plan.AnnualPrice,
+                DiscountAmount = discountAmount,
+                FinalPrice = finalPrice,
+                PromotionCode = promo.Code,
+                AcceptedAtUtc = now
+            };
+
+            dbContext.LegalAcceptances.AddRange(
+                membershipAgreementAcceptance,
+                refundPolicyAcceptance);
 
             user.Role = UserRole.Provider;
             user.UpdatedAtUtc = now;
@@ -398,7 +416,11 @@ public static class BusinessRegistrationEndpoints
             {
                 completed = true, applicationId = application.Id, providerId = provider.Id,
                 providerSlug = provider.Slug, membershipId = membership.Id, promotionUsageId = usage.Id,
-                legalAcceptanceId = legalAcceptance.Id,
+                legalAcceptanceIds = new[]
+                {
+                    membershipAgreementAcceptance.Id,
+                    refundPolicyAcceptance.Id
+                },
                 planCode = plan.Code, originalPrice = plan.AnnualPrice, discountAmount, finalPrice,
                 applicationStatus = "pending", publicationStatus = "draft",
                 message = "İşletme kaydın tamamlandı. İşletmen yönetim panelinde hazır; yayınlanması yönetici onayından sonra gerçekleşecek."

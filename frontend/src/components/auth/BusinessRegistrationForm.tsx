@@ -22,6 +22,10 @@ import {
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken, getStoredUser, saveAuth, type AuthResponse } from "@/lib/auth";
 import type { CategoryDto } from "@/lib/categories";
+import {
+  getLegalDocument,
+  type LegalDocumentData,
+} from "@/components/legal/legal-data";
 
 type DistrictDto = {
   id: string;
@@ -136,6 +140,8 @@ export function BusinessRegistrationForm({
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordAgain, setShowPasswordAgain] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [legalModalDocument, setLegalModalDocument] =
+    useState<LegalDocumentData | null>(null);
   const [existingAccountMode, setExistingAccountMode] =
     useState(false);
 
@@ -1220,13 +1226,18 @@ function chooseProviderKind(kind: ProviderKind) {
               className="mt-0.5 size-4 shrink-0 accent-primary"
             />
             <span>
-              <Link
-                href="/sozlesmeler/kullanim-kosullari"
-                target="_blank"
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setLegalModalDocument(
+                    getLegalDocument("kullanim-kosullari") ?? null,
+                  );
+                }}
                 className="font-semibold text-primary underline-offset-4 hover:underline"
               >
                 Kullanım ve Üyelik Koşulları
-              </Link>{" "}
+              </button>{" "}
               metnini okudum ve kabul ediyorum. *
             </span>
           </label>
@@ -1239,13 +1250,18 @@ function chooseProviderKind(kind: ProviderKind) {
               className="mt-0.5 size-4 shrink-0 accent-primary"
             />
             <span>
-              <Link
-                href="/sozlesmeler/isletme-kosullari"
-                target="_blank"
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setLegalModalDocument(
+                    getLegalDocument("isletme-kosullari") ?? null,
+                  );
+                }}
                 className="font-semibold text-primary underline-offset-4 hover:underline"
               >
                 İşletme ve Hizmet Sağlayıcı Koşulları
-              </Link>{" "}
+              </button>{" "}
               metnini okudum ve kabul ediyorum. *
             </span>
           </label>
@@ -1779,6 +1795,83 @@ function chooseProviderKind(kind: ProviderKind) {
           </p>
         </div>
       </div>
+
+      {legalModalDocument ? (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="registration-legal-modal-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setLegalModalDocument(null);
+            }
+          }}
+        >
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-orange-600">
+                  Sözleşmeler ve Yasal Metinler
+                </div>
+                <h2
+                  id="registration-legal-modal-title"
+                  className="mt-1 font-display text-xl font-black text-slate-950 sm:text-2xl"
+                >
+                  {legalModalDocument.title}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {legalModalDocument.summary}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLegalModalDocument(null)}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-xl text-slate-600 transition hover:bg-slate-100"
+                aria-label="Sözleşmeyi kapat"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-5 sm:px-6">
+              <div className="space-y-6">
+                {legalModalDocument.sections.map((section) => (
+                  <section key={section.title}>
+                    <h3 className="font-display text-base font-bold text-slate-950">
+                      {section.title}
+                    </h3>
+
+                    <div className="mt-2 space-y-3">
+                      {section.paragraphs.map((paragraph, index) => (
+                        <p
+                          key={`${section.title}-${index}`}
+                          className="text-sm leading-6 text-slate-600"
+                        >
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setLegalModalDocument(null)}
+                  className="rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
+                >
+                  Okudum, Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {error && (
         <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">

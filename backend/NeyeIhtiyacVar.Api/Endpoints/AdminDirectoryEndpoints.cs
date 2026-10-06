@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
+using NeyeIhtiyacVar.Api.Infrastructure.Email;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
@@ -17,6 +18,206 @@ public static class AdminDirectoryEndpoints
         var group = app.MapGroup("/api/admin")
             .RequireAuthorization(policy =>
                 policy.RequireRole(UserRole.Admin.ToString()));
+
+        // NIV-ADMIN-CONTACT-REQUESTS
+        group.MapGet("/contact-requests", async (
+            string? status,
+            AppDbContext dbContext) =>
+        {
+            var query = dbContext.ContactRequests
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                var normalizedStatus = status.Trim().ToLowerInvariant();
+                query = query.Where(x => x.Status == normalizedStatus);
+            }
+
+            var items = await query
+                .OrderByDescending(x => x.CreatedAtUtc)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.UserId,
+                    x.FullName,
+                    x.Email,
+                    x.PhoneNumber,
+                    x.Subject,
+                    x.Message,
+                    x.Status,
+                    x.CreatedAtUtc,
+                    x.ReadAtUtc,
+                    replies = x.Replies
+                        .OrderBy(r => r.CreatedAtUtc)
+                        .Select(r => new
+                        {
+                            r.Id,
+                            r.AdminUserId,
+                            adminDisplayName = r.AdminUser != null
+                                ? r.AdminUser.DisplayName
+                                : null,
+                            r.Message,
+                            r.CreatedAtUtc
+                        })
+                        .ToList()
+                })
+                .ToListAsync();
+
+            return Results.Ok(items);
+        });
+
+        group.MapPut("/contact-requests/{id:guid}/status", async (
+            Guid id,
+            AdminContactRequestStatusRequest request,
+            AppDbContext dbContext) =>
+        {
+            var item = await dbContext.ContactRequests
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (item is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İletişim talebi bulunamadı."
+                });
+            }
+
+            var status = request.Status?.Trim().ToLowerInvariant();
+
+            var allowedStatuses = new[]
+            {
+                "new",
+                "read",
+                "answered",
+                "closed"
+            };
+
+            if (string.IsNullOrWhiteSpace(status) ||
+                !allowedStatuses.Contains(status))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Geçerli bir durum seçin."
+                });
+            }
+
+            item.Status = status;
+
+            if (status == "new")
+            {
+                item.ReadAtUtc = null;
+            }
+            else if (item.ReadAtUtc is null)
+            {
+                item.ReadAtUtc = DateTime.UtcNow;
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                item.Id,
+                item.Status,
+                item.ReadAtUtc,
+                message = "İletişim talebi güncellendi."
+            });
+        });
+        group.MapPost("/contact-requests/{id:guid}/reply", async (
+            Guid id,
+            AdminContactReplyRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext,
+            IEmailSender emailSender,
+            CancellationToken cancellationToken) =>
+        {
+            var message = request.Message?.Trim();
+
+            if (string.IsNullOrWhiteSpace(message) ||
+                message.Length < 2 ||
+                message.Length > 4000)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Cevap 2 ile 4000 karakter arasında olmalıdır."
+                });
+            }
+
+            var item = await dbContext.ContactRequests
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+            if (item is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İletişim talebi bulunamadı."
+                });
+            }
+
+            Guid? adminUserId = null;
+
+            var adminIdValue =
+                principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? principal.FindFirst("sub")?.Value;
+
+            if (Guid.TryParse(adminIdValue, out var parsedAdminId))
+            {
+                adminUserId = parsedAdminId;
+            }
+
+            var subject = $"İletişim talebiniz hakkında: {item.Subject}";
+
+            var delivery = await emailSender.SendOperationalMessageAsync(
+                item.Email,
+                item.FullName,
+                subject,
+                "İletişim talebinize yanıt",
+                message,
+                cancellationToken);
+
+            if (!delivery.Success)
+            {
+                return Results.Problem(
+                    title: "E-posta gönderilemedi.",
+                    detail: delivery.ErrorMessage
+                        ?? "E-posta sağlayıcısı gönderimi tamamlayamadı.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+
+            var reply = new ContactReply
+            {
+                ContactRequestId = item.Id,
+                AdminUserId = adminUserId,
+                Message = message,
+                EmailProviderMessageId = delivery.ProviderMessageId,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+
+            dbContext.ContactReplies.Add(reply);
+
+            item.Status = "answered";
+
+            if (item.ReadAtUtc is null)
+            {
+                item.ReadAtUtc = DateTime.UtcNow;
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Results.Ok(new
+            {
+                reply.Id,
+                reply.ContactRequestId,
+                reply.AdminUserId,
+                reply.Message,
+                reply.CreatedAtUtc,
+                status = item.Status,
+                message = "Cevabınız kullanıcıya e-posta olarak gönderildi."
+            });
+        });
+
+        // NIV-ADMIN-CONTACT-REQUESTS-END
 
         group.MapGet("/users/{id:guid}", async (
             Guid id,
@@ -367,6 +568,18 @@ public static class AdminDirectoryEndpoints
 
             try
             {
+                // İşletmeye bağlı analitik kayıtlarını kaldır.
+                // AnalyticsEvents.ProviderId NO ACTION olduğu için
+                // işletme silinmeden önce bu kayıtların temizlenmesi gerekir.
+                var analyticsEvents = await dbContext.AnalyticsEvents
+                    .Where(x => x.ProviderId == id)
+                    .ToListAsync();
+
+                if (analyticsEvents.Count > 0)
+                {
+                    dbContext.AnalyticsEvents.RemoveRange(analyticsEvents);
+                }
+
                 // İşletmeye bağlı teklif ve değerlendirmeleri kaldır.
                 var reviews = await dbContext.ProviderReviews
                     .Where(x =>
@@ -479,6 +692,27 @@ public static class AdminDirectoryEndpoints
 
                     if (!hasAnotherProvider)
                     {
+                        // Kullanıcı hesabı da kalıcı olarak silinecekse,
+                        // RESTRICT ilişkili geçmiş etkileşim ve konuşmaları
+                        // kullanıcı silinmeden önce temizle.
+                        var ownerInteractions = await dbContext.ProviderInteractions
+                            .Where(x => x.UserId == ownerUser.Id)
+                            .ToListAsync();
+
+                        if (ownerInteractions.Count > 0)
+                        {
+                            dbContext.ProviderInteractions.RemoveRange(ownerInteractions);
+                        }
+
+                        var ownerConversations = await dbContext.Conversations
+                            .Where(x => x.UserId == ownerUser.Id)
+                            .ToListAsync();
+
+                        if (ownerConversations.Count > 0)
+                        {
+                            dbContext.Conversations.RemoveRange(ownerConversations);
+                        }
+
                         deletedEmail = ownerUser.Email;
                         deletedPhone = ownerUser.PhoneNumber;
 
@@ -737,3 +971,8 @@ public sealed record AdminCreateProviderRequest(
     int? ExperienceYears,
     bool EmergencyService,
     bool OnsiteService);
+
+public sealed record AdminContactRequestStatusRequest(string? Status);
+
+
+public sealed record AdminContactReplyRequest(string? Message);

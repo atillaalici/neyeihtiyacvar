@@ -9,11 +9,16 @@ import {
   CheckCircle2,
   CreditCard,
   ShieldCheck,
+  X,
 } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken, getStoredUser } from "@/lib/auth";
+import {
+  getLegalDocument,
+  type LegalDocumentData,
+} from "@/components/legal/legal-data";
 
 type PlanCode = "kobi" | "avantaj" | "profesyonel";
 
@@ -35,6 +40,7 @@ const plans: Record<
   PlanCode,
   {
     name: string;
+    regularAnnualPrice: number;
     annualPrice: number;
     serviceLimit: number;
     description: string;
@@ -42,18 +48,21 @@ const plans: Record<
 > = {
   kobi: {
     name: "1+1 Paket",
+    regularAnnualPrice: 2400,
     annualPrice: 1200,
     serviceLimit: 2,
     description: "Esnaf, usta ve küçük işletmeler için ideal başlangıç paketi.",
   },
   avantaj: {
     name: "1+4 Paket",
+    regularAnnualPrice: 5000,
     annualPrice: 2400,
     serviceLimit: 5,
     description: "Daha fazla hizmet alanında görünmek isteyen işletmeler için.",
   },
   profesyonel: {
     name: "12 Kategorili Paket",
+    regularAnnualPrice: 12000,
     annualPrice: 5000,
     serviceLimit: 12,
     description: "Geniş hizmet ağı bulunan işletmeler ve ekipler için.",
@@ -98,6 +107,7 @@ function MembershipPaymentContent() {
   const [promoResult, setPromoResult] =
     useState<PromotionValidationResult | null>(null);
   const [promoError, setPromoError] = useState("");
+  const [paymentMessage, setPaymentMessage] = useState("");
   const [completingRegistration, setCompletingRegistration] =
     useState(false);
   const [billingOpen] = useState(true);
@@ -109,12 +119,16 @@ function MembershipPaymentContent() {
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeError, setUpgradeError] = useState("");
   const [legalAccepted, setLegalAccepted] = useState(false);
+  const [legalModalDocument, setLegalModalDocument] =
+    useState<LegalDocumentData | null>(null);
 
   const [billing, setBilling] = useState({
     billingType: "individual",
     nameOrTitle: "",
+    fullName: "",
     taxOffice: "",
-    taxOrIdentityNumber: "",
+    identityNumber: "",
+    taxNumber: "",
     email: "",
     phone: "",
     address: "",
@@ -185,8 +199,10 @@ function MembershipPaymentContent() {
           setBilling({
             billingType: data.billingType ?? "individual",
             nameOrTitle: data.nameOrTitle ?? "",
+            fullName: data.fullName ?? "",
             taxOffice: data.taxOffice ?? "",
-            taxOrIdentityNumber: data.taxOrIdentityNumber ?? "",
+            identityNumber: data.identityNumber ?? "",
+            taxNumber: data.taxNumber ?? "",
             email: data.email ?? "",
             phone: data.phone ?? "",
             address: data.address ?? "",
@@ -441,18 +457,83 @@ function MembershipPaymentContent() {
   }
 
   async function saveBillingInformation() {
-    const taxDigits = billing.taxOrIdentityNumber.replace(/\D/g, "");
-    if (!billing.nameOrTitle.trim()) { setBillingError("İsim Soyisim / Unvan zorunludur."); return false; }
-    if (billing.billingType === "individual" && taxDigits.length !== 11) {
-      setBillingError("T.C. Kimlik No 11 haneli olmalıdır.");
+    const identityDigits = billing.identityNumber.replace(/\D/g, "");
+    const taxDigits = billing.taxNumber.replace(/\D/g, "");
+
+    if (!billing.nameOrTitle.trim()) {
+      setBillingError("İsim Soyisim / Unvan zorunludur.");
       return false;
     }
-    if (billing.billingType === "corporate" && taxDigits.length !== 10) {
-      setBillingError("Vergi Kimlik No 10 haneli olmalıdır.");
+
+    if (billing.billingType === "individual") {
+      if (identityDigits.length !== 11) {
+        setBillingError("T.C. Kimlik No 11 haneli olmalıdır.");
+        return false;
+      }
+    }
+
+    if (billing.billingType === "sole_proprietorship") {
+      if (!billing.fullName.trim()) {
+        setBillingError("Şahıs işletmesi için Ad Soyad zorunludur.");
+        return false;
+      }
+
+      if (!identityDigits && !taxDigits) {
+        setBillingError(
+          "Şahıs işletmesi için T.C. Kimlik No veya Vergi Kimlik No bilgilerinden en az birini girin.",
+        );
+        return false;
+      }
+
+      if (identityDigits && identityDigits.length !== 11) {
+        setBillingError("T.C. Kimlik No 11 haneli olmalıdır.");
+        return false;
+      }
+
+      if (taxDigits && taxDigits.length !== 10) {
+        setBillingError("Vergi Kimlik No 10 haneli olmalıdır.");
+        return false;
+      }
+
+      if (!billing.taxOffice.trim()) {
+        setBillingError("Şahıs işletmesi için vergi dairesi zorunludur.");
+        return false;
+      }
+    }
+
+    if (billing.billingType === "corporate") {
+      if (taxDigits.length !== 10) {
+        setBillingError("Vergi Kimlik No 10 haneli olmalıdır.");
+        return false;
+      }
+
+      if (!billing.taxOffice.trim()) {
+        setBillingError("Şirket için vergi dairesi zorunludur.");
+        return false;
+      }
+    }
+
+    if (!billing.email.trim()) {
+      setBillingError("E-posta zorunludur.");
       return false;
     }
-    if (!billing.phone.trim()) { setBillingError("Telefon zorunludur."); return false; }
-    if (!billing.taxOffice.trim()) { setBillingError("Vergi dairesi zorunludur."); return false; }
+    if (!billing.phone.trim()) {
+      setBillingError("Telefon zorunludur.");
+      return false;
+    }
+    if (!billing.city.trim()) {
+      setBillingError("İl zorunludur.");
+      return false;
+    }
+    if (!billing.district.trim()) {
+      setBillingError("İlçe zorunludur.");
+      return false;
+    }
+    if (!billing.address.trim()) {
+      setBillingError("Fatura adresi zorunludur.");
+      return false;
+    }
+
     const token = getAccessToken();
     if (!token) {
       router.replace("/giris");
@@ -504,8 +585,8 @@ function MembershipPaymentContent() {
       return;
     }
 
-    setPromoError(
-      "Fatura bilgileriniz hazır. Ödeme sağlayıcısı entegrasyonu bağlandığında güvenli ödeme ekranına yönlendirileceksiniz.",
+    setPaymentMessage(
+      "Fatura bilgileriniz ve sözleşme onayınız hazır. Ödeme sağlayıcısı entegrasyonu tamamlandığında güvenli ödeme ekranına yönlendirileceksiniz.",
     );
   }
 
@@ -544,6 +625,16 @@ function MembershipPaymentContent() {
               </div>
 
               <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-right">
+                {!isUpgrade ? (
+                  <>
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-orange-700">
+                      Birinci Yıla Özel
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground line-through">
+                      {plan.regularAnnualPrice.toLocaleString("tr-TR")} TL
+                    </div>
+                  </>
+                ) : null}
                 <div className="text-lg font-black text-slate-950">
                   {(isUpgrade && upgradeQuote
                     ? upgradeQuote.amountDue
@@ -551,7 +642,7 @@ function MembershipPaymentContent() {
                   ).toLocaleString("tr-TR")} TL
                 </div>
                 <div className="text-[11px] text-muted-foreground">
-                  {isUpgrade ? "ödenecek tutar" : "/ yıl"}
+                  {isUpgrade ? "ödenecek tutar · KDV dahil" : "KDV dahil / yıl"}
                 </div>
               </div>
             </div>
@@ -601,11 +692,19 @@ function MembershipPaymentContent() {
                         ) : null}
                       </div>
 
-                      <div className="mt-1 text-lg font-black">
-                        {item.annualPrice.toLocaleString("tr-TR")} TL
-                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                          / yıl
-                        </span>
+                      <div className="mt-1">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-orange-700">
+                          Birinci Yıla Özel
+                        </div>
+                        <div className="text-[11px] text-muted-foreground line-through">
+                          {item.regularAnnualPrice.toLocaleString("tr-TR")} TL
+                        </div>
+                        <div className="text-lg font-black">
+                          {item.annualPrice.toLocaleString("tr-TR")} TL
+                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">
+                            KDV dahil / yıl
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -696,7 +795,7 @@ function MembershipPaymentContent() {
                   </p>
                 </div>
 
-                <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <button
                     type="button"
                     onClick={() =>
@@ -704,6 +803,7 @@ function MembershipPaymentContent() {
                         ...current,
                         billingType: "individual",
                         taxOffice: "",
+                        taxNumber: "",
                       }))
                     }
                     className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
@@ -714,12 +814,31 @@ function MembershipPaymentContent() {
                   >
                     Bireysel
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBilling((current) => ({
+                        ...current,
+                        billingType: "sole_proprietorship",
+                      }))
+                    }
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                      billing.billingType === "sole_proprietorship"
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-border"
+                    }`}
+                  >
+                    Şahıs İşletmesi
+                  </button>
+
                   <button
                     type="button"
                     onClick={() =>
                       setBilling((current) => ({
                         ...current,
                         billingType: "corporate",
+                        identityNumber: "",
                       }))
                     }
                     className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
@@ -728,45 +847,160 @@ function MembershipPaymentContent() {
                         : "border-border"
                     }`}
                   >
-                    Kurumsal
+                    Şirket
                   </button>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <input
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    placeholder={billing.billingType === "corporate" ? "Firma unvanı *" : "İsim Soyisim *"}
-                    value={billing.nameOrTitle}
-                    onChange={(event) => setBilling((current) => ({ ...current, nameOrTitle: event.target.value }))}
-                  />
-                  <input
-                    className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    inputMode="numeric"
-                    placeholder={
-                      billing.billingType === "corporate"
-                        ? "Vergi Kimlik No * (10 hane)"
-                        : "T.C. Kimlik No * (11 hane)"
-                    }
-                    value={billing.taxOrIdentityNumber}
-                    onChange={(event) =>
-                      setBilling((current) => ({
-                        ...current,
-                        taxOrIdentityNumber: event.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, billing.billingType === "corporate" ? 10 : 11),
-                      }))
-                    }
-                  />
-                  <input
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                      placeholder="Vergi Dairesi *"
-                      value={billing.taxOffice}
-                      onChange={(event) => setBilling((current) => ({ ...current, taxOffice: event.target.value }))}
-                    />
+
+                  {billing.billingType === "sole_proprietorship" ? (
+                    <>
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Ad Soyad *"
+                        value={billing.fullName}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            fullName: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Ticari Unvan *"
+                        value={billing.nameOrTitle}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            nameOrTitle: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        inputMode="numeric"
+                        placeholder="T.C. Kimlik No"
+                        value={billing.identityNumber}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            identityNumber: event.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 11),
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        inputMode="numeric"
+                        placeholder="Vergi Kimlik No"
+                        value={billing.taxNumber}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            taxNumber: event.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 10),
+                          }))
+                        }
+                      />
+
+                      <p className="text-xs text-muted-foreground sm:col-span-2">
+                        T.C. Kimlik No veya Vergi Kimlik No bilgilerinden en az biri zorunludur.
+                      </p>
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Vergi Dairesi *"
+                        value={billing.taxOffice}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            taxOffice: event.target.value,
+                          }))
+                        }
+                      />
+                    </>
+                  ) : billing.billingType === "corporate" ? (
+                    <>
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Ticari Unvan *"
+                        value={billing.nameOrTitle}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            nameOrTitle: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Vergi Dairesi *"
+                        value={billing.taxOffice}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            taxOffice: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        inputMode="numeric"
+                        placeholder="Vergi Kimlik No *"
+                        value={billing.taxNumber}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            taxNumber: event.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 10),
+                          }))
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        placeholder="Ad Soyad *"
+                        value={billing.nameOrTitle}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            nameOrTitle: event.target.value,
+                          }))
+                        }
+                      />
+
+                      <input
+                        className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
+                        inputMode="numeric"
+                        placeholder="T.C. Kimlik No *"
+                        value={billing.identityNumber}
+                        onChange={(event) =>
+                          setBilling((current) => ({
+                            ...current,
+                            identityNumber: event.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 11),
+                          }))
+                        }
+                      />
+                    </>
+                  )}
+
                   <input
                     className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
                     type="email"
-                    placeholder="E-posta"
+                    placeholder="E-posta *"
                     value={billing.email}
                     onChange={(event) => setBilling((current) => ({ ...current, email: event.target.value }))}
                   />
@@ -779,19 +1013,19 @@ function MembershipPaymentContent() {
                   />
                   <input
                     className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    placeholder="İl"
+                    placeholder="İl *"
                     value={billing.city}
                     onChange={(event) => setBilling((current) => ({ ...current, city: event.target.value }))}
                   />
                   <input
                     className="h-10 rounded-xl border border-input bg-background px-3 text-sm"
-                    placeholder="İlçe"
+                    placeholder="İlçe *"
                     value={billing.district}
                     onChange={(event) => setBilling((current) => ({ ...current, district: event.target.value }))}
                   />
                   <textarea
                     className="min-h-20 rounded-xl border border-input bg-background px-3 py-2 text-sm sm:col-span-2"
-                    placeholder="Fatura adresi"
+                    placeholder="Fatura adresi *"
                     value={billing.address}
                     onChange={(event) => setBilling((current) => ({ ...current, address: event.target.value }))}
                   />
@@ -874,7 +1108,7 @@ function MembershipPaymentContent() {
                         {promoResult.code} uygulandı
                       </div>
                       <div className="mt-1 text-xs">
-                        Paket fiyatı:{" "}
+                        Birinci yıla özel paket fiyatı:{" "}
                         <span className="line-through">
                           {promoResult.originalPrice.toLocaleString("tr-TR")} TL
                         </span>
@@ -887,7 +1121,7 @@ function MembershipPaymentContent() {
 
                     <div className="border-green-200 sm:border-l sm:pl-5 sm:text-right">
                       <div className="text-xs font-semibold text-green-800">
-                        Ödenmesi gereken tutar
+                        Ödenmesi gereken tutar (KDV dahil)
                       </div>
                       <div className="mt-1 text-3xl font-black leading-none text-green-800">
                         {promoResult.finalPrice.toLocaleString("tr-TR")} TL
@@ -905,6 +1139,101 @@ function MembershipPaymentContent() {
             </div>
             ) : null}
 
+            {billingSaved ? (
+              <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50/60 p-4">
+                <div className="text-sm font-black text-slate-950">
+                  Sipariş Özeti
+                </div>
+
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Paket</span>
+                    <span className="text-right font-bold">
+                      {isUpgrade && upgradeQuote
+                        ? upgradeQuote.targetPlan.name
+                        : plan.name}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Üyelik dönemi</span>
+                    <span className="font-bold">
+                      {isUpgrade ? "Mevcut üyelik dönemi" : "12 ay"}
+                    </span>
+                  </div>
+
+                  {!isUpgrade ? (
+                    <>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Normal yıllık fiyat</span>
+                        <span className="line-through">
+                          {plan.regularAnnualPrice.toLocaleString("tr-TR")} TL
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Birinci yıla özel fiyat</span>
+                        <span className="font-bold">
+                          {plan.annualPrice.toLocaleString("tr-TR")} TL
+                        </span>
+                      </div>
+
+                      {promoResult ? (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">
+                            Promosyon indirimi ({promoResult.code})
+                          </span>
+                          <span className="font-bold text-emerald-700">
+                            -{promoResult.discountAmount.toLocaleString("tr-TR")} TL
+                          </span>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : upgradeQuote ? (
+                    <>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Yeni paket yıllık fiyatı</span>
+                        <span className="font-bold">
+                          {upgradeQuote.targetPlan.annualPrice.toLocaleString("tr-TR")} TL
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Kullanılmamış paket kredisi</span>
+                        <span className="font-bold text-emerald-700">
+                          -{upgradeQuote.remainingCredit.toLocaleString("tr-TR")} TL
+                        </span>
+                      </div>
+                    </>
+                  ) : null}
+
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Fatura</span>
+                    <span className="max-w-[65%] text-right font-bold">
+                      {billing.nameOrTitle}
+                    </span>
+                  </div>
+
+                  <div className="flex items-end justify-between gap-4 border-t border-orange-200 pt-3">
+                    <div>
+                      <div className="font-black">Ödenecek Toplam</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        KDV dahil nihai tutar
+                      </div>
+                    </div>
+                    <div className="text-2xl font-black text-orange-600">
+                      {(isUpgrade && upgradeQuote
+                        ? upgradeQuote.amountDue
+                        : promoResult
+                          ? promoResult.finalPrice
+                          : plan.annualPrice
+                      ).toLocaleString("tr-TR")} TL
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
               <label className="flex cursor-pointer items-start gap-3">
                 <input
@@ -919,23 +1248,29 @@ function MembershipPaymentContent() {
                   className="mt-1 h-4 w-4 shrink-0 accent-orange-600"
                 />
                 <span className="text-sm leading-6 text-muted-foreground">
-                  <a
-                    href="/sozlesmeler/ucretli-isletme-uyeligi"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLegalModalDocument(
+                        getLegalDocument("ucretli-isletme-uyeligi") ?? null,
+                      )
+                    }
                     className="font-semibold text-foreground underline underline-offset-2"
                   >
                     Ücretli İşletme Üyeliği ve Dijital Vitrin Sözleşmesi
-                  </a>
+                  </button>
                   &apos;ni okudum ve kabul ediyorum.{" "}
-                  <a
-                    href="/sozlesmeler/iptal-iade-politikasi"
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLegalModalDocument(
+                        getLegalDocument("iptal-iade-politikasi") ?? null,
+                      )
+                    }
                     className="font-semibold text-foreground underline underline-offset-2"
                   >
                     İptal ve İade Politikası
-                  </a>
+                  </button>
                   &apos;nı inceledim.
                 </span>
               </label>
@@ -988,6 +1323,121 @@ function MembershipPaymentContent() {
           </div>
         </div>
       </section>
+
+      {paymentMessage ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payment-info-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setPaymentMessage("");
+            }
+          }}
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mx-auto grid size-12 place-items-center rounded-full bg-orange-50 text-2xl">
+              🔒
+            </div>
+
+            <h2
+              id="payment-info-title"
+              className="mt-4 text-center font-display text-xl font-black text-slate-950"
+            >
+              Ödeme Altyapısı Hazırlanıyor
+            </h2>
+
+            <p className="mt-3 text-center text-sm leading-6 text-slate-600">
+              {paymentMessage}
+            </p>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setPaymentMessage("")}
+                className="min-w-32 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
+              >
+                Tamam
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {legalModalDocument ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="legal-modal-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setLegalModalDocument(null);
+            }
+          }}
+        >
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wide text-orange-600">
+                  Sözleşmeler ve Yasal Metinler
+                </div>
+                <h2
+                  id="legal-modal-title"
+                  className="mt-1 font-display text-xl font-black text-slate-950 sm:text-2xl"
+                >
+                  {legalModalDocument.title}
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {legalModalDocument.summary}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setLegalModalDocument(null)}
+                className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-600 transition hover:bg-slate-100"
+                aria-label="Sözleşmeyi kapat"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
+              <div className="space-y-7">
+                {legalModalDocument.sections.map((section) => (
+                  <section key={section.title}>
+                    <h3 className="font-display text-base font-bold text-slate-950 sm:text-lg">
+                      {section.title}
+                    </h3>
+
+                    <div className="mt-2 space-y-3 text-sm leading-7 text-slate-700">
+                      {section.paragraphs.map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+              <span className="text-xs text-slate-500">
+                Metni okuduktan sonra onay kutusunu ayrıca işaretleyin.
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setLegalModalDocument(null)}
+                className="shrink-0 rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-orange-700"
+              >
+                Okudum, Kapat
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </SiteLayout>
   );
 }

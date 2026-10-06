@@ -61,9 +61,75 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
 
+    public DbSet<ContactRequest> ContactRequests => Set<ContactRequest>();
+    public DbSet<ContactReply> ContactReplies => Set<ContactReply>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // NIV-CONTACT
+        modelBuilder.Entity<ContactRequest>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.FullName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(x => x.Email)
+                .HasMaxLength(254)
+                .IsRequired();
+
+            entity.Property(x => x.PhoneNumber)
+                .HasMaxLength(30);
+
+            entity.Property(x => x.Subject)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Message)
+                .HasMaxLength(4000)
+                .IsRequired();
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(30)
+                .HasDefaultValue("new")
+                .IsRequired();
+
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.Status);
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+        // NIV-CONTACT-END
+
         // NIV-EXTERNAL-LOGIN
+        modelBuilder.Entity<ContactReply>(entity =>
+        {
+            entity.Property(x => x.Message)
+                .HasMaxLength(4000)
+                .IsRequired();
+
+            entity.Property(x => x.EmailProviderMessageId)
+                .HasMaxLength(200);
+
+            entity.HasIndex(x => x.ContactRequestId);
+
+            entity.HasIndex(x => x.CreatedAtUtc);
+
+            entity.HasOne(x => x.ContactRequest)
+                .WithMany(x => x.Replies)
+                .HasForeignKey(x => x.ContactRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.AdminUser)
+                .WithMany()
+                .HasForeignKey(x => x.AdminUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         modelBuilder.Entity<UserExternalLogin>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -372,8 +438,10 @@ modelBuilder.Entity<ProviderApplication>(entity =>
             entity.HasIndex(x => x.UserId).IsUnique();
             entity.Property(x => x.BillingType).HasMaxLength(20).IsRequired();
             entity.Property(x => x.NameOrTitle).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.FullName).HasMaxLength(200);
             entity.Property(x => x.TaxOffice).HasMaxLength(150);
-            entity.Property(x => x.TaxOrIdentityNumber).HasMaxLength(11).IsRequired();
+            entity.Property(x => x.IdentityNumber).HasMaxLength(11);
+            entity.Property(x => x.TaxNumber).HasMaxLength(10);
             entity.Property(x => x.Email).HasMaxLength(254).IsRequired();
             entity.Property(x => x.Phone).HasMaxLength(30).IsRequired();
             entity.Property(x => x.Address).HasMaxLength(500).IsRequired();

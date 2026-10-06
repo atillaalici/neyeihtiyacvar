@@ -199,6 +199,7 @@ app.MapReviewEndpoints();
 app.MapProviderInteractionEndpoints();
 app.MapMessagingEndpoints();
 app.MapNotificationEndpoints();
+app.MapContactEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminModerationEndpoints();
 app.MapAdminDirectoryEndpoints();

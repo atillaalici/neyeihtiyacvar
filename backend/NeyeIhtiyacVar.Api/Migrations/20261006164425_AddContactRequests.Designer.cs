@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NeyeIhtiyacVar.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261006164425_AddContactRequests")]
+    partial class AddContactRequests
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -294,14 +297,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)");
 
-                    b.Property<string>("FullName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("IdentityNumber")
-                        .HasMaxLength(11)
-                        .HasColumnType("character varying(11)");
-
                     b.Property<string>("NameOrTitle")
                         .IsRequired()
                         .HasMaxLength(250)
@@ -312,13 +307,14 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("TaxNumber")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
                     b.Property<string>("TaxOffice")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<string>("TaxOrIdentityNumber")
+                        .IsRequired()
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -500,41 +496,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("Cities");
-                });
-
-            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ContactReply", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AdminUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ContactRequestId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EmailProviderMessageId")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdminUserId");
-
-                    b.HasIndex("ContactRequestId");
-
-                    b.HasIndex("CreatedAtUtc");
-
-                    b.ToTable("ContactReplies");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ContactRequest", b =>
@@ -1857,24 +1818,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ContactReply", b =>
-                {
-                    b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "AdminUser")
-                        .WithMany()
-                        .HasForeignKey("AdminUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("NeyeIhtiyacVar.Api.Domain.ContactRequest", "ContactRequest")
-                        .WithMany("Replies")
-                        .HasForeignKey("ContactRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AdminUser");
-
-                    b.Navigation("ContactRequest");
-                });
-
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ContactRequest", b =>
                 {
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "User")
@@ -2160,11 +2103,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.City", b =>
                 {
                     b.Navigation("Districts");
-                });
-
-            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ContactRequest", b =>
-                {
-                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.Conversation", b =>

@@ -17,10 +17,10 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "Kullanıcı üyeliği, ihtiyaç oluşturma, eşleştirme, teklif, iletişim ve platform kullanım kuralları.",
     sections: [
       { title: "1. Taraflar ve Platform İşletmecisi", paragraphs: [
-        "neyeihtiyacvar.com ve buna bağlı dijital hizmetler Teknonet Yazılım tarafından işletilmektedir. Bu metinde TEKNONET platform işletmecisini, Platform Neye İhtiyaç Var hizmetlerini, Kullanıcı ihtiyaç sahibi kişiyi, İşletme ise bağımsız hizmet sağlayıcıları ifade eder."
+        "neyeihtiyacvar.com ve buna bağlı dijital hizmetler Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM tarafından işletilmektedir. Bu metinde TEKNONET platform işletmecisini, Platform Neye İhtiyaç Var hizmetlerini, Kullanıcı ihtiyaç sahibi kişiyi, İşletme ise bağımsız hizmet sağlayıcıları ifade eder."
       ]},
       { title: "2. Platformun Amacı ve Rolü", paragraphs: [
-        "Neye İhtiyaç Var; kullanıcıların ihtiyaçlarını oluşturabildiği, ihtiyaçlarına uygun işletmeleri bulabildiği, teklif ve iletişim süreçlerini yürütebildiği dijital eşleştirme ve aracılık platformudur.",
+        "Neye İhtiyaç Var; kullanıcıların ihtiyaçlarını oluşturabildiği, ihtiyaçlarına uygun bağımsız işletmeleri bulabildiği, teklif ve iletişim süreçlerini yürütebildiği dijital bir platformdur. TEKNONET, Kullanıcı ile İşletme arasındaki asıl hizmet bedelini tahsil etmez; Platform kapsamında İşletmelerden tahsil edilen bedeller, İşletmenin satın aldığı dijital üyelik, dijital vitrin ve ilgili platform hizmetlerine ilişkindir.",
         "Aksi açıkça belirtilmedikçe TEKNONET, Platformda listelenen bağımsız işletmeler tarafından sunulan mal veya hizmetlerin satıcısı ya da sağlayıcısı değildir. Hizmetin kapsamı, fiyatı, süresi ve ifa şartları esas olarak Kullanıcı ile ilgili İşletme arasında belirlenir. Bu hüküm TEKNONET'in mevzuattan doğan ve sözleşmeyle kaldırılamayacak yükümlülüklerini ortadan kaldırmaz."
       ]},
       { title: "3. Üyelik", paragraphs: [
@@ -69,7 +69,7 @@ export const legalDocuments: LegalDocumentData[] = [
       ]},
       // NIHV-HUKUK-GUNCELLEME-2026-09-23
       { title: "17. Kullanıcı ile İşletme Arasındaki Hukuki ve Ticari İlişki", paragraphs: [
-        "Platform; Kullanıcı ile İşletmenin birbirini bulmasını, teklif ve iletişim süreçlerini kolaylaştıran dijital bir eşleştirme ve aracılık hizmetidir. Aksi açıkça belirtilmedikçe TEKNONET; Kullanıcı ile İşletme arasında kurulabilecek satış, eser, hizmet, vekalet veya benzeri sözleşmenin tarafı, işveren, yüklenici, alt yüklenici, satıcı, sağlayıcı, temsilci, kefil, garantör veya sigortacısı değildir.",
+        "Platform; Kullanıcı ile bağımsız İşletmelerin birbirini bulmasını, teklif ve iletişim süreçlerini kolaylaştıran dijital bir platform hizmetidir. TEKNONET, Kullanıcı ile İşletme arasındaki asıl hizmet bedelini tahsil etmez ve bu bedelin İşletmeye aktarımını gerçekleştirmez. Aksi açıkça belirtilmedikçe TEKNONET; Kullanıcı ile İşletme arasında kurulabilecek satış, eser, hizmet, vekalet veya benzeri sözleşmenin tarafı, işveren, yüklenici, alt yüklenici, satıcı, sağlayıcı, temsilci, kefil, garantör veya sigortacısı değildir.",
         "İşin kapsamı, fiyatı, kapora veya avans, ödeme zamanı ve yöntemi, fatura veya diğer mali belgeler, malzeme seçimi, teslim, iptal, gecikme, ayıp, garanti, iade, işçilik, zarar ve diğer tüm ticari şartlar Kullanıcı ile İşletme tarafından belirlenir. Platform dışında veya doğrudan taraflar arasında gerçekleştirilen ödeme ve para transferleri TEKNONET tarafından tahsil edilmiş veya güvence altına alınmış sayılmaz.",
         "Kullanıcı; bir İşletmeyle anlaşmadan, ödeme veya kapora yapmadan önce gerekli gördüğü kimlik, yetki, ruhsat, lisans, mesleki yeterlilik, vergi ve iletişim bilgilerini kontrol etmenin kendi sorumluluğunda olduğunu kabul eder. Platformda bir İşletmenin listelenmesi, eşleştirilmesi, doğrulanmış olarak gösterilmesi veya üst sıralarda yer alması, aksi açıkça belirtilmedikçe hizmetin kalitesi, güvenliği, fiyatı, sonucu veya İşletmenin tüm hukuki ve mesleki yeterlilikleri bakımından TEKNONET garantisi anlamına gelmez."
       ]},
@@ -99,7 +99,7 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "İşletme profili, teklif verme, hizmet sorumluluğu, değerlendirmeler ve ücretli hizmetler.",
     sections: [
       { title: "1. Kapsam ve Platformun Rolü", paragraphs: [
-        "Neye İhtiyaç Var, Teknonet Yazılım tarafından işletilen dijital eşleştirme ve yönlendirme platformudur. İşletmeler, aksi belirtilmedikçe TEKNONET'in çalışanı, şubesi, acentesi veya temsilcisi değildir."
+        "Neye İhtiyaç Var, Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM tarafından işletilen dijital eşleştirme ve yönlendirme platformudur. İşletmeler, aksi belirtilmedikçe TEKNONET'in çalışanı, şubesi, acentesi veya temsilcisi değildir."
       ]},
       { title: "2. İşletme Başvurusu ve Bilgilerin Doğruluğu", paragraphs: [
         "İşletme, başvuru ve profil bilgilerinin doğru ve güncel olduğunu kabul eder. Faaliyet için ruhsat, izin, yetki belgesi, diploma, sertifika veya mesleki yeterlilik gerekiyorsa bunların temini ve geçerliliği İşletmenin sorumluluğundadır. Platform gerektiğinde ek bilgi veya belge isteyebilir."
@@ -172,7 +172,7 @@ export const legalDocuments: LegalDocumentData[] = [
     summary: "Kişisel verilerin hangi amaçlarla, hangi hukuki sebeplerle işlendiğine ilişkin aydınlatma.",
     sections: [
       { title: "1. Veri Sorumlusu", paragraphs: [
-        "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu Teknonet Yazılım'dır. Bu metin neyeihtiyacvar.com ziyaretçileri, kullanıcıları ve işletme hesapları için hazırlanmıştır."
+        "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında veri sorumlusu Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM'dır. Bu metin neyeihtiyacvar.com ziyaretçileri, kullanıcıları ve işletme hesapları için hazırlanmıştır."
       ]},
       { title: "2. İşlenebilecek Kişisel Veriler", paragraphs: [
         "Kullanımınıza göre ad-soyad, e-posta, telefon, hesap bilgileri, il-ilçe, ihtiyaç ve işlem bilgileri, işletme profil bilgileri, değerlendirmeler, destek/iletişim kayıtları ile güvenlik için gerekli teknik ve oturum kayıtları işlenebilir.",
@@ -323,7 +323,7 @@ export const legalDocuments: LegalDocumentData[] = [
         title: "4. Paket, Kapsam ve Fiyat",
         paragraphs: [
           "İşletme, satın alma işlemini tamamlamadan önce seçtiği paketin adını, yıllık bedelini, paket kapsamında tanımlanan hizmet hakkını ve varsa uygulanmış promosyon veya indirimi ödeme veya kayıt tamamlama ekranında görür.",
-          "Platformda farklı kapsam ve fiyatlara sahip paketler sunulabilir. İşletme için geçerli paket ve bedel, işlemin tamamlandığı anda satın alma ekranında gösterilen ve işlem kaydında yer alan paket ve bedeldir.",
+          "Platformda farklı kapsam ve fiyatlara sahip paketler sunulabilir. İşletme için geçerli paket ve bedel, işlemin tamamlandığı anda satın alma ekranında gösterilen ve işlem kaydında yer alan paket ve bedeldir. Platformda İşletmeye gösterilen paket fiyatları KDV dahil nihai tutarlardır.",
           "Promosyon kodu veya kampanya uygulanması halinde indirim tutarı ve ödenecek nihai tutar işlem tamamlanmadan önce gösterilir."
         ]
       },
@@ -486,14 +486,21 @@ export const legalDocuments: LegalDocumentData[] = [
         ]
       },
       {
-        title: "9. Ödeme İtirazları",
+        title: "9. Ödeme Hataları ve Mükerrer Tahsilat",
+        paragraphs: [
+          "Teknik hata veya ödeme sürecindeki bir sorun nedeniyle aynı üyelik işlemi için mükerrer tahsilat yapıldığının doğrulanması halinde fazla tahsil edilen tutar, teknik ve hukuki olarak mümkün olduğu ölçüde ödeme yapılan kanala iade edilir.",
+          "İşletmenin hesabından tutar düşmesine rağmen üyelik işleminin tamamlanmaması veya ödeme durumunun hatalı görünmesi halinde işlem kayıtları ödeme kuruluşu kayıtlarıyla birlikte incelenir ve doğrulanan sonuca göre gerekli düzeltme veya iade işlemi gerçekleştirilir."
+        ]
+      },
+      {
+        title: "10. Ödeme İtirazları",
         paragraphs: [
           "İşletmenin ödeme, üyelik veya iade konusunda bir sorun yaşaması halinde öncelikle destek kanallarımız üzerinden bize ulaşması, işlemin hızlı biçimde araştırılmasına yardımcı olur.",
           "Bu hüküm İşletmenin bankasına, ödeme kuruluşuna, mahkemeye veya kanunen başvurabileceği diğer mercilere müracaat hakkını ortadan kaldırmaz."
         ]
       },
       {
-        title: "10. İletişim",
+        title: "11. İletişim",
         paragraphs: [
           "Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM",
           "Adres: Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye",

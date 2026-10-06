@@ -29,22 +29,95 @@ public static class BillingInformationEndpoints
                 return Results.Unauthorized();
 
             var type = request.BillingType.Trim().ToLowerInvariant();
-            if (type is not ("individual" or "corporate"))
+            if (type is not ("individual" or "sole_proprietorship" or "corporate"))
                 return Results.BadRequest(new { message = "Geçerli bir fatura tipi seçin." });
 
-            var taxOffice = string.IsNullOrWhiteSpace(request.TaxOffice) ? null : request.TaxOffice.Trim();
-            var taxOrIdentityNumber = new string((request.TaxOrIdentityNumber ?? string.Empty).Where(char.IsDigit).ToArray());
+            var taxOffice = string.IsNullOrWhiteSpace(request.TaxOffice)
+                ? null
+                : request.TaxOffice.Trim();
+
+            var identityNumber = new string(
+                (request.IdentityNumber ?? string.Empty)
+                .Where(char.IsDigit)
+                .ToArray());
+
+            var taxNumber = new string(
+                (request.TaxNumber ?? string.Empty)
+                .Where(char.IsDigit)
+                .ToArray());
 
             if (string.IsNullOrWhiteSpace(request.NameOrTitle) ||
+                string.IsNullOrWhiteSpace(request.Email) ||
                 string.IsNullOrWhiteSpace(request.Phone) ||
-                string.IsNullOrWhiteSpace(taxOffice))
-                return Results.BadRequest(new { message = "İsim Soyisim / Unvan, T.C. / Vergi No, telefon ve vergi dairesi zorunludur." });
+                string.IsNullOrWhiteSpace(request.Address) ||
+                string.IsNullOrWhiteSpace(request.City) ||
+                string.IsNullOrWhiteSpace(request.District))
+                return Results.BadRequest(new
+                {
+                    message = "Fatura bilgilerindeki zorunlu alanları eksiksiz doldurun."
+                });
 
-            if (type == "individual" && taxOrIdentityNumber.Length != 11)
-                return Results.BadRequest(new { message = "T.C. Kimlik No 11 haneli olmalıdır." });
+            if (type == "individual")
+            {
+                if (identityNumber.Length != 11)
+                    return Results.BadRequest(new
+                    {
+                        message = "T.C. Kimlik No 11 haneli olmalıdır."
+                    });
 
-            if (type == "corporate" && taxOrIdentityNumber.Length != 10)
-                return Results.BadRequest(new { message = "Vergi Kimlik No 10 haneli olmalıdır." });
+                taxNumber = string.Empty;
+                taxOffice = null;
+            }
+
+            if (type == "sole_proprietorship")
+            {
+                if (string.IsNullOrWhiteSpace(request.FullName))
+                    return Results.BadRequest(new
+                    {
+                        message = "Şahıs işletmesi için adı soyadı zorunludur."
+                    });
+
+                if (identityNumber.Length == 0 && taxNumber.Length == 0)
+                    return Results.BadRequest(new
+                    {
+                        message = "Şahıs işletmesi için T.C. Kimlik No veya Vergi Kimlik No bilgilerinden en az birini girin."
+                    });
+
+                if (identityNumber.Length > 0 && identityNumber.Length != 11)
+                    return Results.BadRequest(new
+                    {
+                        message = "T.C. Kimlik No 11 haneli olmalıdır."
+                    });
+
+                if (taxNumber.Length > 0 && taxNumber.Length != 10)
+                    return Results.BadRequest(new
+                    {
+                        message = "Vergi Kimlik No 10 haneli olmalıdır."
+                    });
+
+                if (string.IsNullOrWhiteSpace(taxOffice))
+                    return Results.BadRequest(new
+                    {
+                        message = "Şahıs işletmesi için vergi dairesi zorunludur."
+                    });
+            }
+
+            if (type == "corporate")
+            {
+                if (taxNumber.Length != 10)
+                    return Results.BadRequest(new
+                    {
+                        message = "Vergi Kimlik No 10 haneli olmalıdır."
+                    });
+
+                if (string.IsNullOrWhiteSpace(taxOffice))
+                    return Results.BadRequest(new
+                    {
+                        message = "Şirket için vergi dairesi zorunludur."
+                    });
+
+                identityNumber = string.Empty;
+            }
 
             var now = DateTime.UtcNow;
             var item = await db.BillingInformations.FirstOrDefaultAsync(x => x.UserId == userId);
@@ -57,8 +130,12 @@ public static class BillingInformationEndpoints
 
             item.BillingType = type;
             item.NameOrTitle = request.NameOrTitle.Trim();
+            item.FullName = type == "sole_proprietorship"
+                ? request.FullName?.Trim()
+                : null;
             item.TaxOffice = taxOffice;
-            item.TaxOrIdentityNumber = taxOrIdentityNumber;
+            item.IdentityNumber = string.IsNullOrWhiteSpace(identityNumber) ? null : identityNumber;
+            item.TaxNumber = string.IsNullOrWhiteSpace(taxNumber) ? null : taxNumber;
             item.Email = request.Email.Trim();
             item.Phone = request.Phone.Trim();
             item.Address = request.Address.Trim();
@@ -77,8 +154,10 @@ public static class BillingInformationEndpoints
 public sealed record SaveBillingInformationRequest(
     string BillingType,
     string NameOrTitle,
+    string? FullName,
     string? TaxOffice,
-    string TaxOrIdentityNumber,
+    string? IdentityNumber,
+    string? TaxNumber,
     string Email,
     string Phone,
     string Address,

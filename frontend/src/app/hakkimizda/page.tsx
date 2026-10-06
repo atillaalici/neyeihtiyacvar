@@ -286,32 +286,32 @@ export default function AboutPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-950 p-7 text-white shadow-sm">
+            <div className="rounded-3xl border border-slate-200 bg-white p-7 text-slate-950 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-400">
                 Teknolojinin arkasında gerçek bir işletme var.
               </p>
               <h2 className="mt-4 font-display text-3xl font-black">
-                Teknonet Yazılım
+                Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM
               </h2>
 
-              <p className="mt-5 text-sm leading-7 text-slate-300">
+              <p className="mt-5 text-sm leading-7 text-slate-600">
                 Neye İhtiyaç Var, bağımsız ve sahipsiz bir internet projesi
-                değildir. Platform Teknonet Yazılım
+                değildir. Platform Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM
                 tarafından geliştirilmekte ve işletilmektedir.
               </p>
 
-              <p className="mt-4 text-sm leading-7 text-slate-300">
+              <p className="mt-4 text-sm leading-7 text-slate-600">
                 Teknoloji, yazılım, bilgisayar ve teknik hizmetler alanındaki
                 tecrübemizi; insanların gerçek hayattaki ihtiyaçlarını çözebilecek
                 yeni nesil bir dijital platform oluşturmak için kullanıyoruz.
               </p>
 
-              <div className="mt-7 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300">
-                <strong className="text-white">Merkez:</strong>
+              <div className="mt-7 rounded-2xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-600">
+                <strong className="text-slate-950">Merkez:</strong>
                 <br />
                 Ahmet Yesevi Mah. Çardak Cad. No: 33/1 Merkez / Osmaniye
                 <div className="mt-4">
-                  <strong className="text-white">Telefon:</strong>{" "}
+                  <strong className="text-slate-950">Telefon:</strong>{" "}
                   <a
                     href="tel:+905325665899"
                     className="transition hover:text-orange-400"
@@ -320,7 +320,7 @@ export default function AboutPage() {
                   </a>
                 </div>
                 <div className="mt-1">
-                  <strong className="text-white">E-posta:</strong>{" "}
+                  <strong className="text-slate-950">E-posta:</strong>{" "}
                   <a
                     href="mailto:destek@neyeihtiyacvar.com"
                     className="transition hover:text-orange-400"

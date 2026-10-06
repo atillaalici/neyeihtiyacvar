@@ -235,6 +235,7 @@ export default function MembershipPage() {
 
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7 xl:text-lg">
               Teklif başına ücret yok. Komisyon yok. Sürpriz maliyet yok.
+              Ödediğiniz tutar yıllık dijital üyelik ve dijital vitrin hizmetiniz içindir.
               İhtiyacınıza uygun paketi seçin, hizmet haklarınızı üyelik süreniz
               boyunca istediğiniz zaman kullanın.
             </p>
@@ -329,7 +330,7 @@ export default function MembershipPage() {
                         {money(plan.annualPrice)} TL
                       </span>
                       <span className="pb-1 text-[10px] font-medium text-muted-foreground sm:text-xs">
-                        / yıl
+                        KDV dahil / yıl
                       </span>
                     </div>
 

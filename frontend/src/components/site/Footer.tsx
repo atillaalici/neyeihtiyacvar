@@ -2,9 +2,9 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/site/BrandLogo";
 
 const groups = [
-  { title: "Platform", links: [["Keşfet","/kesfet"],["Kategoriler","/kategoriler"],["Nasıl Çalışır","/nasil-calisir"],["Hakkımızda","/hakkimizda"]] },
+  { title: "Platform", links: [["Keşfet","/kesfet"],["Kategoriler","/kategoriler"],["Nasıl Çalışır","/nasil-calisir"],["Hakkımızda","/hakkimizda"],["İletişim","/iletisim"]] },
   { title: "Hizmet Verenler", links: [["İşletmeni Ekle","/isletme-ekle"],["Giriş Yap","/giris"],["İşletme Paneli","/giris"]] },
-  { title: "Yasal & Gizlilik", links: [["Sözleşmeler","/sozlesmeler"],["Kullanım Koşulları","/sozlesmeler/kullanim-kosullari"],["KVKK Aydınlatma","/sozlesmeler/kvkk-aydinlatma"],["Gizlilik","/sozlesmeler/gizlilik"],["Çerez Politikası","/sozlesmeler/cerez-politikasi"]] },
+  { title: "Yasal & Gizlilik", links: [["Sözleşmeler","/sozlesmeler"],["Kullanım Koşulları","/sozlesmeler/kullanim-kosullari"],["İptal ve İade Politikası","/sozlesmeler/iptal-iade-politikasi"],["KVKK Aydınlatma","/sozlesmeler/kvkk-aydinlatma"],["Gizlilik","/sozlesmeler/gizlilik"],["Çerez Politikası","/sozlesmeler/cerez-politikasi"]] },
 ] as const;
 
 export function Footer() {

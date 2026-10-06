@@ -7,8 +7,10 @@ public sealed class BillingInformation
     public AppUser User { get; set; } = null!;
     public string BillingType { get; set; } = "individual";
     public string NameOrTitle { get; set; } = string.Empty;
+    public string? FullName { get; set; }
     public string? TaxOffice { get; set; }
-    public string TaxOrIdentityNumber { get; set; } = string.Empty;
+    public string? IdentityNumber { get; set; }
+    public string? TaxNumber { get; set; }
     public string Email { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;

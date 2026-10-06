@@ -138,16 +138,10 @@ function LoginPageContent() {
             </div>
 
             <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="mb-2">
                 <label htmlFor="password" className="text-sm font-medium">
                   Şifre
                 </label>
-                <Link
-                  href="/sifremi-unuttum"
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Şifremi Unuttum
-                </Link>
               </div>
 
               <input
@@ -162,15 +156,24 @@ function LoginPageContent() {
               />
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(event) => setRememberMe(event.target.checked)}
-                className="size-4 rounded border-input"
-              />
-              Beni hatırla
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                  className="size-4 rounded border-input"
+                />
+                Beni hatırla
+              </label>
+
+              <Link
+                href="/sifremi-unuttum"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Şifremi Unuttum
+              </Link>
+            </div>
 
             {error && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
