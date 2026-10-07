@@ -128,7 +128,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!citySlug) continue;
 
     for (const rawServiceSlug of services) {
-      const serviceSlug = rawServiceSlug?.trim();
+      const rawSlug = rawServiceSlug?.trim();
+
+      if (!rawSlug) continue;
+
+      const serviceSlug = toServiceSlug(rawSlug);
 
       if (!serviceSlug || !serviceSlugs.has(serviceSlug)) continue;
 
