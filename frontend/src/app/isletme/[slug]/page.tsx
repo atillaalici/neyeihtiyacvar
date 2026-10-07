@@ -10,7 +10,7 @@ async function getProvider(slug: string): Promise<Provider | null> {
     const response = await fetch(
       `${serverApiBaseUrl}/api/providers/${encodeURIComponent(slug)}`,
       {
-        next: { revalidate: 900 },
+        cache: "no-store",
       },
     );
 
