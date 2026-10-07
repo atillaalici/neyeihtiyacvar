@@ -457,6 +457,7 @@ export default function AdminProviderDetailPage() {
         />
 
         <form
+          noValidate
           onSubmit={save}
           className="space-y-6 rounded-2xl border border-border bg-card p-6 shadow-soft sm:p-8"
         >
@@ -753,6 +754,16 @@ export default function AdminProviderDetailPage() {
               <Button type="submit" disabled={busy}>
                 {busy ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
               </Button>
+              {error && (
+                <p role="alert" className="w-full text-sm font-medium text-red-600">
+                  {error}
+                </p>
+              )}
+              {message && (
+                <p role="status" className="w-full text-sm font-medium text-green-700">
+                  {message}
+                </p>
+              )}
 
               <Button
                 type="button"
