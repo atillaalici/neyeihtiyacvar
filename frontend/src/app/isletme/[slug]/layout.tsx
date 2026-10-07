@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import {
   safeJsonLd,
@@ -14,10 +15,13 @@ type ProviderSeo = {
   description?: string | null;
   categorySlug?: string | null;
   serviceSlug?: string | null;
+  additionalServices?: string[];
   citySlug?: string | null;
   districtSlug?: string | null;
   publicPhone?: string | null;
   publicAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type Props = {
@@ -50,8 +54,14 @@ export async function generateMetadata({
   const { slug } = await params;
   const provider = await getProvider(slug);
 
-  const businessName = provider?.businessName ?? slugToTitle(slug);
-  const serviceName = provider?.serviceSlug
+  if (!provider) {
+    return {
+      title: "İşletme Bulunamadı",
+    };
+  }
+
+  const businessName = provider.businessName;
+  const serviceName = provider.serviceSlug
     ? slugToTitle(provider.serviceSlug)
     : "Hizmet";
   const location = [provider?.districtSlug, provider?.citySlug]
@@ -59,10 +69,7 @@ export async function generateMetadata({
     .map((item) => slugToTitle(item!))
     .join(", ");
 
-  const description =
-    provider?.shortDescription ||
-    provider?.description ||
-    `${businessName} - ${serviceName}${location ? `, ${location}` : ""}. İletişim ve hizmet bilgilerini Neye İhtiyaç Var'da incele.`;
+  const description = `${businessName}${location ? `, ${location} konumunda` : ""} ${serviceName} hizmeti sunan işletmedir. Hizmet bilgilerini ve işletme profilini Neye İhtiyaç Var'da incele.`;
 
   const canonical = `/isletme/${slug}`;
 
@@ -77,6 +84,14 @@ export async function generateMetadata({
       description,
       url: `${siteUrl}${canonical}`,
       type: "website",
+      images: [
+        {
+          url: "/brand/neyeihtiyacvar-og.png",
+          width: 1200,
+          height: 630,
+          alt: "Neye İhtiyaç Var - İhtiyacını Yaz, Doğru Hizmeti Bul",
+        },
+      ],
     },
   };
 }
@@ -89,18 +104,26 @@ export default async function ProviderSlugLayout({
   const provider = await getProvider(slug);
 
   if (!provider) {
-    return children;
+    notFound();
   }
+
+  const serviceName = provider.serviceSlug
+    ? slugToTitle(provider.serviceSlug)
+    : "Hizmet";
+
+  const location = [provider.districtSlug, provider.citySlug]
+    .filter(Boolean)
+    .map((item) => slugToTitle(item!))
+    .join(", ");
+
+  const seoDescription = `${provider.businessName}${location ? `, ${location} konumunda` : ""} ${serviceName} hizmeti sunan işletmedir. Hizmet bilgilerini ve işletme profilini Neye İhtiyaç Var'da incele.`;
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: provider.businessName,
     url: `${siteUrl}/isletme/${slug}`,
-    description:
-      provider.shortDescription ||
-      provider.description ||
-      undefined,
+    description: seoDescription,
     telephone: provider.publicPhone || undefined,
     address: provider.publicAddress
       ? {
@@ -115,6 +138,50 @@ export default async function ProviderSlugLayout({
           addressCountry: "TR",
         }
       : undefined,
+    geo:
+      provider.latitude != null && provider.longitude != null
+        ? {
+            "@type": "GeoCoordinates",
+            latitude: provider.latitude,
+            longitude: provider.longitude,
+          }
+        : undefined,
+    knowsAbout: [
+      provider.serviceSlug,
+      ...(provider.additionalServices ?? []),
+    ]
+      .filter(Boolean)
+      .map((service) => slugToTitle(service!)),
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Ana Sayfa",
+        item: siteUrl,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: serviceName,
+        item:
+          provider.citySlug && provider.serviceSlug
+            ? `${siteUrl}/${provider.citySlug}/${provider.serviceSlug}`
+            : provider.serviceSlug
+              ? `${siteUrl}/hizmet/${provider.serviceSlug}`
+              : `${siteUrl}/hizmetler`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: provider.businessName,
+        item: `${siteUrl}/isletme/${slug}`,
+      },
+    ],
   };
 
   return (
@@ -123,6 +190,12 @@ export default async function ProviderSlugLayout({
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(jsonLd),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: safeJsonLd(breadcrumbJsonLd),
         }}
       />
       {children}

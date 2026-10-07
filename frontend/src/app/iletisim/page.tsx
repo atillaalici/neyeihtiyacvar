@@ -10,9 +10,12 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import ContactForm from "./ContactForm";
 
 export const metadata = {
-  title: "İletişim | Neye İhtiyaç Var",
+  title: "İletişim",
   description:
     "Neye İhtiyaç Var iletişim ve işletmeci bilgileri. Atilla Alıcı – TEKNONET BİLGİSAYAR YAZILIM.",
+  alternates: {
+    canonical: "/iletisim",
+  },
 };
 
 export default function ContactPage() {

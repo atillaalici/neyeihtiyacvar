@@ -207,13 +207,12 @@ export function ShowcaseSection() {
               >
               {/* showcase-provider-image-v6 */}
               <div className="relative h-28 w-full overflow-hidden border-b border-border bg-gradient-to-br from-primary/10 via-cream to-background">
-                <img
-                  src={`${apiBaseUrl}/api/providers/${business.id}/image`}
+                <Image
+                  src={`/api/provider-image/${business.id}`}
                   alt={`${business.businessName} işletme görseli`}
-                  className="h-full w-full object-cover"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
+                  fill
+                  sizes="(max-width: 767px) 50vw, 25vw"
+                  className="object-cover"
                 />
 
                   <span className="absolute left-2 top-2 z-20 rounded-full bg-white/95 px-2 py-1 text-[10px] font-extrabold text-orange-700 shadow-sm">

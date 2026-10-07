@@ -57,6 +57,14 @@ export async function generateMetadata({
       description,
       url: `${siteUrl}${canonical}`,
       type: "website",
+      images: [
+        {
+          url: "/brand/neyeihtiyacvar-og.png",
+          width: 1200,
+          height: 630,
+          alt: "Neye İhtiyaç Var - İhtiyacını Yaz, Doğru Hizmeti Bul",
+        },
+      ],
     },
   };
 }

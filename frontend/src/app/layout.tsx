@@ -35,9 +35,6 @@ export const metadata: Metadata = {
   authors: [{ name: "Neye İhtiyaç Var" }],
   creator: "Neye İhtiyaç Var",
   publisher: "Neye İhtiyaç Var",
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     type: "website",
     locale: "tr_TR",
@@ -46,16 +43,21 @@ export const metadata: Metadata = {
     title: "Neye İhtiyaç Var | İhtiyacını Yaz, Doğru Hizmeti Bul",
     description:
       "İhtiyacını yaz, bulunduğun bölgedeki uygun işletme ve hizmet sağlayıcıları kolayca bul.",
+    images: [
+      {
+        url: "/brand/neyeihtiyacvar-og.png",
+        width: 1200,
+        height: 630,
+        alt: "Neye İhtiyaç Var - İhtiyacını Yaz, Doğru Hizmeti Bul",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Neye İhtiyaç Var",
     description:
       "İhtiyacını yaz, doğru hizmeti ve uygun işletmeleri kolayca bul.",
-  },
-  robots: {
-    index: true,
-    follow: true,
+    images: ["/brand/neyeihtiyacvar-og.png"],
   },
 };
 
@@ -78,11 +80,6 @@ const websiteJsonLd = {
   name: "Neye İhtiyaç Var",
   url: siteUrl,
   inLanguage: "tr-TR",
-  potentialAction: {
-    "@type": "SearchAction",
-    target: `${siteUrl}/kesfet?q={search_term_string}`,
-    "query-input": "required name=search_term_string",
-  },
 };
 
 export default function RootLayout({

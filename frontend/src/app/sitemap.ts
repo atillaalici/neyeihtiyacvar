@@ -4,12 +4,39 @@ import { serverApiBaseUrl } from "@/lib/seo";
 
 const baseUrl = "https://neyeihtiyacvar.com";
 
-type CategoryItem = { slug?: string | null };
-type ProviderItem = { slug?: string | null };
+type CategoryItem = {
+  slug?: string | null;
+  services?: string[];
+};
+type ProviderItem = {
+  slug?: string | null;
+  citySlug?: string | null;
+  serviceSlug?: string | null;
+  additionalServices?: string[];
+};
 
 type ListEnvelope<T> =
   | T[]
   | { items?: T[]; data?: T[]; results?: T[] };
+
+function toServiceSlug(value: string) {
+  const normalized = value
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ü", "u")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ç", "c")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  const aliases: Record<string, string> = {
+    "hafriyat-isleri": "hafriyat",
+  };
+
+  return aliases[normalized] ?? normalized;
+}
 
 function listFrom<T>(value: ListEnvelope<T> | null | undefined): T[] {
   if (Array.isArray(value)) return value;
@@ -33,17 +60,15 @@ async function fetchList<T>(path: string): Promise<T[]> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
-
   const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${baseUrl}/kesfet`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
-    { url: `${baseUrl}/hizmetler`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${baseUrl}/kategoriler`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-    { url: `${baseUrl}/nasil-calisir`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/hakkimizda`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${baseUrl}/isletme-ekle`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
-    { url: `${baseUrl}/sozlesmeler`, lastModified: now, changeFrequency: "monthly", priority: 0.3 },
+    { url: baseUrl, changeFrequency: "daily", priority: 1 },
+    { url: `${baseUrl}/hizmetler`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${baseUrl}/kategoriler`, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${baseUrl}/nasil-calisir`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${baseUrl}/hakkimizda`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${baseUrl}/iletisim`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${baseUrl}/uyelik`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${baseUrl}/sozlesmeler`, changeFrequency: "monthly", priority: 0.3 },
   ];
 
   const [categories, providers] = await Promise.all([
@@ -56,7 +81,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .filter((slug): slug is string => Boolean(slug))
     .map((slug) => ({
       url: `${baseUrl}/kategoriler/${encodeURIComponent(slug)}`,
-      lastModified: now,
       changeFrequency: "weekly" as const,
       priority: 0.75,
     }));
@@ -68,10 +92,66 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .filter((slug): slug is string => Boolean(slug))
     .map((slug) => ({
       url: `${baseUrl}/isletme/${encodeURIComponent(slug)}`,
-      lastModified: now,
       changeFrequency: "weekly" as const,
       priority: 0.8,
     }));
 
-  return [...staticPages, ...categoryPages, ...providerPages];
+  const serviceSlugs = new Set<string>();
+
+  for (const category of categories) {
+    for (const serviceName of category.services ?? []) {
+      const slug = toServiceSlug(serviceName);
+
+      if (slug) {
+        serviceSlugs.add(slug);
+      }
+    }
+  }
+
+  const servicePages: MetadataRoute.Sitemap = Array.from(serviceSlugs).map(
+    (slug) => ({
+      url: `${baseUrl}/hizmet/${encodeURIComponent(slug)}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.8,
+    }),
+  );
+
+  const localServiceKeys = new Set<string>();
+
+  for (const provider of providers) {
+    const citySlug = provider.citySlug?.trim();
+    const services = [
+      provider.serviceSlug,
+      ...(provider.additionalServices ?? []),
+    ];
+
+    if (!citySlug) continue;
+
+    for (const rawServiceSlug of services) {
+      const serviceSlug = rawServiceSlug?.trim();
+
+      if (!serviceSlug || !serviceSlugs.has(serviceSlug)) continue;
+
+      localServiceKeys.add(`${citySlug}/${serviceSlug}`);
+    }
+  }
+
+  const localServicePages: MetadataRoute.Sitemap = Array.from(
+    localServiceKeys,
+  ).map((key) => ({
+    url: `${baseUrl}/${key
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/")}`,
+    changeFrequency: "weekly" as const,
+    priority: 0.85,
+  }));
+
+  return [
+    ...staticPages,
+    ...categoryPages,
+    ...servicePages,
+    ...localServicePages,
+    ...providerPages,
+  ];
 }

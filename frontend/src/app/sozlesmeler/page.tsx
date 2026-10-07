@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { legalDocuments } from "@/components/legal/legal-data";
 import { SiteLayout } from "@/components/site/SiteLayout";
+
+export const metadata: Metadata = {
+  title: "Sözleşmeler ve Yasal Metinler",
+  description:
+    "Neye İhtiyaç Var kullanım koşulları, işletme koşulları, KVKK, gizlilik ve diğer güncel yasal metinlerini inceleyin.",
+  alternates: {
+    canonical: "/sozlesmeler",
+  },
+};
 
 export default function LegalHubPage() {
   return (

@@ -350,10 +350,7 @@ export default function ServicesPage() {
                       {category.services.map((service) => (
                         <Link
                           key={`${category.slug}-${service.slug}`}
-                          href={`/kesfet?${new URLSearchParams({
-                            kategori: category.slug,
-                            hizmet: service.slug,
-                          }).toString()}`}
+                          href={`/hizmet/${encodeURIComponent(service.slug)}`}
                           className="group flex items-center justify-between rounded-xl px-3 py-3 text-sm transition hover:bg-orange-50"
                         >
                           <span className="font-medium text-slate-800">

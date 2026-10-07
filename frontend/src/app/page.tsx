@@ -1,57 +1,38 @@
-"use client";
+import type { Metadata } from "next";
 
-import { useRouter } from "next/navigation";
+import { HomeClient } from "./home-client";
 
-import { ShowcaseSection } from "@/components/site/ShowcaseSection";
-import { HeroSearch } from "@/components/site/HeroSearch";
-import { HowItWorks } from "@/components/site/HowItWorks";
-import { HomeProvidersMap } from "@/components/site/HomeProvidersMap";
-import { LocationSearch } from "@/components/site/LocationSearch";
-import { ProviderCTA } from "@/components/site/ProviderCTA";
-import { SiteLayout } from "@/components/site/SiteLayout";
-import { TrustSection } from "@/components/site/TrustSection";
+export const metadata: Metadata = {
+  title: "İhtiyacını Yaz, Doğru Hizmeti Bul",
+  description:
+    "İhtiyacını anlat, sana uygun kişi, işletme veya hizmeti bul. Elektrikçi, tesisatçı, teknik servis, nakliye, hafriyat ve daha birçok hizmeti Neye İhtiyaç Var ile keşfet.",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://neyeihtiyacvar.com",
+    title: "Neye İhtiyaç Var | İhtiyacını Yaz, Doğru Hizmeti Bul",
+    description:
+      "İhtiyacını anlat, sana uygun kişi, işletme veya hizmeti bul. Yakınındaki hizmet verenleri keşfet.",
+    images: [
+      {
+        url: "/brand/neyeihtiyacvar-og.png",
+        width: 1200,
+        height: 630,
+        alt: "Neye İhtiyaç Var - İhtiyacını Yaz, Doğru Hizmeti Bul",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Neye İhtiyaç Var | İhtiyacını Yaz, Doğru Hizmeti Bul",
+    description:
+      "İhtiyacını anlat, sana uygun kişi, işletme veya hizmeti bul. Yakınındaki hizmet verenleri keşfet.",
+    images: ["/brand/neyeihtiyacvar-og.png"],
+  },
+};
 
 export default function HomePage() {
-  const router = useRouter();
-
-  return (
-    <SiteLayout>
-      <div className="home-page">
-        <HeroSearch />
-
-        <ShowcaseSection />
-
-        <HowItWorks />
-
-        <TrustSection />
-
-        <section className="home-location section-shell py-6 sm:py-8 lg:py-10">
-          <h2 className="max-w-2xl font-display text-3xl font-bold text-balance sm:text-4xl">
-            Yakınında kim var?
-          </h2>
-
-          <p className="mt-3 text-muted-foreground">
-            İl ve ilçeni seç, bölgendeki hizmet verenleri listeleyelim.
-          </p>
-
-          <div className="mt-8 max-w-3xl">
-            <LocationSearch
-              onSearch={({ city, district }) => {
-                const params = new URLSearchParams({
-                  il: city,
-                  ilce: district,
-                });
-
-                router.push(`/kesfet?${params.toString()}`);
-              }}
-            />
-          </div>
-
-          <HomeProvidersMap />
-        </section>
-
-        <ProviderCTA />
-      </div>
-    </SiteLayout>
-  );
+  return <HomeClient />;
 }

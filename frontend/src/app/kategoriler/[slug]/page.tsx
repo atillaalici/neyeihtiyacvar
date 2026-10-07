@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
-import { apiBaseUrl } from "@/lib/api";
+import { safeJsonLd, serverApiBaseUrl, siteUrl } from "@/lib/seo";
 
 type LiveCatalogCategory = {
   id: string;
@@ -138,9 +138,9 @@ export default async function CategoryDetailPage({
 
   try {
     const [categoryResponse, providerResponse] = await Promise.all([
-      fetch(`${apiBaseUrl}/api/categories`, { cache: "no-store" }),
+      fetch(`${serverApiBaseUrl}/api/categories`, { cache: "no-store" }),
       fetch(
-        `${apiBaseUrl}/api/providers?kategori=${encodeURIComponent(slug)}`,
+        `${serverApiBaseUrl}/api/providers?kategori=${encodeURIComponent(slug)}`,
         { cache: "no-store" },
       ),
     ]);
@@ -200,9 +200,62 @@ export default async function CategoryDetailPage({
     }
   }
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Ana Sayfa",
+        item: siteUrl,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Kategoriler",
+        item: `${siteUrl}/kategoriler`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: category.name,
+        item: `${siteUrl}/kategoriler/${category.slug}`,
+      },
+    ],
+  };
+
+  const serviceListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: `${category.name} hizmetleri`,
+    numberOfItems: category.services.length,
+    itemListElement: category.services.map((serviceName, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: serviceName,
+      url: `${siteUrl}/hizmet/${toServiceSlug(serviceName)}`,
+    })),
+  };
+
   return (
     <SiteLayout>
       <main className="section-shell py-10 sm:py-14 lg:py-16">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: safeJsonLd(breadcrumbJsonLd),
+          }}
+        />
+
+        {category.services.length > 0 ? (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: safeJsonLd(serviceListJsonLd),
+            }}
+          />
+        ) : null}
         <Link
           href="/kategoriler"
           className="inline-flex items-center gap-2 text-sm font-semibold text-orange-700 hover:text-orange-800"
@@ -262,7 +315,7 @@ export default async function CategoryDetailPage({
                 return (
                   <Link
                     key={serviceName}
-                    href={`/kesfet?kategori=${encodeURIComponent(slug)}&hizmet=${encodeURIComponent(serviceSlug)}`}
+                    href={`/hizmet/${encodeURIComponent(serviceSlug)}`}
                     className="group flex min-h-24 items-center justify-between rounded-2xl border border-border bg-card px-4 py-4 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                   >
                     <div className="min-w-0">

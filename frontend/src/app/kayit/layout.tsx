@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 
-import AdminClientLayout from "./admin-client-layout";
-
 export const metadata: Metadata = {
-  title: "Yönetim Paneli",
+  title: "Kayıt",
   robots: {
     index: false,
     follow: false,
@@ -11,10 +9,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AdminLayout({
+export default function PrivateRouteLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <AdminClientLayout>{children}</AdminClientLayout>;
+  return children;
 }
