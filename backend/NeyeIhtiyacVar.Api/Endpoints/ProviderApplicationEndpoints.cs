@@ -117,6 +117,46 @@ public static class ProviderApplicationEndpoints
                     x.CitySlug,
                     x.DistrictSlug,
                     x.ApplicantName,
+                    Promotion = dbContext.PromotionUsages
+                        .Where(u => dbContext.ProviderMemberships.Any(m =>
+                            m.Provider.SourceApplicationId == x.Id &&
+                            u.UserId == m.UserId &&
+                            m.Plan != null &&
+                            u.PlanCode == m.Plan.Code &&
+                            u.UsedAtUtc >= m.StartsAtUtc.AddMinutes(-5) &&
+                            u.UsedAtUtc <= m.StartsAtUtc.AddMinutes(5)))
+                        .OrderByDescending(u => u.UsedAtUtc)
+                        .Select(u => new
+                        {
+                            u.PlanCode,
+                            u.OriginalPrice,
+                            u.DiscountAmount,
+                            u.FinalPrice,
+                            u.PaymentStatus,
+                            u.UsedAtUtc,
+                            PromotionCode = dbContext.PromotionCodes
+                                .Where(c => c.Id == u.PromotionCodeId)
+                                .Select(c => c.Code)
+                                .FirstOrDefault(),
+                            CampaignName = dbContext.PromotionCampaigns
+                                .Where(c => c.Id == u.CampaignId)
+                                .Select(c => c.Name)
+                                .FirstOrDefault()
+                        })
+                        .FirstOrDefault(),
+                    Membership = dbContext.ProviderMemberships
+                        .Where(m => m.Provider.SourceApplicationId == x.Id)
+                        .Select(m => new
+                        {
+                            m.IsActive,
+                            m.StartsAtUtc,
+                            m.ExpiresAtUtc,
+                            m.CreatedAtUtc,
+                            m.AnnualPriceSnapshot,
+                            PlanCode = m.Plan != null ? m.Plan.Code : null,
+                            PlanName = m.Plan != null ? m.Plan.Name : null
+                        })
+                        .FirstOrDefault(),
                     x.Phone,
                     x.Whatsapp,
                     x.Note,
@@ -203,6 +243,29 @@ public static class ProviderApplicationEndpoints
                 .AnyAsync(x => x.SourceApplicationId == application.Id);
 
             Provider? provider = null;
+
+            if (providerExists)
+            {
+                provider = await dbContext.Providers
+                    .FirstAsync(x => x.SourceApplicationId == application.Id);
+
+                if (!provider.Latitude.HasValue &&
+                    !provider.Longitude.HasValue &&
+                    application.Latitude.HasValue &&
+                    application.Longitude.HasValue)
+                {
+                    provider.Latitude = application.Latitude;
+                    provider.Longitude = application.Longitude;
+
+                    if (string.IsNullOrWhiteSpace(provider.PublicAddress))
+                    {
+                        provider.PublicAddress = application.PublicAddress;
+                    }
+
+                    provider.UpdatedAtUtc = DateTime.UtcNow;
+                    provider.Version++;
+                }
+            }
 
             if (!providerExists)
             {

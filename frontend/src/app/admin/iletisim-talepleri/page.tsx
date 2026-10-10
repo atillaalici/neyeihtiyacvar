@@ -157,6 +157,7 @@ export default function AdminContactRequestsPage() {
       }
 
       setNotice("İletişim talebinin durumu güncellendi.");
+      window.dispatchEvent(new Event("admin-counts-refresh"));
       await loadItems();
     } catch {
       setError("Sunucuya bağlanılamadı.");
@@ -220,6 +221,13 @@ export default function AdminContactRequestsPage() {
           "Cevabınız kullanıcıya e-posta olarak gönderildi.",
       );
 
+      setExpandedIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+
+      window.dispatchEvent(new Event("admin-counts-refresh"));
       await loadItems();
     } catch {
       setError("Sunucuya bağlanılamadı.");
@@ -229,10 +237,7 @@ export default function AdminContactRequestsPage() {
   }
 
   function isCollapsed(item: ContactRequest) {
-    return (
-      (item.status === "answered" || item.status === "closed") &&
-      !expandedIds.has(item.id)
-    );
+    return !expandedIds.has(item.id);
   }
 
   function toggleExpanded(id: string) {
@@ -372,39 +377,34 @@ export default function AdminContactRequestsPage() {
                     : "border-border",
                 ].join(" ")}
               >
-                <div className="flex flex-col gap-4 border-b border-border p-5 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={[
-                          "rounded-full border px-2.5 py-1 text-xs font-bold",
-                          statusClasses[item.status],
-                        ].join(" ")}
-                      >
-                        {statusLabels[item.status]}
-                      </span>
-
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(item.createdAtUtc)}
-                      </span>
-                    </div>
-
-                    <h2 className="mt-3 font-display text-xl font-bold">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+                    <h2 className="font-display text-base font-bold">
                       {item.subject}
                     </h2>
+
+                    <span
+                      className={[
+                        "rounded-full border px-2 py-0.5 text-xs font-bold",
+                        statusClasses[item.status],
+                      ].join(" ")}
+                    >
+                      {statusLabels[item.status]}
+                    </span>
+
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(item.createdAtUtc)}
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(item.status === "answered" ||
-                      item.status === "closed") && (
-                      <button
-                        type="button"
-                        onClick={() => toggleExpanded(item.id)}
-                        className="h-10 rounded-xl border border-border bg-background px-4 text-sm font-bold transition hover:border-primary/40"
-                      >
-                        {isCollapsed(item) ? "Görüntüle" : "Gizle"}
-                      </button>
-                    )}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(item.id)}
+                      className="h-9 rounded-xl border border-border bg-background px-3 text-xs font-bold transition hover:border-primary/40"
+                    >
+                      {isCollapsed(item) ? "Görüntüle" : "Gizle"}
+                    </button>
 
                     <select
                       value={item.status}
@@ -415,7 +415,7 @@ export default function AdminContactRequestsPage() {
                           event.target.value as ContactStatus,
                         )
                       }
-                      className="h-10 rounded-xl border border-input bg-background px-3 text-sm font-medium"
+                      className="h-9 rounded-xl border border-input bg-background px-2 text-xs font-medium"
                     >
                       <option value="new">Yeni</option>
                       <option value="read">Okundu</option>

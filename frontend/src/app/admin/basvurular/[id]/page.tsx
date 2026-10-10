@@ -34,9 +34,32 @@ type ProviderApplication = {
   additionalServices: string[];
   emailVerified: boolean;
   phoneVerified: boolean;
+  membership?: MembershipInfo | null;
+  promotion?: PromotionInfo | null;
   status: "pending" | "approved" | "rejected";
   createdAtUtc: string;
   version: number;
+};
+
+type MembershipInfo = {
+  isActive: boolean;
+  startsAtUtc: string;
+  expiresAtUtc: string | null;
+  createdAtUtc: string;
+  annualPriceSnapshot: number;
+  planCode: string | null;
+  planName: string | null;
+};
+
+type PromotionInfo = {
+  planCode: string;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  paymentStatus: string;
+  usedAtUtc: string;
+  promotionCode: string | null;
+  campaignName: string | null;
 };
 
 type ApproveResponse = {
@@ -139,6 +162,56 @@ export default function AdminApplicationReviewPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  async function rejectApplication() {
+    if (!application || busy || application.status !== "pending") return;
+
+    const reviewNote = window.prompt(
+      `${application.businessName} başvurusunun reddedilme gerekçesi (isteğe bağlı):`,
+      "",
+    );
+
+    if (reviewNote === null) return;
+
+    const confirmed = window.confirm(
+      `${application.businessName} başvurusunu reddetmek istediğinize emin misiniz?`,
+    );
+
+    if (!confirmed) return;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const response = await adminFetch(
+        `${apiBaseUrl}/api/admin/provider-applications/${application.id}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reviewNote: reviewNote.trim() || null,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+
+        setError(data?.message ?? "Başvuru reddedilemedi.");
+        return;
+      }
+
+      window.dispatchEvent(new Event("admin-counts-refresh"));
+      router.push("/admin/basvurular");
+      router.refresh();
+    } catch {
+      setError("Sunucuya bağlanılamadı.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function approveAndPublish() {
     if (!application || busy) return;
 
@@ -173,6 +246,8 @@ export default function AdminApplicationReviewPage() {
         );
         return;
       }
+
+      window.dispatchEvent(new Event("admin-counts-refresh"));
 
       const result = approved as ApproveResponse;
 
@@ -362,6 +437,56 @@ export default function AdminApplicationReviewPage() {
               </div>
             </div>
 
+            <div className="mt-6 border-t border-slate-200 pt-5">
+              <h3 className="mb-4 text-base font-bold text-slate-900">
+                Üyelik ve Ödeme Bilgileri
+              </h3>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["Üyelik Paketi", application.membership?.planName || "Bulunamadı"],
+                  ["Üyelik Durumu", application.membership
+                    ? (application.membership.isActive ? "Aktif" : "Pasif")
+                    : "Üyelik yok"],
+                  ["Başlangıç Tarihi", application.membership?.startsAtUtc
+                    ? new Date(application.membership.startsAtUtc).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })
+                    : "-"],
+                  ["Bitiş Tarihi", application.membership?.expiresAtUtc
+                    ? new Date(application.membership.expiresAtUtc).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })
+                    : "-"],
+                  ["Promosyon Kullanımı", application.promotion ? "Evet" : "Hayır"],
+                  ["Kampanya", application.promotion?.campaignName || "-"],
+                  ["Promosyon Kodu", application.promotion?.promotionCode || "-"],
+                  ["Ödeme Durumu", application.promotion?.paymentStatus === "free_completed"
+                    ? "Ücretsiz tamamlandı"
+                    : application.promotion?.paymentStatus || "-"],
+                  ["Normal Fiyat", application.promotion
+                    ? application.promotion.originalPrice.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })
+                    : application.membership
+                      ? application.membership.annualPriceSnapshot.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })
+                      : "-"],
+                  ["İndirim", application.promotion
+                    ? application.promotion.discountAmount.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })
+                    : "-"],
+                  ["Ödenen Tutar", application.promotion
+                    ? application.promotion.finalPrice.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })
+                    : "-"],
+                  ["Promosyon Tarihi", application.promotion?.usedAtUtc
+                    ? new Date(application.promotion.usedAtUtc).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })
+                    : "-"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      {label}
+                    </div>
+                    <div className="mt-1 break-words font-semibold text-slate-900">
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
           <div className="mt-5">
@@ -390,15 +515,28 @@ export default function AdminApplicationReviewPage() {
             </div>
           )}
 
-          <Button
-            type="button"
-            size="lg"
-            disabled={busy}
-            onClick={() => void approveAndPublish()}
-            className="w-full sm:w-auto"
-          >
-            {busy ? "İşlem Yapılıyor..." : "Onayla ve Yayınla"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              size="lg"
+              disabled={busy}
+              onClick={() => void approveAndPublish()}
+              className="w-full sm:w-auto"
+            >
+              {busy ? "İşlem Yapılıyor..." : "Onayla ve Yayınla"}
+            </Button>
+
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void rejectApplication()}
+              className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 sm:w-auto"
+            >
+              Başvuruyu Reddet
+            </Button>
+          </div>
         </div>
       </section>
     </SiteLayout>

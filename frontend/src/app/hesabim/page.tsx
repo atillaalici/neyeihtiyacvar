@@ -39,19 +39,7 @@ type City = { id: string; slug: string; name: string; districts: District[] };
 
 type Notice = { kind: "success" | "error" | "info"; text: string } | null;
 
-type MembershipUpgradeOption = {
-  id: string;
-  code: string;
-  name: string;
-  description: string;
-  annualPrice: number;
-  serviceLimit: number;
-  sortOrder: number;
-  remainingCredit: number;
-  amountDue: number;
-};
-
-type MembershipUpgradeData = {
+type MembershipSummary = {
   membershipId: string;
   currentPlan: {
     id: string;
@@ -63,10 +51,6 @@ type MembershipUpgradeData = {
   };
   startsAtUtc: string;
   expiresAtUtc: string;
-  paidAmount: number;
-  remainingRatio: number;
-  remainingCredit: number;
-  upgrades: MembershipUpgradeOption[];
 };
 
 export default function AccountPage() {
@@ -90,9 +74,8 @@ export default function AccountPage() {
     useState(0);
 
   const [membershipData, setMembershipData] =
-    useState<MembershipUpgradeData | null>(null);
+    useState<MembershipSummary | null>(null);
   const [membershipLoading, setMembershipLoading] = useState(false);
-  const [membershipModalOpen, setMembershipModalOpen] = useState(false);
   const [membershipError, setMembershipError] = useState("");
 
   const [displayName, setDisplayName] = useState("");
@@ -803,56 +786,55 @@ export default function AccountPage() {
     }
   }
 
-  async function loadMembershipUpgradeOptions(openModal = false) {
-    const token = getAccessToken();
-
-    if (!token) return;
-
-    setMembershipLoading(true);
-    setMembershipError("");
-
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/membership-selection/upgrade-options`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        },
-      );
-
-      const payload = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        setMembershipError(
-          payload?.message ?? "Paket bilgileri yüklenemedi.",
-        );
-        return;
-      }
-
-      setMembershipData(payload as MembershipUpgradeData);
-
-      if (openModal) {
-        setMembershipModalOpen(true);
-      }
-    } catch {
-      setMembershipError("Paket bilgileri yüklenemedi.");
-    } finally {
-      setMembershipLoading(false);
-    }
-  }
-
-  function selectUpgradePlan(planCode: string) {
-    window.location.assign(
-      `/uyelik/odeme?paket=${encodeURIComponent(planCode)}&mode=upgrade`,
-    );
-  }
 
   function logout() {
     clearAuth();
     window.location.assign("/");
   }
+
+  useEffect(() => {
+    if (loading || user?.role !== "provider") return;
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/membership-selection/summary`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+          },
+        );
+
+        const payload = await response.json().catch(() => null);
+        if (cancelled) return;
+
+        if (!response.ok) {
+          setMembershipError(
+            payload?.message ?? "Paket bilgileri yüklenemedi.",
+          );
+          return;
+        }
+
+        setMembershipData(payload as MembershipSummary);
+        setMembershipError("");
+      } catch {
+        if (!cancelled) {
+          setMembershipError("Paket bilgileri yüklenemedi.");
+        }
+      } finally {
+        if (!cancelled) setMembershipLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user?.id, user?.role]);
 
   if (loading || !user) {
     return (
@@ -870,15 +852,6 @@ export default function AccountPage() {
   const profileImageUrl =
     avatarPreview ??
     `${apiBaseUrl}/api/users/${user.id}/profile-image`;
-
-  if (
-    user.role === "provider" &&
-    !membershipData &&
-    !membershipLoading &&
-    !membershipError
-  ) {
-    void loadMembershipUpgradeOptions();
-  }
 
   if (user.role === "provider") {
     return (
@@ -906,23 +879,10 @@ export default function AccountPage() {
 
                   <button
                     type="button"
-                    disabled={
-                      membershipLoading ||
-                      !membershipData ||
-                      membershipData.upgrades.length === 0
-                    }
-                    onClick={() => {
-                      if (membershipData) {
-                        setMembershipModalOpen(true);
-                      } else {
-                        void loadMembershipUpgradeOptions(true);
-                      }
-                    }}
+                    onClick={() => window.location.assign("/iletisim")}
                     className="mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-[#f4510b] px-4 text-xs font-black text-white transition hover:bg-[#dd4709] disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    {membershipData?.upgrades.length === 0
-                      ? "En Üst Pakettesiniz"
-                      : "Paket Değiştir"}
+                    Paket Değişikliği İçin İletişime Geç
                   </button>
 
                   {membershipError ? (
@@ -1098,104 +1058,7 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {membershipModalOpen && membershipData ? (
-            <div className="fixed inset-0 z-[9999] grid place-items-center bg-slate-950/45 p-4 backdrop-blur-[2px]">
-              <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[24px] bg-white p-5 shadow-2xl sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-[#ea580c]">
-                      Üyelik Paketi
-                    </p>
-                    <h2 className="mt-1 text-2xl font-black text-slate-950">
-                      Paket Yükselt
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      Mevcut paketiniz:{" "}
-                      <span className="font-black text-slate-800">
-                        {membershipData.currentPlan.name}
-                      </span>
-                    </p>
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setMembershipModalOpen(false)}
-                    className="grid size-10 shrink-0 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50"
-                    aria-label="Kapat"
-                  >
-                    <X className="size-5" />
-                  </button>
-                </div>
-
-                {membershipData.upgrades.length ? (
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                    {membershipData.upgrades.map((plan) => (
-                      <div
-                        key={plan.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50/60 p-5"
-                      >
-                        <h3 className="text-xl font-black text-slate-950">
-                          {plan.name}
-                        </h3>
-
-                        <p className="mt-2 min-h-10 text-sm leading-5 text-slate-500">
-                          {plan.description}
-                        </p>
-
-                        <div className="mt-5 space-y-2 text-sm">
-                          <div className="flex justify-between gap-4">
-                            <span className="text-slate-500">
-                              Yıllık paket
-                            </span>
-                            <span className="font-bold">
-                              {plan.annualPrice.toLocaleString("tr-TR")} TL
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between gap-4">
-                            <span className="text-slate-500">
-                              Kalan paket kredisi
-                            </span>
-                            <span className="font-bold text-emerald-700">
-                              -{plan.remainingCredit.toLocaleString("tr-TR")} TL
-                            </span>
-                          </div>
-
-                          <div className="border-t border-slate-200 pt-3">
-                            <div className="flex items-end justify-between gap-4">
-                              <span className="font-bold text-slate-700">
-                                Ödenecek
-                              </span>
-                              <span className="text-2xl font-black text-[#ea580c]">
-                                {plan.amountDue.toLocaleString("tr-TR")} TL
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => selectUpgradePlan(plan.code)}
-                          className="mt-5 h-11 w-full rounded-xl bg-[#f4510b] px-5 text-sm font-black text-white transition hover:bg-[#dd4709]"
-                        >
-                          Bu Pakete Yükselt
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5 text-sm font-semibold text-green-800">
-                    Kullanabileceğiniz daha üst bir paket bulunmuyor.
-                  </div>
-                )}
-
-                <p className="mt-5 text-xs leading-5 text-slate-500">
-                  Kalan paket krediniz, mevcut paketiniz için gerçekten
-                  ödediğiniz tutarın kullanılmamış süresine göre hesaplanır.
-                </p>
-              </div>
-            </div>
-          ) : null}
         </main>
       </SiteLayout>
     );

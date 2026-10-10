@@ -24,6 +24,8 @@ type Props = {
   latitude: number | null;
   longitude: number | null;
   onChange: (value: LocationValue) => void;
+  cityName?: string;
+  districtName?: string;
 };
 
 const defaultCenter: [number, number] = [39.0, 35.0];
@@ -106,12 +108,57 @@ function ClickHandler({
 function MapViewport({
   latitude,
   longitude,
+  cityName,
+  districtName,
 }: {
   latitude: number | null;
   longitude: number | null;
+  cityName?: string;
+  districtName?: string;
 }) {
   const map = useMap();
   const lastPosition = useRef<string | null>(null);
+  const selectedArea = `${cityName ?? ""}:${districtName ?? ""}`;
+
+  useEffect(() => {
+    if (!cityName) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const query = districtName
+          ? `${districtName}, ${cityName}, Türkiye`
+          : `${cityName}, Türkiye`;
+        const params = new URLSearchParams({
+          q: query,
+          format: "jsonv2",
+          limit: "1",
+          countrycodes: "tr",
+          "accept-language": "tr",
+        });
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?${params}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) return;
+        const results = (await response.json()) as Array<{
+          lat: string;
+          lon: string;
+        }>;
+        const point = results[0];
+        if (!point || controller.signal.aborted) return;
+        const lat = Number(point.lat);
+        const lon = Number(point.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        map.setView([lat, lon], districtName ? 12 : 9);
+      } catch {
+        // Arama başarısızsa mevcut harita görünümü korunur.
+      }
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [map, selectedArea, cityName, districtName]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -141,6 +188,8 @@ export default function BusinessLocationMap({
   latitude,
   longitude,
   onChange,
+  cityName,
+  districtName,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -230,6 +279,8 @@ export default function BusinessLocationMap({
           <MapViewport
             latitude={latitude}
             longitude={longitude}
+            cityName={cityName}
+            districtName={districtName}
           />
 
           <ClickHandler

@@ -51,6 +51,9 @@ type BusinessRegistrationDraft = {
   phoneNumber?: string;
   citySlug?: string;
   districtSlug?: string;
+  publicAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   categorySlug?: string;
   serviceSlug?: string;
   additionalServiceSlug?: string | null;
@@ -212,6 +215,18 @@ export function BusinessRegistrationForm({
         draft?.districtSlug?.trim() ||
         existingUser?.districtSlug?.trim() ||
         "",
+      );
+
+      setMapAddress((current) =>
+        current || draft?.publicAddress?.trim() || "",
+      );
+
+      setMapLatitude((current) =>
+        current ?? draft?.latitude ?? null,
+      );
+
+      setMapLongitude((current) =>
+        current ?? draft?.longitude ?? null,
       );
 
       setCategorySlug((current) =>
@@ -634,6 +649,9 @@ function chooseProviderKind(kind: ProviderKind) {
             `+90${phoneDigits}`,
           citySlug,
           districtSlug,
+          publicAddress: mapAddress.trim() || null,
+          latitude: mapLatitude,
+          longitude: mapLongitude,
           categorySlug,
           serviceSlug,
           additionalServiceSelections:
@@ -774,7 +792,7 @@ function chooseProviderKind(kind: ProviderKind) {
             Hesap Doğrulama
           </h2>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            İşletmenizin yayına alınabilmesi için e-posta adresinizi doğrulayın. Telefon doğrulaması şimdilik isteğe bağlıdır.
+            İşletmenizin yayına alınabilmesi için e-posta adresinizi doğrulayın.
           </p>
         </div>
 
@@ -784,7 +802,7 @@ function chooseProviderKind(kind: ProviderKind) {
           </div>
         ) : null}
 
-        <div className="mx-auto mt-6 grid max-w-4xl gap-4 md:grid-cols-2">
+        <div className="mx-auto mt-6 max-w-lg">
           <div className="rounded-[22px] border border-border bg-card p-5 shadow-sm">
             <div className="grid size-12 place-items-center rounded-full bg-orange-100 text-orange-600">
               <span className="text-2xl" aria-hidden="true">✉</span>
@@ -809,29 +827,7 @@ function chooseProviderKind(kind: ProviderKind) {
             </Button>
           </div>
 
-          <div className="rounded-[22px] border border-border bg-card p-5 shadow-sm">
-            <div className="grid size-12 place-items-center rounded-full bg-orange-100 text-orange-600">
-              <span className="text-2xl" aria-hidden="true">☎</span>
-            </div>
-            <h3 className="mt-4 font-display text-xl font-bold">
-              Telefon Doğrulaması
-            </h3>
-            <p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
-              Telefon numaranıza SMS ile 6 haneli doğrulama kodu gönderilir. Telefon doğrulaması şimdilik isteğe bağlıdır.
-            </p>
-            <div className="mt-4 rounded-xl border border-input bg-background px-4 py-3 text-sm font-medium">
-              {registered.user.phoneNumber || "Telefon numarası bulunamadı"}
-            </div>
-            <Button
-              type="button"
-              className="mt-4 w-full"
-              size="lg"
-              onClick={() => void verifyNow("phone")}
-              disabled={verifyWorking || !registered.user.phoneNumber}
-            >
-              {verifyWorking ? "Kod gönderiliyor..." : "Telefon ile Doğrula"}
-            </Button>
-          </div>
+
         </div>
 
 
@@ -1203,6 +1199,8 @@ function chooseProviderKind(kind: ProviderKind) {
                 <BusinessLocationMap
                   latitude={mapLatitude}
                   longitude={mapLongitude}
+                  cityName={selectedCity?.name}
+                  districtName={districtOptions.find((item) => item.slug === districtSlug)?.name}
                   onChange={({ latitude, longitude, address, city, district, districtCandidates }) => {
                     setMapLatitude(latitude);
                     setMapLongitude(longitude);

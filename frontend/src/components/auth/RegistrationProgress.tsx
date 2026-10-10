@@ -7,7 +7,7 @@ type Props = {
 const steps = [
   "İşletme Bilgileri",
   "Hizmet Bilgileri",
-  "Doğrulama",
+  "Hesap Doğrulama",
   "Faturalama",
 ];
 
@@ -29,7 +29,7 @@ export function RegistrationProgress({ current }: Props) {
                 <div
                   className={[
                     "absolute right-1/2 top-[15px] h-[3px] w-full rounded-full",
-                    step <= current ? "bg-orange-500" : "bg-stone-200",
+                    step < current ? "bg-green-500" : "bg-stone-200",
                   ].join(" ")}
                 />
               ) : null}
@@ -38,14 +38,14 @@ export function RegistrationProgress({ current }: Props) {
                 className={[
                   "relative z-10 grid size-8 place-items-center rounded-full border-2 text-[11px] font-bold",
                   completed
-                    ? "border-orange-500 bg-orange-500 text-white"
+                    ? "border-green-500 bg-green-500 text-white"
                     : active
                       ? "border-orange-500 bg-white text-orange-600"
                       : "border-stone-300 bg-white text-stone-400",
                 ].join(" ")}
                 aria-current={active ? "step" : undefined}
               >
-                {completed || active ? (
+                {completed ? (
                   <svg
                     viewBox="0 0 24 24"
                     className="size-4"
@@ -66,9 +66,11 @@ export function RegistrationProgress({ current }: Props) {
               <span
                 className={[
                   "mt-1.5 truncate text-center text-[9px] font-semibold sm:text-[10px]",
-                  completed || active
-                    ? "text-orange-700"
-                    : "text-muted-foreground",
+                  completed
+                    ? "text-green-700"
+                    : active
+                      ? "text-orange-700"
+                      : "text-muted-foreground",
                 ].join(" ")}
               >
                 {label}

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NeyeIhtiyacVar.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261008200850_AddMembershipOrders")]
+    partial class AddMembershipOrders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -745,9 +748,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
-                    b.Property<DateTime?>("ExpiresAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<decimal>("FinalAmount")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
@@ -772,13 +772,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<string>("PaymentReference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
-
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("not_started");
 
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uuid");
@@ -809,11 +802,6 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasIndex("PlanId");
 
                     b.HasIndex("ProviderId");
-
-                    b.HasIndex("UserId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_MembershipOrders_OnePendingPerUser")
-                        .HasFilter("\"Status\" = 'pending'");
 
                     b.HasIndex("PaymentProvider", "PaymentReference")
                         .IsUnique()

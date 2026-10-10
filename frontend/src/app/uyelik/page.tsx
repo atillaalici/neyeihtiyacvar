@@ -285,7 +285,13 @@ export default function MembershipPage() {
 
                     <div className="min-w-0 flex-1 pt-0.5">
                       <h2 className="pr-14 font-display text-base font-extrabold leading-tight sm:text-xl">
-                        {plan.name}
+                        {plan.code === "kobi"
+                          ? "KOBİ Paket"
+                          : plan.code === "avantaj"
+                            ? "Avantaj Paket"
+                            : plan.code === "profesyonel"
+                              ? "Profesyonel Paket"
+                              : plan.name}
                       </h2>
 
                       <p className="mt-1 text-[10px] leading-4 text-muted-foreground sm:min-h-10 sm:text-xs sm:leading-5">
@@ -349,9 +355,7 @@ export default function MembershipPage() {
                     <div className="mt-0.5 text-lg font-bold sm:text-xl">
                       {plan.serviceLimit} hizmet
                     </div>
-                    <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground sm:text-xs">
-                      Tüm hizmet haklarını ilk gün kullanmak zorunda değilsiniz.
-                    </p>
+
                   </div>
 
                   <div className="mt-2 flex-1 space-y-1 sm:mt-2.5 sm:space-y-1">

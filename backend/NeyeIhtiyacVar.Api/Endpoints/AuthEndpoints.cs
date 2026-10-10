@@ -275,8 +275,8 @@ public static class AuthEndpoints
                 return Results.Json(
                     new
                     {
-                        message = "Hesabın oluşturuldu ancak doğrulama e-postası gönderilemedi. Lütfen doğrulama ekranından yeni kod iste.",
-                        verificationRequired = true,
+                        message = "Hesabın oluşturuldu. E-posta doğrulaması şu anda tamamlanamadı; e-posta ve şifrenle giriş yapabilirsin.",
+                        verificationRequired = false,
                         userId = user.Id,
                         user.Email,
                         user.PhoneNumber,
@@ -286,7 +286,7 @@ public static class AuthEndpoints
                             ? verificationCode
                             : null
                     },
-                    statusCode: StatusCodes.Status502BadGateway);
+                    statusCode: StatusCodes.Status201Created);
             }
 
             return Results.Created(
@@ -1135,22 +1135,8 @@ public static class AuthEndpoints
                 await dbContext.SaveChangesAsync();
             }
 
-            if (user.EmailVerifiedAtUtc is null)
-            {
-                return Results.Json(
-                    new
-                    {
-                        code = "verification_required",
-                        message = "Giriş yapabilmek için e-posta adresini doğrulamalısın.",
-                        userId = user.Id,
-                        user.Email,
-                        user.PhoneNumber,
-                        emailVerified = false,
-                        phoneVerified = user.PhoneVerifiedAtUtc != null
-                    },
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
-
+            // E-posta doğrulaması kullanıcı girişini engellemez.
+            // Şifre ve hesap aktiflik kontrolleri korunur.
             var token = tokenService.CreateToken(user);
             return Results.Ok(ToAuthResponse(user, token));
         });

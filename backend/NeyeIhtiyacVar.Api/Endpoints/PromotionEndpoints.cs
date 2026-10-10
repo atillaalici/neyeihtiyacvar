@@ -11,6 +11,59 @@ public static class PromotionEndpoints
     public static IEndpointRouteBuilder MapPromotionEndpoints(
         this IEndpointRouteBuilder app)
     {
+        app.MapGet("/api/promotions/first500/availability", async (
+            AppDbContext dbContext,
+            IConfiguration configuration) =>
+        {
+            var prefix = configuration["Promotions:First500CodePrefix"]?.Trim();
+            var now = DateTime.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(prefix))
+                return Results.Ok(new { available = false, remaining = 0 });
+
+            var plan = await dbContext.MembershipPlans.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Code == "kobi" && x.IsActive);
+
+            if (plan is null)
+                return Results.Ok(new { available = false, remaining = 0 });
+
+            var remaining = await (
+                from p in dbContext.PromotionCodes.AsNoTracking()
+                join c in dbContext.PromotionCampaigns.AsNoTracking()
+                    on p.CampaignId equals c.Id
+                join o in dbContext.PromotionOrganizations.AsNoTracking()
+                    on c.OrganizationId equals o.Id
+                where c.CodePrefix == prefix
+                    && c.IsActive
+                    && c.PlanCode == "kobi"
+                    && c.DiscountType == "percentage"
+                    && c.DiscountValue == 100m
+                    && o.IsActive
+                    && p.IsActive
+                    && p.MaxUses == 1
+                    && p.UsedCount == 0
+                    && p.UsedAtUtc == null
+                    && p.DiscountType == "percentage"
+                    && p.DiscountValue == 100m
+                    && (p.PlanCode == null || p.PlanCode == "kobi")
+                    && (p.StartsAtUtc == null || p.StartsAtUtc <= now)
+                    && (p.ExpiresAtUtc == null || p.ExpiresAtUtc >= now)
+                    && (c.StartsAtUtc == null || c.StartsAtUtc <= now)
+                    && (c.ExpiresAtUtc == null || c.ExpiresAtUtc >= now)
+                select p.Id
+            ).CountAsync();
+
+            return Results.Ok(new
+            {
+                available = remaining > 0,
+                remaining,
+                planCode = "kobi",
+                planName = plan.Name,
+                annualPrice = plan.AnnualPrice,
+                durationMonths = 12
+            });
+        });
+
         var admin = app.MapGroup("/api/admin/promotions")
             .RequireAuthorization(policy =>
                 policy.RequireRole(UserRole.Admin.ToString()));
@@ -758,7 +811,7 @@ public static class PromotionEndpoints
                 });
             }
 
-            var calculation = Calculate(
+            var calculation = PromotionPricingService.Calculate(
                 plan.AnnualPrice,
                 promo.DiscountType,
                 promo.DiscountValue);
@@ -868,7 +921,7 @@ public static class PromotionEndpoints
             ValidatePromotionCodeRequest request,
             AppDbContext dbContext) =>
         {
-            var result = await ValidateAndCalculateAsync(
+            var result = await PromotionPricingService.ValidateAndCalculateAsync(
                 request.Code,
                 request.PlanCode,
                 dbContext);
@@ -915,7 +968,7 @@ public static class PromotionEndpoints
                 await dbContext.Database.BeginTransactionAsync(
                     IsolationLevel.Serializable);
 
-            var result = await ValidateAndCalculateAsync(
+            var result = await PromotionPricingService.ValidateAndCalculateAsync(
                 request.Code,
                 request.PlanCode,
                 dbContext,
@@ -994,192 +1047,6 @@ public static class PromotionEndpoints
         }).RequireAuthorization();
 
         return app;
-    }
-
-    private static async Task<PromotionValidationResult>
-        ValidateAndCalculateAsync(
-            string codeValue,
-            string planValue,
-            AppDbContext dbContext,
-            bool tracking = false)
-    {
-        if (string.IsNullOrWhiteSpace(codeValue) ||
-            string.IsNullOrWhiteSpace(planValue))
-        {
-            return PromotionValidationResult.Error(
-                Results.BadRequest(new
-                {
-                    message = "Promosyon kodu ve paket zorunludur."
-                }));
-        }
-
-        var code = NormalizeCode(codeValue);
-        var planCode = planValue.Trim().ToLowerInvariant();
-
-        var plan = await dbContext.MembershipPlans
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x =>
-                x.Code == planCode &&
-                x.IsActive);
-
-        if (plan is null)
-        {
-            return PromotionValidationResult.Error(
-                Results.NotFound(new
-                {
-                    message = "Paket bulunamadı."
-                }));
-        }
-
-        IQueryable<PromotionCode> promoQuery =
-            dbContext.PromotionCodes;
-
-        if (!tracking)
-        {
-            promoQuery = promoQuery.AsNoTracking();
-        }
-
-        var promo = await promoQuery
-            .FirstOrDefaultAsync(x => x.Code == code);
-
-        if (promo is null)
-        {
-            return PromotionValidationResult.Error(
-                Results.NotFound(new
-                {
-                    message = "Promosyon kodu bulunamadı."
-                }));
-        }
-
-        var now = DateTime.UtcNow;
-
-        if (promo.UsedCount > 0 || promo.UsedAtUtc.HasValue)
-        {
-            return PromotionValidationResult.Error(
-                Results.Conflict(new
-                {
-                    message = "Bu promosyon kodu daha önce kullanılmış."
-                }));
-        }
-
-        if (!promo.IsActive)
-        {
-            return PromotionValidationResult.Error(
-                Results.BadRequest(new
-                {
-                    message = "Bu promosyon kodu aktif değil."
-                }));
-        }
-
-        if (promo.StartsAtUtc.HasValue &&
-            promo.StartsAtUtc.Value > now)
-        {
-            return PromotionValidationResult.Error(
-                Results.BadRequest(new
-                {
-                    message = "Bu promosyon henüz başlamadı."
-                }));
-        }
-
-        if (promo.ExpiresAtUtc.HasValue &&
-            promo.ExpiresAtUtc.Value < now)
-        {
-            return PromotionValidationResult.Error(
-                Results.BadRequest(new
-                {
-                    message = "Bu promosyon kodunun süresi dolmuş."
-                }));
-        }
-
-        if (!string.IsNullOrWhiteSpace(promo.PlanCode) &&
-            !string.Equals(
-                promo.PlanCode,
-                planCode,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return PromotionValidationResult.Error(
-                Results.BadRequest(new
-                {
-                    message =
-                        "Bu promosyon kodu seçilen pakette geçerli değil."
-                }));
-        }
-
-        if (promo.CampaignId.HasValue)
-        {
-            var campaign = await dbContext.PromotionCampaigns
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x =>
-                    x.Id == promo.CampaignId.Value);
-
-            if (campaign is null || !campaign.IsActive)
-            {
-                return PromotionValidationResult.Error(
-                    Results.BadRequest(new
-                    {
-                        message = "Bu promosyon kampanyası aktif değil."
-                    }));
-            }
-
-            var organization =
-                await dbContext.PromotionOrganizations
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(x =>
-                        x.Id == campaign.OrganizationId);
-
-            if (organization is null || !organization.IsActive)
-            {
-                return PromotionValidationResult.Error(
-                    Results.BadRequest(new
-                    {
-                        message =
-                            "Bu promosyonun bağlı olduğu kurum aktif değil."
-                    }));
-            }
-        }
-
-        var calculation = Calculate(
-            plan.AnnualPrice,
-            promo.DiscountType,
-            promo.DiscountValue);
-
-        return PromotionValidationResult.Success(
-            promo,
-            plan,
-            calculation.DiscountAmount,
-            calculation.FinalPrice);
-    }
-
-    private static (
-        decimal DiscountAmount,
-        decimal FinalPrice) Calculate(
-        decimal originalPrice,
-        string discountType,
-        decimal discountValue)
-    {
-        decimal discountAmount;
-
-        if (discountType == "percentage")
-        {
-            discountAmount =
-                decimal.Round(
-                    originalPrice * discountValue / 100m,
-                    2,
-                    MidpointRounding.AwayFromZero);
-        }
-        else
-        {
-            discountAmount = discountValue;
-        }
-
-        if (discountAmount > originalPrice)
-        {
-            discountAmount = originalPrice;
-        }
-
-        return (
-            discountAmount,
-            originalPrice - discountAmount);
     }
 
     private static string? ValidateSingle(
@@ -1450,34 +1317,7 @@ public static class PromotionEndpoints
         });
     }
 
-    private sealed record PromotionValidationResult(
-        PromotionCode? Promo,
-        MembershipPlan? Plan,
-        decimal DiscountAmount,
-        decimal FinalPrice,
-        IResult? ErrorResult)
-    {
-        public static PromotionValidationResult Error(
-            IResult errorResult)
-            => new(
-                null,
-                null,
-                0,
-                0,
-                errorResult);
 
-        public static PromotionValidationResult Success(
-            PromotionCode promo,
-            MembershipPlan plan,
-            decimal discountAmount,
-            decimal finalPrice)
-            => new(
-                promo,
-                plan,
-                discountAmount,
-                finalPrice,
-                null);
-    }
 }
 
 public sealed record CreatePromotionOrganizationRequest(

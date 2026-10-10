@@ -190,6 +190,7 @@ app.MapProviderPanelEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapMembershipPlanEndpoints();
 app.MapMembershipSelectionEndpoints();
+app.MapMembershipOrderEndpoints();
 app.MapBillingInformationEndpoints();
 app.MapPromotionEndpoints();
 app.MapProviderImageEndpoints();
@@ -203,6 +204,7 @@ app.MapContactEndpoints();
 app.MapAdminAuditLogEndpoints();
 app.MapAdminModerationEndpoints();
 app.MapAdminDirectoryEndpoints();
+app.MapAdminNotificationCountEndpoints();
 
 if (app.Environment.IsDevelopment())
 {

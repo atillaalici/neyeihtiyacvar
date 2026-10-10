@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminNotificationBadge } from "@/components/admin/AdminNotificationBadge";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -101,6 +102,12 @@ export function AdminNav() {
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {item.label}
+                {item.href === "/admin/iletisim-talepleri" && (
+                  <AdminNotificationBadge type="contactRequests" />
+                )}
+                {item.href === "/admin/basvurular" && (
+                  <AdminNotificationBadge type="providerApplications" />
+                )}
               </Link>
             );
           })}

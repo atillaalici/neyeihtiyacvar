@@ -336,15 +336,14 @@ function RegisterPageContent() {
 
       const registerData = data as RegisterResponse;
 
+      // Normal kullanıcı kaydında e-posta doğrulaması giriş şartı değildir.
+      // Kayıt sonrası kullanıcı güvenli giriş ekranına yönlendirilir.
       const params = new URLSearchParams({
-        userId: registerData.userId,
-        email: registerData.email,
-        phone: registerData.phoneNumber ?? "",
-        channel: "email",
         returnUrl,
+        email: registerData.email,
       });
 
-      router.push(`/dogrula?${params.toString()}`);
+      router.push(`/giris?${params.toString()}`);
     } catch {
       setError(
         "Sunucuya bağlanılamadı. İnternet bağlantısını ve backend servisinin çalıştığını kontrol et.",

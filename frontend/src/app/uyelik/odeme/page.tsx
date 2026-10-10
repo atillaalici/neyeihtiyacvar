@@ -79,29 +79,19 @@ type PromotionValidationResult = {
   discountValue: number;
 };
 
-type UpgradeQuote = {
-  membershipId: string;
-  currentPlan: {
-    code: string;
-    name: string;
-  };
-  targetPlan: {
-    id: string;
-    code: string;
-    name: string;
-    annualPrice: number;
-    serviceLimit: number;
-    sortOrder: number;
-  };
-  startsAtUtc: string;
-  expiresAtUtc: string;
-  paidAmount: number;
-  remainingCredit: number;
-  amountDue: number;
+type First500Availability = {
+  available: boolean;
+  remaining: number;
+  planCode?: string;
+  planName?: string;
+  annualPrice?: number;
+  durationMonths?: number;
 };
+
 function MembershipPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [first500, setFirst500] = useState<First500Availability | null>(null);
   const [promoCode, setPromoCode] = useState("");
   const [promoApplying, setPromoApplying] = useState(false);
   const [promoResult, setPromoResult] =
@@ -115,9 +105,6 @@ function MembershipPaymentContent() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [billingSaving, setBillingSaving] = useState(false);
   const [billingError, setBillingError] = useState("");
-  const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
-  const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState("");
   const [legalAccepted, setLegalAccepted] = useState(false);
   const [legalModalDocument, setLegalModalDocument] =
     useState<LegalDocumentData | null>(null);
@@ -166,8 +153,6 @@ function MembershipPaymentContent() {
   }, [searchParams]);
 
   const plan = plans[planCode];
-  const isUpgrade = searchParams.get("mode") === "upgrade";
-
   useEffect(() => {
     const token = getAccessToken();
     const user = getStoredUser();
@@ -220,70 +205,41 @@ function MembershipPaymentContent() {
   }, []);
 
   useEffect(() => {
-    if (!isUpgrade) {
-      return;
-    }
-
-    const token = getAccessToken();
-
-    if (!token) {
-      router.replace("/giris");
-      return;
-    }
-
-    let cancelled = false;
+    const controller = new AbortController();
 
     void (async () => {
-      setUpgradeLoading(true);
-      setUpgradeError("");
-
       try {
         const response = await fetch(
-          `${apiBaseUrl}/api/membership-selection/upgrade-quote/${encodeURIComponent(planCode)}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            cache: "no-store",
-          },
+          `${apiBaseUrl}/api/promotions/first500/availability`,
+          { signal: controller.signal, cache: "no-store" },
         );
 
-        const data = await response.json().catch(() => null);
+        if (!response.ok) return;
 
-        if (cancelled) return;
+        const data = (await response.json()) as First500Availability;
 
-        if (!response.ok) {
-          setUpgradeQuote(null);
-          setUpgradeError(
-            data?.message ?? "Paket yükseltme bilgileri alınamadı.",
-          );
-          return;
+        if (
+          !controller.signal.aborted &&
+          data.available === true &&
+          data.remaining > 0 &&
+          data.planCode === "kobi" &&
+          data.durationMonths === 12 &&
+          typeof data.annualPrice === "number"
+        ) {
+          setFirst500(data);
         }
-
-        setUpgradeQuote(data as UpgradeQuote);
       } catch {
-        if (!cancelled) {
-          setUpgradeQuote(null);
-          setUpgradeError(
-            "Paket yükseltme bilgileri alınırken sunucuya bağlanılamadı.",
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setUpgradeLoading(false);
-        }
+        // Kampanya bilgisi alınamazsa teklif gösterilmez.
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isUpgrade, planCode, router]);
+    return () => controller.abort();
+  }, []);
 
   function changePlan(code: PlanCode) {
     sessionStorage.setItem("neyeihtiyacvar.selectedPlanCode", code);
     router.replace(
-      `/uyelik/odeme?paket=${encodeURIComponent(code)}${isUpgrade ? "&mode=upgrade" : ""}`,
+      `/uyelik/odeme?paket=${encodeURIComponent(code)}`,
     );
   }
   async function applyPromotionCode() {
@@ -353,8 +309,20 @@ function MembershipPaymentContent() {
     }
   }
 
-  async function completeFreeRegistration() {
-    if (!promoResult || promoResult.finalPrice !== 0) {
+  async function completeFreeRegistration(autoCampaign = false) {
+    if (completingRegistration) return;
+
+    if (autoCampaign) {
+      if (planCode !== "kobi" || !first500?.available || first500.remaining <= 0) {
+        setPromoError("Hediye kampanyası bu paket için kullanılamıyor.");
+        return;
+      }
+    } else if (!promoResult || promoResult.finalPrice !== 0) {
+      return;
+    }
+
+    if (!billingSaved || billingLoading || billingSaving) {
+      setPromoError("Önce fatura bilgilerini kaydetmelisin.");
       return;
     }
 
@@ -389,6 +357,9 @@ function MembershipPaymentContent() {
       phoneNumber: string;
       citySlug: string;
       districtSlug: string;
+      publicAddress?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
       categorySlug: string;
       serviceSlug: string;
       additionalCategorySlug?: string | null;
@@ -408,6 +379,31 @@ function MembershipPaymentContent() {
     setPromoError("");
 
     try {
+      if (autoCampaign) {
+        const availabilityResponse = await fetch(
+          `${apiBaseUrl}/api/promotions/first500/availability`,
+          { cache: "no-store" },
+        );
+
+        if (!availabilityResponse.ok) {
+          setPromoError("Kampanya kontenjanı şu anda doğrulanamıyor.");
+          return;
+        }
+
+        const availability =
+          (await availabilityResponse.json()) as First500Availability;
+
+        if (
+          !availability.available ||
+          availability.remaining <= 0 ||
+          availability.planCode !== "kobi"
+        ) {
+          setFirst500(null);
+          setPromoError("Hediye kampanyasının kontenjanı dolmuş olabilir.");
+          return;
+        }
+      }
+
       const response = await fetch(
         `${apiBaseUrl}/api/provider-applications/complete-free`,
         {
@@ -417,7 +413,7 @@ function MembershipPaymentContent() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            promotionCode: promoResult.code,
+            promotionCode: autoCampaign ? "AUTO-FIRST500" : promoResult!.code,
             planCode,
             ...draft,
             legalAccepted: true,
@@ -586,7 +582,7 @@ function MembershipPaymentContent() {
     }
 
     setPaymentMessage(
-      "Fatura bilgileriniz ve sözleşme onayınız hazır. Ödeme sağlayıcısı entegrasyonu tamamlandığında güvenli ödeme ekranına yönlendirileceksiniz.",
+      "Güvenli ödeme sistemimizin entegrasyon çalışmaları devam ediyor. Ücretli üyelik ödemeleri henüz başlatılmamıştır. İlk 500 işletmeye özel ücretsiz KOBİ üyeliği kampanyası ise kontenjan dahilinde kullanılabilir.",
     );
   }
 
@@ -601,193 +597,16 @@ function MembershipPaymentContent() {
               ÜYELİK / SON ADIM
             </p>
             <h1 className="mt-1 font-display text-2xl font-bold">
-              {isUpgrade ? "Paket yükseltme" : "Paketini kontrol et"}
+              Paketini kontrol et
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isUpgrade
-                ? "Yeni paketini ve mevcut üyeliğinden düşülecek kalan tutarı kontrol et."
-                : "Seçtiğin paketi kontrol et, istersen aşağıdan değiştirebilirsin."}
+              Fatura bilgilerini tamamla ve üyelik işlemini onayla.
             </p>
           </div>
 
           <div className="mt-3 rounded-[22px] border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="text-xs font-semibold text-muted-foreground">
-                  Seçilen paket
-                </div>
-                <div className="mt-0.5 font-display text-xl font-bold">
-                  {plan.name}
-                </div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {plan.serviceLimit} hizmet hakkı
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-right">
-                {!isUpgrade ? (
-                  <>
-                    <div className="text-[10px] font-bold uppercase tracking-wide text-orange-700">
-                      Birinci Yıla Özel
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground line-through">
-                      {plan.regularAnnualPrice.toLocaleString("tr-TR")} TL
-                    </div>
-                  </>
-                ) : null}
-                <div className="text-lg font-black text-slate-950">
-                  {(isUpgrade && upgradeQuote
-                    ? upgradeQuote.amountDue
-                    : plan.annualPrice
-                  ).toLocaleString("tr-TR")} TL
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  {isUpgrade ? "ödenecek tutar · KDV dahil" : "KDV dahil / yıl"}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 text-xs">
-                <CheckCircle2 className="size-4 text-emerald-600" />
-                Paket seçimi korundu
-              </div>
-              <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 text-xs">
-                <ShieldCheck className="size-4 text-sky-600" />
-                E-posta doğrulandı
-              </div>
-              <div className="flex items-center gap-2 rounded-xl bg-muted/40 px-3 py-2 text-xs">
-                <CreditCard className="size-4 text-orange-600" />
-                Ödeme sonrası başvuru
-              </div>
-            </div>
-
-            {!isUpgrade ? (
-            <div className="mt-3 border-t border-border pt-3">
-              <div className="mb-2 text-[13px] font-bold">Paket seçenekleri</div>
-
-              <div className="grid gap-2 sm:grid-cols-3">
-                {(Object.keys(plans) as PlanCode[]).map((code) => {
-                  const item = plans[code];
-                  const selected = code === planCode;
-
-                  return (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => changePlan(code)}
-                      className={[
-                        "rounded-xl border p-3 text-left transition",
-                        selected
-                          ? "border-orange-500 bg-orange-50 ring-1 ring-orange-200"
-                          : "border-border bg-background hover:border-orange-300",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-bold">{item.name}</div>
-                        {selected ? (
-                          <span className="grid size-5 place-items-center rounded-full bg-orange-600 text-white">
-                            <Check className="size-3.5" />
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-1">
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-orange-700">
-                          Birinci Yıla Özel
-                        </div>
-                        <div className="text-[11px] text-muted-foreground line-through">
-                          {item.regularAnnualPrice.toLocaleString("tr-TR")} TL
-                        </div>
-                        <div className="text-lg font-black">
-                          {item.annualPrice.toLocaleString("tr-TR")} TL
-                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">
-                            KDV dahil / yıl
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.serviceLimit} hizmet hakkı
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Paket değiştirildiğinde kayıt bilgileriniz silinmez ve bu
-                sayfada kalırsınız. İşletme başvurusu ödeme başarıyla
-                tamamlandıktan sonra oluşturulur.
-              </p>
-            </div>
-            ) : null}
-
-            {isUpgrade ? (
-              <div className="mt-3 border-t border-border pt-3">
-                <div className="text-sm font-bold">Paket Yükseltme Özeti</div>
-
-                {upgradeLoading ? (
-                  <div className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
-                    Yükseltme tutarı hesaplanıyor...
-                  </div>
-                ) : upgradeError ? (
-                  <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
-                    {upgradeError}
-                  </div>
-                ) : upgradeQuote ? (
-                  <div className="mt-3 space-y-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-4 text-sm">
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">
-                        Mevcut paket
-                      </span>
-                      <span className="font-bold">
-                        {upgradeQuote.currentPlan.name}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">
-                        Yeni paket
-                      </span>
-                      <span className="font-bold">
-                        {upgradeQuote.targetPlan.name}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">
-                        Yeni paket yıllık fiyatı
-                      </span>
-                      <span className="font-bold">
-                        {upgradeQuote.targetPlan.annualPrice.toLocaleString("tr-TR")} TL
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between gap-4">
-                      <span className="text-muted-foreground">
-                        Kullanılmamış paket kredisi
-                      </span>
-                      <span className="font-bold text-emerald-700">
-                        -{upgradeQuote.remainingCredit.toLocaleString("tr-TR")} TL
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between gap-4 border-t border-orange-200 pt-3">
-                      <span className="font-black">
-                        Ödenecek tutar
-                      </span>
-                      <span className="text-xl font-black text-orange-600">
-                        {upgradeQuote.amountDue.toLocaleString("tr-TR")} TL
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
             {billingOpen ? (
-              <div className="mt-3 border-t border-border pt-3">
+              <div className="mt-3 hidden border-t border-border pt-3">
                 <div className="mb-3">
                   <div className="text-sm font-bold">Fatura Bilgileri</div>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -1042,12 +861,8 @@ function MembershipPaymentContent() {
                     {billingLoading
                       ? "Fatura bilgileri kontrol ediliyor..."
                       : billingSaved
-                        ? isUpgrade
-                          ? "Fatura bilgileri kaydedildi. Ödeme adımına geçebilirsin."
-                          : "Fatura bilgileri kaydedildi. Promosyon adımına geçebilirsin."
-                        : isUpgrade
-                          ? "Ödemeden önce fatura bilgilerini kaydet."
-                          : "Promosyon kodundan önce fatura bilgilerini kaydet."}
+                        ? "Fatura bilgileri kaydedildi. Promosyon adımına geçebilirsin."
+                        : "Promosyon kodundan önce fatura bilgilerini kaydet."}
                   </span>
                   <button
                     type="button"
@@ -1066,7 +881,6 @@ function MembershipPaymentContent() {
             ) : null}
 
             
-            {!isUpgrade ? (
             <div className="mt-3 border-t border-border pt-3">
               <label className="mb-1 block text-[13px] font-medium">
                 Promosyon kodu
@@ -1137,7 +951,6 @@ function MembershipPaymentContent() {
                 </>
               ) : null}
             </div>
-            ) : null}
 
             {billingSaved ? (
               <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50/60 p-4">
@@ -1149,21 +962,18 @@ function MembershipPaymentContent() {
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Paket</span>
                     <span className="text-right font-bold">
-                      {isUpgrade && upgradeQuote
-                        ? upgradeQuote.targetPlan.name
-                        : plan.name}
+                      {plan.name}
                     </span>
                   </div>
 
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Üyelik dönemi</span>
                     <span className="font-bold">
-                      {isUpgrade ? "Mevcut üyelik dönemi" : "12 ay"}
+                      12 ay
                     </span>
                   </div>
 
-                  {!isUpgrade ? (
-                    <>
+                  <>
                       <div className="flex justify-between gap-4">
                         <span className="text-muted-foreground">Normal yıllık fiyat</span>
                         <span className="line-through">
@@ -1188,25 +998,7 @@ function MembershipPaymentContent() {
                           </span>
                         </div>
                       ) : null}
-                    </>
-                  ) : upgradeQuote ? (
-                    <>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">Yeni paket yıllık fiyatı</span>
-                        <span className="font-bold">
-                          {upgradeQuote.targetPlan.annualPrice.toLocaleString("tr-TR")} TL
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between gap-4">
-                        <span className="text-muted-foreground">Kullanılmamış paket kredisi</span>
-                        <span className="font-bold text-emerald-700">
-                          -{upgradeQuote.remainingCredit.toLocaleString("tr-TR")} TL
-                        </span>
-                      </div>
-                    </>
-                  ) : null}
-
+                  </>
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Fatura</span>
                     <span className="max-w-[65%] text-right font-bold">
@@ -1222,11 +1014,9 @@ function MembershipPaymentContent() {
                       </div>
                     </div>
                     <div className="text-2xl font-black text-orange-600">
-                      {(isUpgrade && upgradeQuote
-                        ? upgradeQuote.amountDue
-                        : promoResult
-                          ? promoResult.finalPrice
-                          : plan.annualPrice
+                      {(promoResult
+                        ? promoResult.finalPrice
+                        : plan.annualPrice
                       ).toLocaleString("tr-TR")} TL
                     </div>
                   </div>
@@ -1276,6 +1066,66 @@ function MembershipPaymentContent() {
               </label>
             </div>
 
+            {planCode === "kobi" && first500?.available ? (
+              <div className="mt-4 overflow-hidden rounded-[22px] border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-black text-white">
+                    İLK 500 İŞLETMEYE ÖZEL
+                  </span>
+                  <BadgePercent className="size-7 text-emerald-700" />
+                </div>
+
+                <h2 className="mt-4 font-display text-xl font-black text-slate-950 sm:text-2xl">
+                  İlk 1 Yıllık Paket Ödemeniz Bizden!
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  Neye İhtiyaç Var ailesine katılan ilk işletmelerden biri olun.
+                  KOBİ paketinizin ilk 12 ayını biz karşılıyoruz.
+                </p>
+
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <span className="pb-1 text-lg font-semibold text-slate-500 line-through">
+                    {first500.annualPrice?.toLocaleString("tr-TR")} TL
+                  </span>
+                  <span className="text-4xl font-black leading-none text-emerald-700">
+                    0 TL
+                  </span>
+                  <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-xs font-bold text-emerald-800">
+                    12 AY HEDİYE
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-emerald-900">
+                  <CheckCircle2 className="size-4 shrink-0" />
+                  Kampanyada kalan kontenjan: {first500.remaining}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void completeFreeRegistration(true)}
+                  disabled={
+                    completingRegistration ||
+                    billingLoading ||
+                    billingSaving ||
+                    !billingSaved ||
+                    !legalAccepted
+                  }
+                  className="mt-5 w-full rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {completingRegistration
+                    ? "İşletme kaydınız tamamlanıyor..."
+                    : "Hediyemi Kullan ve Devam Et"}
+                </button>
+
+                <p className="mt-2 text-center text-[11px] leading-5 text-slate-600">
+                  Hediyenizi kullanmak için fatura bilgilerinizi kaydedin
+                  ve yukarıdaki üyelik sözleşmesini onaylayın.
+                  Kontenjan, kayıt tamamlandığında kesinleşir.
+                </p>
+              </div>
+            ) : null}
+
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
               <button
                 type="button"
@@ -1285,7 +1135,7 @@ function MembershipPaymentContent() {
                 Geri
               </button>
 
-              {!isUpgrade && promoResult?.finalPrice === 0 ? (
+              {promoResult?.finalPrice === 0 ? (
                 <button
                   type="button"
                   onClick={() => void completeFreeRegistration()}
@@ -1307,16 +1157,13 @@ function MembershipPaymentContent() {
                   disabled={
                     billingSaving ||
                     !billingSaved ||
-                    !legalAccepted ||
-                    (isUpgrade && (upgradeLoading || !upgradeQuote))
+                    !legalAccepted
                   }
                   className="rounded-xl bg-orange-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {billingSaving
                     ? "Kaydediliyor..."
-                    : isUpgrade
-                      ? "Yükseltme Ödemesine Geç"
-                      : "Ödemeye Geç"}
+                    : "Ödemeye Geç"}
                 </button>
               )}
             </div>
@@ -1345,7 +1192,7 @@ function MembershipPaymentContent() {
               id="payment-info-title"
               className="mt-4 text-center font-display text-xl font-black text-slate-950"
             >
-              Ödeme Altyapısı Hazırlanıyor
+              Ödeme Altyapımız Hazırlanıyor
             </h2>
 
             <p className="mt-3 text-center text-sm leading-6 text-slate-600">

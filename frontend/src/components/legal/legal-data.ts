@@ -343,10 +343,11 @@ export const legalDocuments: LegalDocumentData[] = [
         ]
       },
       {
-        title: "7. Paket Yükseltme",
+        title: "7. Paket Değişikliği",
         paragraphs: [
-          "Platformun paket yükseltmeye izin verdiği durumlarda İşletmeye mevcut paketi, hedef paketi, kullanılmamış üyelik döneminden hesaplanan kredi veya mahsup tutarı ve ödenecek nihai fark işlem tamamlanmadan önce gösterilir.",
-          "Paket yükseltme işleminin mali ve süreye ilişkin sonucu, yükseltme ekranında İşletmeye gösterilen güncel hesaplamaya göre belirlenir."
+          "Aktif üyelik süresi içerisinde İşletme tarafından doğrudan paket yükseltme, paket düşürme veya paketler arasında otomatik geçiş yapılamaz.",
+          "Paket değişikliği talep eden İşletme, Platform Yönetimi ile iletişime geçebilir. Talepler münferiden değerlendirilir; başvurunun yapılması değişikliğin kabul edildiği anlamına gelmez.",
+          "Uygun görülen istisnai değişikliklerin koşulları ve varsa ücretleri İşletmeye önceden bildirilir. İşletmenin açık onayı olmadan yeni ücret tahsil edilmez. Mevzuattan doğan iptal, fesih ve iade hakları saklıdır."
         ]
       },
       {
@@ -378,8 +379,9 @@ export const legalDocuments: LegalDocumentData[] = [
       {
         title: "11. Otomatik Yenileme",
         paragraphs: [
-          "İşbu sözleşme, Platformda ayrıca açıkça sunulup İşletme tarafından onaylanmış bir otomatik yenileme talimatı bulunmadıkça otomatik yenileme taahhüdü oluşturmaz.",
-          "Yeni üyelik dönemi için uygulanacak paket kapsamı ve ücret, yenileme işlemi öncesinde İşletmeye gösterilir."
+          "Üyelik paketleri, aktivasyon tarihinden itibaren 12 ay geçerlidir. Üyelik bedeli tek seferde tahsil edilir.",
+          "Üyelik süresi sonunda otomatik yenileme yapılmaz ve kayıtlı ödeme yönteminden otomatik tahsilat gerçekleştirilmez.",
+          "İşletme, üyelik süresi sona erdiğinde sunulan paketlerden dilediğini seçerek yeni bir üyelik satın alabilir."
         ]
       },
       {

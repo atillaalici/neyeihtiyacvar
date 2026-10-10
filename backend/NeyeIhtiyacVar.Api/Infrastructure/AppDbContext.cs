@@ -23,6 +23,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProviderMembership> ProviderMemberships => Set<ProviderMembership>();
 
+    public DbSet<MembershipOrder> MembershipOrders => Set<MembershipOrder>();
+
     public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
 
     public DbSet<MembershipPlan> MembershipPlans => Set<MembershipPlan>();
@@ -66,6 +68,55 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // NIV-MEMBERSHIP-ORDERS
+        modelBuilder.Entity<MembershipOrder>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.OrderType).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(x => x.PromotionCode).HasMaxLength(100);
+            entity.Property(x => x.PaymentProvider).HasMaxLength(50).IsRequired();
+            entity.Property(x => x.PaymentStatus)
+                .HasMaxLength(30)
+                .HasDefaultValue("not_started")
+                .IsRequired();
+            entity.Property(x => x.PaymentReference).HasMaxLength(200);
+
+            entity.Property(x => x.OriginalAmount).HasPrecision(12, 2);
+            entity.Property(x => x.DiscountAmount).HasPrecision(12, 2);
+            entity.Property(x => x.FinalAmount).HasPrecision(12, 2);
+
+            entity.HasIndex(x => x.UserId)
+                .IsUnique()
+                .HasDatabaseName("IX_MembershipOrders_OnePendingPerUser")
+                .HasFilter("\"Status\" = 'pending'");
+
+            entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.CreatedAtUtc });
+
+            entity.HasIndex(x => new { x.PaymentProvider, x.PaymentReference })
+                .IsUnique()
+                .HasFilter("\"PaymentReference\" IS NOT NULL");
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(x => x.Plan)
+                .WithMany()
+                .HasForeignKey(x => x.PlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        // NIV-MEMBERSHIP-ORDERS-END
+
         // NIV-CONTACT
         modelBuilder.Entity<ContactRequest>(entity =>
         {

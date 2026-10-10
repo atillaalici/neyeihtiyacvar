@@ -239,15 +239,27 @@ public static class BusinessRegistrationEndpoints
         group.MapPost("/complete-free", async (
             CompleteFreeBusinessRegistrationRequest request,
             ClaimsPrincipal principal,
-            AppDbContext dbContext) =>
+            AppDbContext dbContext,
+            IConfiguration configuration) =>
         {
             var userIdText = principal.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!Guid.TryParse(userIdText, out var userId)) return Results.Unauthorized();
 
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
 
-            var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId && x.IsActive);
+            var lockedUsers = await dbContext.Users
+                .FromSqlInterpolated($@"SELECT * FROM ""Users"" WHERE ""Id"" = {userId} AND ""IsActive"" = TRUE FOR UPDATE")
+                .ToListAsync();
+
+            var user = lockedUsers.FirstOrDefault();
+
             if (user is null) return Results.Unauthorized();
+
+            if (user.EmailVerifiedAtUtc is null)
+                return Results.BadRequest(new
+                {
+                    message = "Ücretsiz üyelik için önce e-posta adresinizi doğrulamalısınız."
+                });
 
             if (!await dbContext.Set<BillingInformation>().AsNoTracking().AnyAsync(x => x.UserId == userId))
                 return Results.BadRequest(new { message = "Önce fatura bilgilerini kaydetmelisin." });
@@ -277,10 +289,34 @@ public static class BusinessRegistrationEndpoints
             if (plan is null) return Results.BadRequest(new { message = "Geçerli bir üyelik paketi seçin." });
 
             var code = Regex.Replace(request.PromotionCode.Trim().ToUpperInvariant(), @"\s+", string.Empty);
-            var promo = await dbContext.PromotionCodes.FirstOrDefaultAsync(x => x.Code == code);
-            if (promo is null) return Results.NotFound(new { message = "Promosyon kodu bulunamadı." });
-
             var now = DateTime.UtcNow;
+
+            PromotionCode? promo;
+
+            if (code == "AUTO-FIRST500")
+            {
+                var campaignPrefix = configuration["Promotions:First500CodePrefix"]?.Trim();
+
+                if (string.IsNullOrWhiteSpace(campaignPrefix))
+                    return Results.BadRequest(new { message = "Otomatik kampanya henüz yapılandırılmamış." });
+
+                if (planCode != "kobi")
+                    return Results.BadRequest(new { message = "İlk 500 işletme kampanyası yalnızca KOBİ paketinde geçerlidir." });
+
+                promo = (await First500PromotionQuery
+                    .Available(dbContext, campaignPrefix, now)
+                    .ToListAsync())
+                    .FirstOrDefault();
+
+                if (promo is null)
+                    return Results.Conflict(new { message = "İlk 500 işletme kampanyasının kontenjanı dolmuş veya kampanya sona ermiştir." });
+            }
+            else
+            {
+                promo = await dbContext.PromotionCodes.FirstOrDefaultAsync(x => x.Code == code);
+                if (promo is null)
+                    return Results.NotFound(new { message = "Promosyon kodu bulunamadı." });
+            }
             if (promo.UsedCount > 0 || promo.UsedAtUtc.HasValue)
                 return Results.Conflict(new { message = "Bu promosyon kodu daha önce kullanılmış." });
             if (!promo.IsActive) return Results.BadRequest(new { message = "Bu promosyon kodu aktif değil." });
@@ -316,7 +352,7 @@ public static class BusinessRegistrationEndpoints
 
             var category = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
                 .FirstOrDefaultAsync(x => x.Slug == request.CategorySlug.Trim() && x.IsActive);
-            if (category is null || !category.Services.Where(x => x.IsActive).Select(x => ToSlug(x.Name))
+            if (category is null || !category.Services.Where(x => x.IsActive).Select(x => RegistrationValidationHelper.ToSlug(x.Name))
                     .Contains(request.ServiceSlug.Trim(), StringComparer.OrdinalIgnoreCase))
                 return Results.BadRequest(new { message = "Kategori veya hizmet bilgisi geçerli değil." });
 
@@ -330,6 +366,8 @@ public static class BusinessRegistrationEndpoints
                 OwnerUserId = userId, BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
                 CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
                 CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
+                PublicAddress = request.PublicAddress?.Trim(),
+                Latitude = request.Latitude, Longitude = request.Longitude,
                 ApplicantName = request.ApplicantName.Trim(), Phone = request.PhoneNumber.Trim(),
                 Whatsapp = request.PhoneNumber.Trim(), Status = ProviderApplicationStatus.Pending,
                 CreatedAtUtc = now, UpdatedAtUtc = now
@@ -339,11 +377,13 @@ public static class BusinessRegistrationEndpoints
             var provider = new Provider
             {
                 SourceApplicationId = application.Id, OwnerUserId = userId,
-                Slug = $"{ToSlug(request.BusinessName)}-{Guid.NewGuid().ToString("N")[..8]}",
+                Slug = $"{RegistrationValidationHelper.ToSlug(request.BusinessName)}-{Guid.NewGuid().ToString("N")[..8]}",
                 BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
                 CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
                 AdditionalServices = string.IsNullOrWhiteSpace(request.AdditionalServiceSlug) ? [] : [request.AdditionalServiceSlug.Trim()],
                 CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
+                PublicAddress = request.PublicAddress?.Trim(),
+                Latitude = request.Latitude, Longitude = request.Longitude,
                 PublicPhone = request.PhoneNumber.Trim(), PublicWhatsapp = request.PhoneNumber.Trim(),
                 PublicationStatus = PublicationStatus.Draft, IsActive = true,
                 CreatedAtUtc = now, UpdatedAtUtc = now
@@ -354,7 +394,7 @@ public static class BusinessRegistrationEndpoints
             {
                 ProviderId = provider.Id, UserId = userId, PlanId = plan.Id,
                 AnnualPriceSnapshot = plan.AnnualPrice, ServiceLimitSnapshot = plan.ServiceLimit,
-                StartsAtUtc = now, ExpiresAtUtc = null, IsActive = true,
+                StartsAtUtc = now, ExpiresAtUtc = now.AddYears(1), IsActive = true,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             };
             dbContext.ProviderMemberships.Add(membership);
@@ -551,7 +591,7 @@ public static class BusinessRegistrationEndpoints
             var serviceSlugs =
                 category.Services
                     .Where(x => x.IsActive)
-                    .Select(x => ToSlug(x.Name))
+                    .Select(x => RegistrationValidationHelper.ToSlug(x.Name))
                     .ToHashSet(
                         StringComparer.OrdinalIgnoreCase);
 
@@ -590,7 +630,7 @@ public static class BusinessRegistrationEndpoints
                 var additionalServiceSlugs =
                     additionalCategory.Services
                         .Where(x => x.IsActive)
-                        .Select(x => ToSlug(x.Name))
+                        .Select(x => RegistrationValidationHelper.ToSlug(x.Name))
                         .ToHashSet(
                             StringComparer.OrdinalIgnoreCase);
 
@@ -756,56 +796,7 @@ public static class BusinessRegistrationEndpoints
                 user.PhoneVerifiedAtUtc != null
         };
 
-    private static string ToSlug(
-        string value)
-    {
-        value = value
-            .Replace('\u0131', 'i')
-            .Replace('\u0130', 'I')
-            .Replace('\u011F', 'g')
-            .Replace('\u011E', 'G')
-            .Replace('\u00FC', 'u')
-            .Replace('\u00DC', 'U')
-            .Replace('\u015F', 's')
-            .Replace('\u015E', 'S')
-            .Replace('\u00F6', 'o')
-            .Replace('\u00D6', 'O')
-            .Replace('\u00E7', 'c')
-            .Replace('\u00C7', 'C');
 
-        var normalized =
-            value.Normalize(
-                NormalizationForm.FormD);
-
-        var builder =
-            new StringBuilder();
-
-        foreach (var character in normalized)
-        {
-            if (
-                CharUnicodeInfo.GetUnicodeCategory(
-                    character) !=
-                UnicodeCategory.NonSpacingMark)
-            {
-                builder.Append(character);
-            }
-        }
-
-        var ascii =
-            builder
-                .ToString()
-                .Normalize(
-                    NormalizationForm.FormC)
-                .ToLowerInvariant();
-
-        ascii =
-            Regex.Replace(
-                ascii,
-                "[^a-z0-9]+",
-                "-");
-
-        return ascii.Trim('-');
-    }
 }
 
 public sealed record CompleteFreeBusinessRegistrationRequest(
@@ -820,7 +811,10 @@ public sealed record CompleteFreeBusinessRegistrationRequest(
     string ServiceSlug,
     string? AdditionalCategorySlug,
     string? AdditionalServiceSlug,
-    bool LegalAccepted);
+    bool LegalAccepted,
+    string? PublicAddress = null,
+    double? Latitude = null,
+    double? Longitude = null);
 
 public sealed record BusinessRegisterRequest(
     string BusinessName,
