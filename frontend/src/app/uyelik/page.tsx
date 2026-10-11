@@ -415,7 +415,7 @@ export default function MembershipPage() {
             </div>
             <div className="flex items-center gap-3">
               <BadgeCheck className="size-5 text-sky-600" />
-              <span className="text-sm font-semibold">İstediğin zaman üst pakete geç</span>
+              <span className="text-sm font-semibold">12 ay üyelik · Otomatik yenileme yok</span>
             </div>
           </div>
 

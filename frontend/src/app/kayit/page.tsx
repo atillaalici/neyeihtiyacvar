@@ -562,7 +562,7 @@ function RegisterPageContent() {
               </h1>
 
               <p className="mt-3 text-muted-foreground">
-                Kullanıcı veya işletme hesabı türünü seçerek devam et.
+                İşletme bilgilerinizi doldurarak kaydınızı oluşturun.
               </p>
             </div>
 

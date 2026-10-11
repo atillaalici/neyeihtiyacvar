@@ -2,12 +2,9 @@
 
 import dynamic from "next/dynamic";
 
-type ProviderKind = "usta" | "esnaf";
-
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { TaxonomyV3Picker } from "@/components/auth/TaxonomyV3Picker";
-import { Hammer, Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -118,7 +115,7 @@ export function BusinessRegistrationForm({
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [cities, setCities] = useState<CityDto[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);  const [providerKind, setProviderKind] = useState<ProviderKind | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [wizardStep, setWizardStep] = useState(2);
   const membershipContinueUrl = selectedPlanCode
     ? `/uyelik/odeme?paket=${encodeURIComponent(selectedPlanCode)}`
@@ -278,21 +275,8 @@ export function BusinessRegistrationForm({
   const [registered, setRegistered] =
     useState<BusinessRegisterResponse | null>(null);
   useEffect(() => {
-    onStepChange?.(registered ? 3 : wizardStep);
+    onStepChange?.(registered ? 3 : wizardStep - 1);
   }, [onStepChange, registered, wizardStep]);
-function chooseProviderKind(kind: ProviderKind) {
-    setProviderKind(kind);
-    setWizardStep(2);
-    sessionStorage.setItem("neyeihtiyacvar.providerKind", kind);
-    setError("");
-  }
-
-  function resetProviderKind() {
-    setProviderKind(null);
-    setWizardStep(2);
-    sessionStorage.removeItem("neyeihtiyacvar.providerKind");
-    setError("");
-  }
   const planServiceLimit =
     selectedPlanCode === "profesyonel"
       ? 12
@@ -508,8 +492,7 @@ function chooseProviderKind(kind: ProviderKind) {
       normalizePhoneDigits(phoneNumber);
 
     if (
-      (providerKind === "esnaf" &&
-        !businessName.trim()) ||
+      !businessName.trim() ||
       !applicantName.trim() ||
       !email.trim() ||
       phoneDigits.length !== 10 ||
@@ -583,10 +566,7 @@ function chooseProviderKind(kind: ProviderKind) {
               : {}),
           },
           body: JSON.stringify({
-            businessName:
-              providerKind === "usta"
-                ? applicantName.trim()
-                : businessName.trim(),
+            businessName: businessName.trim(),
             applicantName:
               applicantName.trim(),
             email: email.trim(),
@@ -637,11 +617,8 @@ function chooseProviderKind(kind: ProviderKind) {
 
       const businessDraft =
         JSON.stringify({
-          providerKind,
-          businessName:
-            providerKind === "usta"
-              ? applicantName.trim()
-              : businessName.trim(),
+          providerKind: "esnaf",
+          businessName: businessName.trim(),
           applicantName:
             applicantName.trim(),
           email: email.trim(),
@@ -847,99 +824,7 @@ function chooseProviderKind(kind: ProviderKind) {
     );
   }
 
-  if (!providerKind) {
-    const planName =
-      selectedPlanCode === "kobi"
-        ? "KOBİ"
-        : selectedPlanCode === "avantaj"
-          ? "Avantaj"
-          : selectedPlanCode === "profesyonel"
-            ? "Profesyonel"
-            : null;
-
-    return (
-      <div className="mt-3 rounded-[22px] border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
-              Adım 1 / 5
-            </p>
-            <h2 className="mt-0.5 font-display text-xl font-bold">
-              Nasıl hizmet veriyorsunuz?
-            </h2>
-            <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
-              Size uygun kayıt yolunu seçin. Sonraki adımlar seçiminize göre hazırlanacak.
-            </p>
-          </div>
-
-          {planName ? (
-            <div className="shrink-0 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-right">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-orange-700">
-                Seçilen paket
-              </div>
-              <div className="text-sm font-bold text-slate-950">{planName}</div>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => chooseProviderKind("usta")}
-            className="group rounded-2xl border-2 border-border bg-background p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50"
-          >
-            <div className="flex items-start gap-3">
-              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange-100 text-orange-700">
-                <Hammer className="size-6" strokeWidth={2.2} />
-              </div>
-              <div>
-                <div className="font-display text-lg font-bold">Usta</div>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  Bireysel olarak hizmet veriyorum.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
-              Örn. elektrikçi, tesisatçı, tamirci, boya ustası, teknik servis.
-            </div>
-          </button>
-
-                    
-<button
-            type="button"
-            onClick={() => chooseProviderKind("esnaf")}
-            className="group rounded-2xl border-2 border-border bg-background p-4 text-left transition hover:border-orange-400 hover:bg-orange-50/50"
-          >
-            <div className="flex items-start gap-3">
-              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700">
-                <Store className="size-6" strokeWidth={2.2} />
-              </div>
-              <div>
-                <div className="font-display text-lg font-bold">
-                  Esnaf / İşletme
-                </div>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                  Dükkânım veya işletmem üzerinden hizmet veriyorum.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-xs leading-5 text-muted-foreground">
-              Örn. mağaza, servis, firma, ofis, atölye veya ticari işletme.
-            </div>
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4 text-xs text-muted-foreground">
-          <span>Bu seçim profil ve kayıt alanlarını belirleyecek.</span>
-          <span className="font-semibold text-foreground">Sonradan değiştirilebilir.</span>
-        </div>
-      </div>
-    );
-  }
-  if (providerKind && wizardStep === 2) {
-    const isUsta = providerKind === "usta";
+  if (wizardStep === 2) {
 
     function goNextFromStep2() {
       const phoneDigits = phoneNumber
@@ -953,7 +838,7 @@ function chooseProviderKind(kind: ProviderKind) {
         !email.trim() ||
         phoneDigits.length !== 10 ||
         !phoneDigits.startsWith("5") ||
-        (!isUsta && !businessName.trim()) ||
+        !businessName.trim() ||
         !termsAccepted ||
         !businessTermsAccepted
       ) {
@@ -995,27 +880,17 @@ function chooseProviderKind(kind: ProviderKind) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="mt-0.5 font-display text-xl font-bold">
-              {isUsta ? "Usta bilgileri" : "İşletme bilgileri"}
+              İşletme bilgileri
             </h2>
             <p className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
-              {isUsta
-                ? "Sizi müşterilere tanıtacak temel bilgileri girin."
-                : "İşletmenizi ve yetkili kişiyi tanımlayan temel bilgileri girin."}
+              İşletmenizi ve yetkili kişiyi tanımlayan temel bilgileri girin.
             </p>
           </div>
 
-          <div className="shrink-0 rounded-xl border border-border bg-muted/40 px-3 py-2 text-right">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Kayıt türü
-            </div>
-            <div className="text-sm font-bold text-foreground">
-              {isUsta ? "Usta" : "Esnaf / İşletme"}
-            </div>
-          </div>
         </div>
 
         <div className="mt-3 grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
-          {!isUsta ? (
+          {
             <div className="sm:col-span-2">
               <label className="mb-1 block text-[13px] font-medium">
                 İşletme Adı *
@@ -1028,18 +903,18 @@ function chooseProviderKind(kind: ProviderKind) {
                 placeholder="İşletme adını yazın"
               />
             </div>
-          ) : null}
+          }
 
           <div>
             <label className="mb-1 block text-[13px] font-medium">
-              {isUsta ? "Ad Soyad *" : "Yetkili Kişi Adı Soyadı *"}
+              Yetkili Kişi Adı Soyadı *
             </label>
             <input
               value={applicantName}
               onChange={(event) => setApplicantName(event.target.value)}
               maxLength={150}
               className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/15"
-              placeholder={isUsta ? "Adınız ve soyadınız" : "Yetkili kişinin adı soyadı"}
+              placeholder="Yetkili kişinin adı soyadı"
             />
           </div>
 
@@ -1266,13 +1141,7 @@ function chooseProviderKind(kind: ProviderKind) {
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
-          <button
-            type="button"
-            onClick={() => { setError(""); setProviderKind(null); setWizardStep(2); }}
-            className="rounded-xl border border-border px-4 py-2 text-sm font-semibold transition hover:bg-muted"
-          >
-            Geri
-          </button>
+
 
           <button
             type="button"
@@ -1288,7 +1157,7 @@ function chooseProviderKind(kind: ProviderKind) {
   }
   const inputClass =
     "h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/15";
-  if (providerKind && wizardStep === 3) {
+  if (wizardStep === 3) {
     const goNextFromStep3 = () => {
       if (!citySlug || !districtSlug || !categorySlug || !serviceSlug) {
         setError("İl, ilçe, kategori ve ana hizmet alanlarını seçin.");
@@ -1474,27 +1343,13 @@ function chooseProviderKind(kind: ProviderKind) {
       onSubmit={handleSubmit}
       className="mt-5 rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-7"
     >
-      <div className="mb-4 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-3 py-2">
-        <div className="text-xs text-muted-foreground">
-          Kayıt türü:{" "}
-          <strong className="text-foreground">
-            {providerKind === "usta" ? "Usta" : "Esnaf / İşletme"}
-          </strong>
-        </div>
-        <button
-          type="button"
-          onClick={() => { setError(""); setProviderKind(null); setWizardStep(2); }}
-          className="text-xs font-semibold text-primary hover:underline"
-        >
-          Hizmet türünü değiştir
-        </button>
-      </div>
+
       <div className="mb-6">
         <p className="text-sm font-semibold text-primary">
           İşletme bilgileri
         </p>
         <h2 className="mt-1 font-display text-xl font-bold">
-          {providerKind === "usta" ? "Usta hesabını oluştur" : "İşletme hesabını oluştur"}
+          İşletme hesabını oluştur
         </h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           İşletme hesabı ve işletme başvurusu aynı anda oluşturulur.
@@ -1518,7 +1373,7 @@ function chooseProviderKind(kind: ProviderKind) {
 
         <div>
           <label className="mb-2 block text-sm font-medium">
-            {providerKind === "usta" ? "Ad Soyad *" : "Yetkili Kişi Adı Soyadı *"}
+            Yetkili Kişi Adı Soyadı *
           </label>
           <input
             className={inputClass}

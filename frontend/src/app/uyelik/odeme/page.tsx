@@ -153,14 +153,72 @@ function MembershipPaymentContent() {
   }, [searchParams]);
 
   const plan = plans[planCode];
+
+  const registrationNames = useMemo(() => {
+    if (typeof window === "undefined") {
+      return { businessName: "", applicantName: "" };
+    }
+
+    let draft: {
+      businessName?: string;
+      applicantName?: string;
+    } | null = null;
+
+    try {
+      const raw =
+        sessionStorage.getItem("neyeihtiyacvar.businessRegistrationDraft") ??
+        localStorage.getItem("neyeihtiyacvar.businessRegistrationDraft");
+
+      if (raw) draft = JSON.parse(raw);
+    } catch {
+      draft = null;
+    }
+
+    return {
+      businessName: draft?.businessName?.trim() || "",
+      applicantName:
+        draft?.applicantName?.trim() ||
+        getStoredUser()?.displayName?.trim() ||
+        "",
+    };
+  }, []);
+
   useEffect(() => {
     const token = getAccessToken();
     const user = getStoredUser();
 
+    let registrationDraft: {
+      businessName?: string;
+      applicantName?: string;
+    } | null = null;
+
+    try {
+      const rawDraft =
+        sessionStorage.getItem("neyeihtiyacvar.businessRegistrationDraft") ??
+        localStorage.getItem("neyeihtiyacvar.businessRegistrationDraft");
+
+      if (rawDraft) {
+        registrationDraft = JSON.parse(rawDraft);
+      }
+    } catch {
+      registrationDraft = null;
+    }
+
+    const businessName = registrationDraft?.businessName?.trim() || "";
+    const applicantName =
+      registrationDraft?.applicantName?.trim() ||
+      user?.displayName?.trim() ||
+      "";
+
     const profileTimer = window.setTimeout(() => {
       setBilling((current) => ({
         ...current,
-        nameOrTitle: current.nameOrTitle || user?.displayName?.trim() || "",
+        nameOrTitle:
+          current.nameOrTitle ||
+          (current.billingType === "individual"
+            ? applicantName
+            : businessName || applicantName),
+        fullName: current.fullName || applicantName,
         email: current.email || user?.email?.trim() || "",
         phone: current.phone || user?.phoneNumber?.trim() || "",
         city: current.city || formatLocationName(user?.citySlug?.trim()),
@@ -606,7 +664,7 @@ function MembershipPaymentContent() {
 
           <div className="mt-3 rounded-[22px] border border-border bg-card p-4 shadow-sm">
             {billingOpen ? (
-              <div className="mt-3 hidden border-t border-border pt-3">
+              <div className="mt-3 border-t border-border pt-3">
                 <div className="mb-3">
                   <div className="text-sm font-bold">Fatura Bilgileri</div>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -621,6 +679,9 @@ function MembershipPaymentContent() {
                       setBilling((current) => ({
                         ...current,
                         billingType: "individual",
+                        nameOrTitle: billingSaved
+                          ? current.nameOrTitle
+                          : registrationNames.applicantName || current.nameOrTitle,
                         taxOffice: "",
                         taxNumber: "",
                       }))
@@ -640,6 +701,12 @@ function MembershipPaymentContent() {
                       setBilling((current) => ({
                         ...current,
                         billingType: "sole_proprietorship",
+                        fullName: billingSaved
+                          ? current.fullName
+                          : registrationNames.applicantName || current.fullName,
+                        nameOrTitle: billingSaved
+                          ? current.nameOrTitle
+                          : registrationNames.businessName || current.nameOrTitle,
                       }))
                     }
                     className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
@@ -658,6 +725,9 @@ function MembershipPaymentContent() {
                         ...current,
                         billingType: "corporate",
                         identityNumber: "",
+                        nameOrTitle: billingSaved
+                          ? current.nameOrTitle
+                          : registrationNames.businessName || current.nameOrTitle,
                       }))
                     }
                     className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
@@ -861,8 +931,8 @@ function MembershipPaymentContent() {
                     {billingLoading
                       ? "Fatura bilgileri kontrol ediliyor..."
                       : billingSaved
-                        ? "Fatura bilgileri kaydedildi. Promosyon adımına geçebilirsin."
-                        : "Promosyon kodundan önce fatura bilgilerini kaydet."}
+                        ? "Fatura bilgileriniz başarıyla kaydedildi."
+                        : "Üyelik işlemini tamamlamak için fatura bilgilerinizi kaydedin."}
                   </span>
                   <button
                     type="button"
@@ -881,7 +951,7 @@ function MembershipPaymentContent() {
             ) : null}
 
             
-            <div className="mt-3 border-t border-border pt-3">
+            <div className="mt-3 hidden border-t border-border pt-3">
               <label className="mb-1 block text-[13px] font-medium">
                 Promosyon kodu
               </label>
