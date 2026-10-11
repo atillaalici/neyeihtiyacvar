@@ -12,7 +12,7 @@ public sealed class ProjectSmokeTests
             projectRoot,
             "backend",
             "NeyeIhtiyacVar.Api",
-            "appsettings.Production.json");
+            "appsettings.Production.example.json");
 
         Assert.True(File.Exists(path), $"Dosya bulunamadi: {path}");
 
