@@ -9,6 +9,7 @@ import { HomeProvidersMap } from "@/components/site/HomeProvidersMap";
 import { LocationSearch } from "@/components/site/LocationSearch";
 import { ProviderCTA } from "@/components/site/ProviderCTA";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { First500CampaignPopup } from "@/components/site/First500CampaignPopup";
 import { TrustSection } from "@/components/site/TrustSection";
 
 export function HomeClient() {
@@ -16,6 +17,7 @@ export function HomeClient() {
 
   return (
     <SiteLayout>
+      <First500CampaignPopup />
       <div className="home-page">
         <HeroSearch />
 
