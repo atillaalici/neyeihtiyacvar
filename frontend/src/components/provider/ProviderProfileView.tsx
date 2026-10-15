@@ -131,6 +131,18 @@ export default function ProviderProfileView({
   const router = useRouter();
   const slug = providerOverride?.slug ?? params.slug ?? "";
 
+  const [authVersion, setAuthVersion] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setAuthVersion((v) => v + 1);
+    window.addEventListener("auth-changed", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.removeEventListener("auth-changed", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
   const [loadedProvider, setLoadedProvider] = useState<Provider | null>(null);
   const [loadedGallery, setLoadedGallery] = useState<GalleryPhoto[]>([]);
   const [loading, setLoading] = useState(!providerOverride);
@@ -200,7 +212,7 @@ export default function ProviderProfileView({
     return () => {
       active = false;
     };
-  }, [slug, providerOverride, galleryOverride]);
+  }, [slug, providerOverride, galleryOverride, authVersion]);
 
   useEffect(() => {
     if (!slug) return;

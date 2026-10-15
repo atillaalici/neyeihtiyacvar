@@ -40,7 +40,7 @@ export function RegistrationProgress({ current }: Props) {
                   completed
                     ? "border-green-500 bg-green-500 text-white"
                     : active
-                      ? "border-orange-500 bg-white text-orange-600"
+                      ? "border-green-500 bg-green-500 text-white"
                       : "border-stone-300 bg-white text-stone-400",
                 ].join(" ")}
                 aria-current={active ? "step" : undefined}
@@ -69,7 +69,7 @@ export function RegistrationProgress({ current }: Props) {
                   completed
                     ? "text-green-700"
                     : active
-                      ? "text-orange-700"
+                      ? "text-green-700"
                       : "text-muted-foreground",
                 ].join(" ")}
               >

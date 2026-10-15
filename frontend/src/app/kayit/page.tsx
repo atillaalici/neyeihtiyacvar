@@ -3,6 +3,7 @@
 import {
   FormEvent,
   Suspense,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -84,6 +85,20 @@ function RegisterPageContent() {
   const [accountType, setAccountType] =
     useState<AccountType>(initialAccountType);
   const [businessRegistrationStep, setBusinessRegistrationStep] = useState(1);
+
+  const handleBusinessStepChange = (step: number) => {
+    setBusinessRegistrationStep(step);
+  };
+
+  useEffect(() => {
+    if (accountType !== "business") return;
+
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [businessRegistrationStep, accountType]);
 
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -546,6 +561,7 @@ function RegisterPageContent() {
         <section className="section-shell py-10 sm:py-14">
           <div className="mx-auto max-w-2xl">
             <RegistrationProgress current={businessRegistrationStep} />
+            {businessRegistrationStep === 1 && (
             <div className="mb-7 text-center">
               <p className="text-sm font-semibold text-primary">
                 {selectedPlanCode === "kobi"
@@ -565,8 +581,21 @@ function RegisterPageContent() {
                 İşletme bilgilerinizi doldurarak kaydınızı oluşturun.
               </p>
             </div>
+            )}
 
-            <BusinessRegistrationForm selectedPlanCode={selectedPlan?.code ?? null} onStepChange={setBusinessRegistrationStep} />
+            {businessRegistrationStep === 1 && (
+            <div className="mb-4 flex flex-col items-center gap-2">
+              <GoogleSignInButton
+                returnUrl={returnUrl}
+                onError={(message) => setError(message)}
+              />
+              <p className="text-center text-xs text-muted-foreground">
+                veya aşağıdaki formu doldurarak devam edin
+              </p>
+            </div>
+            )}
+
+            <BusinessRegistrationForm selectedPlanCode={selectedPlan?.code ?? null} onStepChange={handleBusinessStepChange} />
           </div>
         </section>
       </SiteLayout>

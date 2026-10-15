@@ -36,5 +36,5 @@ export default async function ProviderDetailPage({
     notFound();
   }
 
-  return <ProviderProfileView providerOverride={provider} />;
+  return <ProviderProfileView />;
 }

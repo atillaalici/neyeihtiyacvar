@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -125,9 +125,19 @@ function MapViewport({
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const query = districtName
-          ? `${districtName}, ${cityName}, Türkiye`
-          : `${cityName}, Türkiye`;
+        // Merkez ilçeler harita servisinde genellikle il adıyla bulunur.
+        const isCentralDistrict =
+          districtName?.trim().toLocaleLowerCase("tr-TR") === "merkez";
+
+        const isOsmaniyeCenter =
+          isCentralDistrict &&
+          cityName?.trim().toLocaleLowerCase("tr-TR") === "osmaniye";
+
+        const query = isOsmaniyeCenter
+          ? "Osmaniye Merkez, Osmaniye, Türkiye"
+          : districtName && !isCentralDistrict
+            ? `${districtName}, ${cityName}, Türkiye`
+            : `${cityName}, Türkiye`;
         const params = new URLSearchParams({
           q: query,
           format: "jsonv2",
@@ -165,7 +175,7 @@ function MapViewport({
       map.invalidateSize();
 
       if (latitude === null || longitude === null) {
-        if (lastPosition.current === null) {
+        if (lastPosition.current === null && !cityName) {
           map.setView(defaultCenter, 6, { animate: false });
         }
         return;
