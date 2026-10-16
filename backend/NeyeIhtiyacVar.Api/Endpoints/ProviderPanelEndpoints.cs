@@ -655,9 +655,7 @@ public static class ProviderPanelEndpoints
                     contactByEmail = x.ContactByEmail,
                     contactByPush = x.ContactByPush,
                     requesterEmail =
-                        x.TargetProviderId == provider.Id &&
-                        x.ContactByEmail &&
-                        x.OwnerUser != null
+                        x.TargetProviderId == provider.Id && x.OwnerUser != null
                             ? x.OwnerUser.Email
                             : null,
                     requesterName =

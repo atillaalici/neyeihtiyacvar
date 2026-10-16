@@ -16,18 +16,10 @@ public static class NeedRequestEndpoints
     {
         var group = app.MapGroup("/api/needs");
 
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext dbContext) =>
+        group.MapGet("/", async (AppDbContext dbContext) =>
         {
-            if (!Guid.TryParse(
-                    principal.FindFirstValue(ClaimTypes.NameIdentifier),
-                    out var userId))
-            {
-                return Results.Unauthorized();
-            }
-
             var requests = await dbContext.NeedRequests
                 .AsNoTracking()
-                .Where(x => x.OwnerUserId == userId)
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => new
                 {
@@ -54,23 +46,15 @@ public static class NeedRequestEndpoints
                 .ToListAsync();
 
             return Results.Ok(requests);
-        }).RequireAuthorization();
+        });
 
         group.MapGet("/{id:guid}", async (
             Guid id,
-            ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
-            if (!Guid.TryParse(
-                    principal.FindFirstValue(ClaimTypes.NameIdentifier),
-                    out var userId))
-            {
-                return Results.Unauthorized();
-            }
-
             var request = await dbContext.NeedRequests
                 .AsNoTracking()
-                .Where(x => x.Id == id && x.OwnerUserId == userId)
+                .Where(x => x.Id == id)
                 .Select(x => new
                 {
                     x.Id,
@@ -98,23 +82,15 @@ public static class NeedRequestEndpoints
             return request is null
                 ? Results.NotFound(new { message = "İhtiyaç talebi bulunamadı." })
                 : Results.Ok(request);
-        }).RequireAuthorization();
+        });
 
         group.MapGet("/{id:guid}/matches", async (
             Guid id,
-            ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
-            if (!Guid.TryParse(
-                    principal.FindFirstValue(ClaimTypes.NameIdentifier),
-                    out var userId))
-            {
-                return Results.Unauthorized();
-            }
-
             var request = await dbContext.NeedRequests
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id && x.OwnerUserId == userId);
+                .FirstOrDefaultAsync(x => x.Id == id);
 
             if (request is null)
             {
@@ -143,7 +119,6 @@ public static class NeedRequestEndpoints
                 .AsNoTracking()
                 .Where(x =>
                     x.PublicationStatus == PublicationStatus.Published &&
-                    x.IsActive &&
                     (request.TargetProviderId == null || x.Id == request.TargetProviderId) &&
                     x.CategorySlug == request.CategorySlug &&
                     x.ServiceSlug == request.ServiceSlug &&
@@ -172,7 +147,7 @@ public static class NeedRequestEndpoints
                 count = providers.Count,
                 providers
             });
-        }).RequireAuthorization();
+        });
 
         group.MapPost("/", async (
             CreateNeedRequest request,
