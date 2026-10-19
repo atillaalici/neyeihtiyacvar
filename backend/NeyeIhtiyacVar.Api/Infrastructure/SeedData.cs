@@ -8,33 +8,6 @@ public static class SeedData
 {
     public static async Task InitializeAsync(AppDbContext dbContext)
     {
-        if (!await dbContext.Categories.AnyAsync())
-        {
-            var categories = new[]
-            {
-                Category("usta-tamir", "Usta & Tamir", 1,
-                    "Elektrikçi", "Su tesisatçısı", "Boyacı", "Mobilya montajı",
-                    "Çilingir", "Beyaz eşya servisi", "Klima servisi"),
-                Category("ev-yasam", "Ev & Yaşam", 2,
-                    "Ev temizliği", "Bahçe işleri", "Haşere ilaçlama", "Apartman hizmetleri"),
-                Category("nakliye-tasima", "Nakliye & Taşıma", 3,
-                    "Evden eve nakliyat", "Şehirlerarası nakliye", "Parça eşya taşıma", "Yük taşıma"),
-                Category("teknoloji", "Teknoloji", 4,
-                    "Bilgisayar servisi", "Telefon tamiri", "Kamera sistemleri",
-                    "Network / internet", "Yazılım ve web hizmetleri"),
-                Category("otomotiv", "Otomotiv", 5,
-                    "Oto tamir", "Lastikçi", "Oto elektrik", "Çekici", "Oto yıkama"),
-                Category("egitim", "Eğitim", 6,
-                    "Özel ders", "Yabancı dil", "Sınav hazırlık", "Bilgisayar eğitimi"),
-                Category("organizasyon", "Organizasyon", 7,
-                    "Düğün", "Fotoğrafçı", "Catering", "Organizasyon firmaları"),
-                Category("diger", "Diğer", 8,
-                    "Aradığın hizmet listede yoksa ihtiyacını yazman yeterli")
-            };
-
-            dbContext.Categories.AddRange(categories);
-        }
-
         if (!await dbContext.Cities.AnyAsync())
         {
             var cities = new[]

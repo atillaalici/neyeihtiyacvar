@@ -19,6 +19,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<District> Districts => Set<District>();
 
+    public DbSet<ProviderEmergencyDeclaration> ProviderEmergencyDeclarations => Set<ProviderEmergencyDeclaration>();
+
+    public DbSet<ProviderCategoryLibraryWork> ProviderCategoryLibraryWorks
+        => Set<ProviderCategoryLibraryWork>();
+
     public DbSet<Provider> Providers => Set<Provider>();
 
     public DbSet<ProviderMembership> ProviderMemberships => Set<ProviderMembership>();
@@ -68,6 +73,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ProviderEmergencyDeclaration>(entity =>
+        {
+            entity.HasKey(x => x.ProviderId);
+            entity.HasOne<Provider>().WithMany().HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(x => x.DeclaredByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
         // NIV-MEMBERSHIP-ORDERS
         modelBuilder.Entity<MembershipOrder>(entity =>
         {
@@ -255,6 +268,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(x => new { x.CategoryServiceId, x.NormalizedName }).IsUnique();
             entity.HasOne(x => x.CategoryService).WithMany().HasForeignKey(x => x.CategoryServiceId).OnDelete(DeleteBehavior.Cascade);
         });
+        modelBuilder.Entity<ProviderCategoryLibraryWork>(entity =>
+        {
+            entity.HasKey(x => new { x.ProviderId, x.CategoryLibraryWorkId });
+
+            entity.HasIndex(x => x.CategoryLibraryWorkId);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.CategoryLibraryWork)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryLibraryWorkId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<CategoryLibraryPhrase>(entity =>
         {
             entity.HasKey(x => x.Id);
@@ -874,6 +904,12 @@ modelBuilder.Entity<ProviderApplication>(entity =>
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => x.TrackingExpiresAtUtc);
             entity.HasIndex(x => x.TargetProviderId);
+            entity.HasIndex(x => x.CategoryLibraryWorkId);
+
+            entity.HasOne(x => x.CategoryLibraryWork)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryLibraryWorkId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.Property(x => x.IsActive)
                 .HasDefaultValue(true);

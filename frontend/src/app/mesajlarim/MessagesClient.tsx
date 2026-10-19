@@ -108,7 +108,19 @@ function formatMessageTime(value: string) {
   }).format(date);
 }
 
-export default function MessagesClient() {
+
+function MessagesLayout({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  return embedded ? <>{children}</> : <SiteLayout>{children}</SiteLayout>;
+}
+
+export default function MessagesClient({ embedded = false }: { embedded?: boolean }) {
+  const messagesPath = embedded ? "/panel/mesajlarim" : "/mesajlarim";
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedConversationId = searchParams.get("conversation");
@@ -131,7 +143,7 @@ export default function MessagesClient() {
 
     if (!token) {
       router.replace(
-        `/giris?returnUrl=${encodeURIComponent("/mesajlarim")}`,
+        `/giris?returnUrl=${encodeURIComponent(messagesPath)}`,
       );
       return;
     }
@@ -167,14 +179,14 @@ export default function MessagesClient() {
           if (requested) return requested.id;
         }
 
-        return data[0]?.id ?? null;
+        return embedded ? null : (data[0]?.id ?? null);
       });
     } catch {
       setError("Mesajlar yüklenirken bir sorun oluştu.");
     } finally {
       setLoadingConversations(false);
     }
-  }, [requestedConversationId, router]);
+  }, [requestedConversationId, router, messagesPath]);
 
   const loadConversation = useCallback(async (conversationId: string) => {
     const token = getAccessToken();
@@ -346,7 +358,7 @@ export default function MessagesClient() {
 
     const params = new URLSearchParams(searchParams.toString());
     params.set("conversation", id);
-    router.replace(`/mesajlarim?${params.toString()}`, {
+    router.replace(`${messagesPath}?${params.toString()}`, {
       scroll: false,
     });
   }
@@ -354,7 +366,7 @@ export default function MessagesClient() {
   function backToList() {
     setSelectedId(null);
     setDetail(null);
-    router.replace("/mesajlarim", { scroll: false });
+    router.replace(messagesPath, { scroll: false });
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -368,7 +380,7 @@ export default function MessagesClient() {
 
     if (!token) {
       router.push(
-        `/giris?returnUrl=${encodeURIComponent("/mesajlarim")}`,
+        `/giris?returnUrl=${encodeURIComponent(messagesPath)}`,
       );
       return;
     }
@@ -423,9 +435,9 @@ export default function MessagesClient() {
   );
 
   return (
-    <SiteLayout>
-      <main className="bg-muted/20 py-4 md:py-8">
-        <div className="section-shell">
+    <MessagesLayout embedded={embedded}>
+      <main className={embedded ? "py-4" : "bg-muted/20 py-4 md:py-8"}>
+        <div className={embedded ? "min-w-0" : "section-shell"}>
           <div className="mb-4">
             <h1 className="text-2xl font-bold tracking-tight">
               Mesajlarım
@@ -435,11 +447,12 @@ export default function MessagesClient() {
             </p>
           </div>
 
-          <div className="grid min-h-[70vh] overflow-hidden rounded-2xl border border-border bg-background shadow-sm md:grid-cols-[22rem_minmax(0,1fr)]">
+          <div className={embedded ? "min-h-[65vh] overflow-hidden rounded-2xl border border-border bg-background shadow-sm" : "grid min-h-[70vh] overflow-hidden rounded-2xl border border-border bg-background shadow-sm md:grid-cols-[22rem_minmax(0,1fr)]"}>
             <aside
-              className={`border-r border-border ${
-                selectedId ? "hidden md:block" : "block"
-              }`}
+              className={embedded
+                ? selectedId ? "hidden" : "block"
+                : `border-r border-border ${selectedId ? "hidden md:block" : "block"}`
+              }
             >
               <div className="border-b border-border px-4 py-4">
                 <div className="font-semibold">Konuşmalar</div>
@@ -448,7 +461,7 @@ export default function MessagesClient() {
                 </div>
               </div>
 
-              <div className="max-h-[70vh] overflow-y-auto p-2">
+              <div className={embedded ? "divide-y divide-border p-3" : "max-h-[70vh] overflow-y-auto p-2"}>
                 {loadingConversations ? (
                   <div className="px-4 py-10 text-center text-sm text-muted-foreground">
                     Konuşmalar yükleniyor...
@@ -483,11 +496,10 @@ export default function MessagesClient() {
                         key={conversation.id}
                         type="button"
                         onClick={() => selectConversation(conversation.id)}
-                        className={`flex w-full gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                          active
-                            ? "bg-orange-50"
-                            : "hover:bg-muted"
-                        }`}
+                        className={embedded
+                          ? "flex w-full items-center gap-3 rounded-xl px-4 py-4 text-left transition-colors hover:bg-muted"
+                          : `flex w-full gap-3 rounded-xl px-3 py-3 text-left transition-colors ${active ? "bg-orange-50" : "hover:bg-muted"}`
+                        }
                       >
                         <div className="grid size-11 shrink-0 place-items-center rounded-full bg-orange-100 font-bold text-orange-700">
                           {displayName
@@ -533,9 +545,10 @@ export default function MessagesClient() {
             </aside>
 
             <section
-              className={`min-w-0 ${
-                selectedId ? "flex" : "hidden md:flex"
-              } flex-col`}
+              className={embedded
+                ? selectedId ? "flex min-h-[65vh] min-w-0 flex-col" : "hidden"
+                : `min-w-0 ${selectedId ? "flex" : "hidden md:flex"} flex-col`
+              }
             >
               {!selectedId ? (
                 <div className="flex flex-1 items-center justify-center p-8 text-center">
@@ -560,7 +573,7 @@ export default function MessagesClient() {
                     <button
                       type="button"
                       onClick={backToList}
-                      className="grid size-9 place-items-center rounded-full hover:bg-muted md:hidden"
+                      className={`grid size-9 place-items-center rounded-full hover:bg-muted ${embedded ? "" : "md:hidden"}`}
                       aria-label="Konuşmalara dön"
                     >
                       <ArrowLeft className="size-5" />
@@ -734,6 +747,6 @@ export default function MessagesClient() {
           </div>
         </div>
       </main>
-    </SiteLayout>
+    </MessagesLayout>
   );
 }

@@ -1,167 +1,373 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 
-type Phrase={id:string;phrase:string;isActive:boolean};
-type Work={id:string;name:string;sortOrder:number;isActive:boolean;phrases:Phrase[]};
-type Service={id:string;name:string;works:Work[]};
-type Category={id:string;name:string;slug:string;services:Service[]};
+type Work = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
 
-export default function CategoryLibraryPage(){
- const [data,setData]=useState<Category[]>([]);
- const [categoryId,setCategoryId]=useState("");
- const [serviceId,setServiceId]=useState("");
- const [newCategory,setNewCategory]=useState("");
- const [newService,setNewService]=useState("");
- const [newPhrase,setNewPhrase]=useState("");
- const [bulkPhrases,setBulkPhrases]=useState("");
- const [bulkBusy,setBulkBusy]=useState(false);
- const [message,setMessage]=useState("");
- const token=typeof window!=="undefined"?getAccessToken():null;
- const headers:HeadersInit={"Content-Type":"application/json",...(token?{Authorization:`Bearer ${token}`}:{})};
+type Service = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  works: Work[];
+};
 
- async function load(){
-  const r=await fetch(`${apiBaseUrl}/api/admin/category-library`,{headers,cache:"no-store"});
-  if(!r.ok){setMessage(`Kütüphane yüklenemedi (${r.status})`);return;}
-  setData(await r.json());
- }
- useEffect(() => {
-  let active = true;
-  void (async () => {
-   const r = await fetch(`${apiBaseUrl}/api/admin/category-library`, { headers, cache: "no-store" });
-   if (!active) return;
-   if (!r.ok) { setMessage(`Kütüphane yüklenemedi (${r.status})`); return; }
-   setData(await r.json());
-  })();
-  return () => { active = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
- },[]);
- const sortedCategories=useMemo(()=>[...data].sort((a,b)=>a.name.localeCompare(b.name,"tr-TR",{sensitivity:"base"})),[data]);
- const category=useMemo(()=>data.find(x=>x.id===categoryId),[data,categoryId]);
- const service=useMemo(()=>category?.services.find(x=>x.id===serviceId),[category,serviceId]);
-  const sortedServices = useMemo(
-    () =>
-      [...(category?.services ?? [])].sort((a, b) =>
-        a.name.localeCompare(b.name, "tr-TR", { sensitivity: "base" }),
-      ),
-    [category],
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  services: Service[];
+};
+
+const trSort = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name, "tr-TR", { sensitivity: "base" });
+
+export default function CategoryLibraryPage() {
+  const [data, setData] = useState<Category[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [newCategory, setNewCategory] = useState("");
+  const [newService, setNewService] = useState("");
+  const [newWork, setNewWork] = useState("");
+  const [editor, setEditor] = useState<null | { level: "A" | "B" | "C"; id: string; name: string }>(null);
+  const [editName, setEditName] = useState("");
+
+  const categories = useMemo(
+    () => data
+      
+      .sort(trSort),
+    [data]
   );
- const phrases=useMemo(()=>service?.works.flatMap(w=>w.phrases)??[],[service]);
+  const category = data.find(x => x.id === categoryId);
+  const services = useMemo(
+    () => [...(category?.services ?? [])].sort(trSort),
+    [category]
+  );
+  const service = services.find(x => x.id === serviceId);
+  const works = useMemo(
+    () => [...(service?.works ?? [])].sort(trSort),
+    [service]
+  );
 
- async function req(url:string,options:RequestInit){
-  const r=await fetch(`${apiBaseUrl}${url}`,{...options,headers});
-  if(!r.ok)throw new Error((await r.text())||`İşlem başarısız (${r.status})`);
-  return r;
- }
- async function addCategory(){
-  const name=newCategory.trim(); if(!name)return;
-  try{
-   const r=await req("/api/admin/category-library/categories",{method:"POST",body:JSON.stringify({name})});
-   const created=await r.json() as {id:string;name:string};
-   setNewCategory(""); setCategoryId(created.id); setServiceId("");
-   setMessage(`"${created.name}" ana kategorisi eklendi.`); await load();
-  }catch(e){setMessage(e instanceof Error?e.message:"Ana kategori eklenemedi.");}
- }
- async function delCategory(){
-  if(!categoryId||!category)return;
-  if(category.services.length>0){
-   setMessage(`"${category.name}" kategorisinde ${category.services.length} aktif hizmet var. Önce hizmetleri silmelisiniz.`);
-   return;
+  const headers = useCallback((): HeadersInit => {
+    const token = getAccessToken();
+    return {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
+
+  const load = useCallback(async () => {
+    const response = await fetch(
+      `${apiBaseUrl}/api/admin/category-library`,
+      { headers: headers(), cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Kategori listesi yüklenemedi (${response.status}).`);
+    }
+
+    const result = await response.json() as Category[];
+    setData(result);
+  }, [headers]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function initialLoad() {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/admin/category-library`,
+          { headers: headers(), cache: "no-store" }
+        );
+        if (!response.ok) {
+          throw new Error(`Kategori listesi yüklenemedi (${response.status}).`);
+        }
+        const result = await response.json() as Category[];
+        if (active) {
+          setData(result);
+        }
+      } catch (error) {
+        if (active) setMessage(error instanceof Error ? error.message : "Yükleme hatası.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void initialLoad();
+    return () => { active = false; };
+  }, [headers]);
+
+  async function request(path: string, method: string, body?: object) {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method,
+      headers: headers(),
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `İşlem başarısız (${response.status}).`);
+    }
+
+    return response;
   }
-  if(!confirm(`"${category.name}" ana kategorisi silinsin mi?`))return;
-  try{
-   await req(`/api/admin/category-library/categories/${categoryId}`,{method:"DELETE"});
-   setCategoryId(""); setServiceId(""); setMessage("Ana kategori silindi."); await load();
-  }catch(e){setMessage(e instanceof Error?e.message:"Ana kategori silinemedi.");}
- }
- async function addService(){
-  if(!categoryId||!newService.trim())return;
-  try{await req("/api/admin/category-library/services",{method:"POST",body:JSON.stringify({categoryId,name:newService.trim()})});setNewService("");setMessage("Hizmet eklendi.");await load();}
-  catch(e){setMessage(e instanceof Error?e.message:"Hizmet eklenemedi.");}
- }
- async function delService(){
-  if(!serviceId||!service||!confirm(`"${service.name}" hizmeti silinsin mi?`))return;
-  try{await req(`/api/admin/category-library/services/${serviceId}`,{method:"DELETE"});setServiceId("");setMessage("Hizmet silindi.");await load();}
-  catch(e){setMessage(e instanceof Error?e.message:"Hizmet silinemedi.");}
- }
- async function addPhrase(){
-  if(!serviceId||!newPhrase.trim())return;
-  try{await req(`/api/admin/category-library/services/${serviceId}/phrases`,{method:"POST",body:JSON.stringify({phrase:newPhrase.trim()})});setNewPhrase("");setMessage("Kullanıcı cümlesi eklendi.");await load();}
-  catch(e){setMessage(e instanceof Error?e.message:"Cümle eklenemedi.");}
- }
 
- async function addBulkPhrases(){
-  if(!serviceId||!bulkPhrases.trim())return;
-  const items=bulkPhrases.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  if(items.length===0)return;
-  setBulkBusy(true);
-  try{
-   const r=await req(`/api/admin/category-library/services/${serviceId}/phrases/bulk`,{method:"POST",body:JSON.stringify({phrases:items})});
-   const result=await r.json() as {added:number;skipped:number;valid:number};
-   setBulkPhrases("");
-   setMessage(`${result.added} kullanıcı cümlesi eklendi.${result.skipped>0?` ${result.skipped} tekrar kayıt atlandı.`:""}`);
-   await load();
+  async function execute(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      await action();
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "İşlem başarısız.");
+    } finally {
+      setBusy(false);
+    }
   }
-  catch(e){setMessage(e instanceof Error?e.message:"Toplu cümleler eklenemedi.");}
-  finally{setBulkBusy(false);}
- }
- async function delPhrase(id:string){
-  try{await req(`/api/admin/category-library/phrases/${id}`,{method:"DELETE"});setMessage("Kullanıcı cümlesi silindi.");await load();}
-  catch(e){setMessage(e instanceof Error?e.message:"Cümle silinemedi.");}
- }
 
+  function addCategory() {
+    const name = newCategory.trim();
+    if (!name) return;
 
- return <SiteLayout><AdminNav/><section className="section-shell py-6 sm:py-8">
-  <div className="mb-5"><h1 className="font-display text-3xl font-bold">Kategori Kütüphanesi</h1><p className="mt-1 text-muted-foreground">Ana Kategori → Hizmet → Kullanıcı Cümlesi</p></div>
-  {message&&<div className="mb-4 rounded-xl border bg-card px-4 py-3 text-sm">{message}</div>}
-  <div className="grid gap-4 lg:grid-cols-3">
+    void execute(async () => {
+      const response = await request(
+        "/api/admin/category-library/categories", "POST", { name }
+      );
+      const created = await response.json() as { id: string };
+      setNewCategory("");
+      setCategoryId(created.id);
+      setServiceId("");
+      setMessage("Ana kategori eklendi.");
+    });
+  }
 
-   <section className="min-h-[700px] rounded-2xl border bg-card p-5">
-    <div className="flex items-center gap-3"><b className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground">1</b><h2 className="text-lg font-bold">Kategori ve Hizmet</h2></div>
-    <label className="mt-6 block"><b className="mb-2 block text-sm">Ana Kategori</b><select className="h-12 w-full rounded-xl border bg-background px-4" value={categoryId} onChange={e=>{setCategoryId(e.target.value);setServiceId("");}}><option value="">Kategori seçin</option>{sortedCategories.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-    <div className="mt-4 rounded-xl border bg-muted/20 p-3">
-     <h3 className="font-bold">Ana Kategori Ekle</h3>
-     <div className="mt-3 flex gap-2"><input className="h-11 min-w-0 flex-1 rounded-xl border bg-background px-3" value={newCategory} onChange={e=>setNewCategory(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void addCategory();}} placeholder="Yeni ana kategori adı"/><button onClick={()=>void addCategory()} disabled={!newCategory.trim()} className="rounded-xl bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-40">Ekle</button></div>
-     <button onClick={()=>void delCategory()} disabled={!categoryId} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-red-200 font-semibold text-red-600 disabled:opacity-40"><Trash2 className="size-4"/> Seçili Ana Kategoriyi Sil</button>
-     {category&&category.services.length>0&&<p className="mt-2 text-xs text-muted-foreground">Bu kategoride {category.services.length} aktif hizmet var. Silmek için önce hizmetleri silmelisiniz.</p>}
-    </div>
-    <label className="mt-4 block"><b className="mb-2 block text-sm">Hizmet</b><select className="h-12 w-full rounded-xl border bg-background px-4" value={serviceId} disabled={!category} onChange={e=>setServiceId(e.target.value)}><option value="">Hizmet seçin</option>{sortedServices.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-    <div className="my-5 border-t"/><h3 className="font-bold">Hizmet Ekle</h3>
-    <div className="mt-3 flex gap-2"><input className="h-12 min-w-0 flex-1 rounded-xl border bg-background px-4" value={newService} disabled={!categoryId} onChange={e=>setNewService(e.target.value)} placeholder="Yeni hizmet adı"/><button onClick={()=>void addService()} className="rounded-xl bg-primary px-5 font-semibold text-primary-foreground">Ekle</button></div>
-    <button onClick={()=>void delService()} disabled={!serviceId} className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200 font-semibold text-red-600 disabled:opacity-40"><Trash2 className="size-4"/> Seçili Hizmeti Sil</button>
-   </section>
+  function toggleCategory(item: Category) {
+    const isActive = !item.isActive;
+    if (!window.confirm(
+      `"${item.name}" ${isActive ? "aktif" : "pasif"} yapılsın mı?`
+    )) return;
 
-   <section className="min-h-[700px] rounded-2xl border bg-card p-5">
-    <div className="flex items-center gap-3"><b className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground">2</b><h2 className="text-lg font-bold">Kullanıcı Cümleleri</h2></div>
-    {!service?<div className="mt-6 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Önce hizmet seçin.</div>:<>
-     <div className="mt-6 rounded-xl border bg-muted/20 px-4 py-3 text-sm">Seçili Hizmet: <strong>{service.name}</strong></div>
-<h3 className="font-bold">Kullanıcı Cümlesi Ekle</h3>
-     <div className="mt-3 flex gap-2"><input className="h-12 min-w-0 flex-1 rounded-xl border bg-background px-4" value={newPhrase} onChange={e=>setNewPhrase(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")void addPhrase();}} placeholder="Örn. sigorta sürekli atıyor"/><button onClick={()=>void addPhrase()} className="rounded-xl bg-primary px-5 font-semibold text-primary-foreground">Ekle</button></div>
+    void execute(async () => {
+      await request(
+        `/api/admin/category-library/categories/${item.id}/status`,
+        "PATCH", { isActive }
+      );
+      setMessage("Ana kategori durumu güncellendi.");
+    });
+  }
 
-     <div className="my-6 border-t"/>
-     <h3 className="font-bold">Toplu Kullanıcı Cümlesi Ekle</h3>
-     <p className="mt-1 text-sm text-muted-foreground">Her satıra bir kullanıcı cümlesi yazın veya Excel&apos;den tek sütun halinde yapıştırın.</p>
-     <textarea className="mt-3 min-h-[230px] w-full resize-y rounded-xl border bg-background px-4 py-3 text-sm leading-6" value={bulkPhrases} onChange={e=>setBulkPhrases(e.target.value)} placeholder={"Sigorta sürekli atıyor\nElektrikler sürekli kesiliyor\nEvde elektrik yok\nPrizde elektrik yok"}/>
-     <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground"><span>Boş satırlar ve tekrar eden cümleler otomatik atlanır.</span><span>{bulkPhrases.split(/\r?\n/).filter(x=>x.trim()).length} satır</span></div>
-     <button onClick={()=>void addBulkPhrases()} disabled={bulkBusy||!bulkPhrases.trim()} className="mt-3 h-12 w-full rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-50">{bulkBusy?"Ekleniyor...":"Tümünü Ekle"}</button>
+  function addService() {
+    const name = newService.trim();
+    if (!categoryId || !name) return;
 
-     <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">Bu cümleler seçili hizmetin arama eşleşmelerinde kullanılacaktır.</div>
-    </>}
-   </section>
+    void execute(async () => {
+      const response = await request(
+        "/api/admin/category-library/services",
+        "POST", { categoryId, name }
+      );
+      const created = await response.json() as { id: string };
+      setNewService("");
+      setServiceId(created.id);
+      setMessage("Alt kategori eklendi.");
+    });
+  }
 
-   <section className="min-h-[700px] rounded-2xl border bg-card p-5">
-    <div className="flex items-center gap-3"><b className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground">3</b><h2 className="text-lg font-bold">Mevcut Kullanıcı Cümleleri</h2></div>
-    {!service?<div className="mt-6 rounded-xl border border-dashed p-5 text-sm text-muted-foreground">Önce hizmet seçin.</div>:<>
-     <h3 className="mt-6 font-bold">Mevcut Kullanıcı Cümleleri ({phrases.length})</h3>
-     <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">{phrases.length===0?<div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Bu hizmete henüz kullanıcı cümlesi eklenmedi.</div>:phrases.map(p=><div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border bg-background px-4 py-3"><span className="text-sm">{p.phrase}</span><button onClick={()=>void delPhrase(p.id)} className="grid size-7 shrink-0 place-items-center rounded-full text-lg font-bold text-red-500 hover:bg-red-50" title="Cümleyi kaldır">×</button></div>)}</div>
-    </>}
-   </section>
+  function toggleService(item: Service) {
+    const isActive = !item.isActive;
+    if (!window.confirm(
+      `"${item.name}" ${isActive ? "aktif" : "pasif"} yapılsın mı?`
+    )) return;
 
-  </div>
- </section></SiteLayout>;
+    void execute(async () => {
+      await request(
+        `/api/admin/category-library/services/${item.id}/status`,
+        "PATCH", { isActive }
+      );
+      setMessage("Alt kategori durumu güncellendi.");
+    });
+  }
+
+  function addWork() {
+    const name = newWork.trim();
+    if (!serviceId || !name) return;
+
+    void execute(async () => {
+      await request(
+        "/api/admin/category-library/works",
+        "POST", { categoryServiceId: serviceId, name }
+      );
+      setNewWork("");
+      setMessage("Hizmet eklendi.");
+    });
+  }
+
+  function toggleWork(item: Work) {
+    void execute(async () => {
+      await request(
+        `/api/admin/category-library/works/${item.id}`,
+        "PUT",
+        {
+          name: item.name,
+          sortOrder: item.sortOrder,
+          isActive: !item.isActive,
+        }
+      );
+      setMessage("Hizmet durumu güncellendi.");
+    });
+  }
+
+  const inputClass = "h-10 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm";
+  const buttonClass = "shrink-0 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-40";
+
+  function openEditor(level: "A" | "B" | "C") {
+    const items = level === "A" ? categories : level === "B" ? services : works;
+    if (items.length === 0) return;
+    const selectedId = level === "A" ? categoryId : level === "B" ? serviceId : "";
+    const selected = items.find(x => x.id === selectedId) ?? items[0];
+    setEditor({ level, id: selected.id, name: selected.name });
+    setEditName(selected.name);
+  }
+
+  function saveEdit() {
+    if (!editor || editName.trim().length < 2 || busy) return;
+    const { level, id } = editor;
+    const name = editName.trim();
+    const work = works.find(x => x.id === id);
+    if (level === "C" && !work) return;
+    void execute(async () => {
+      if (level === "A") {
+        await request(`/api/admin/category-library/categories/${id}`, "PUT", { name });
+      } else if (level === "B") {
+        await request(`/api/admin/category-library/services/${id}`, "PUT", { name });
+      } else if (work) {
+        await request(`/api/admin/category-library/works/${id}`, "PUT", {
+          name, sortOrder: work.sortOrder, isActive: work.isActive,
+        });
+      }
+      setEditor(null);
+      setMessage("Değişiklik kaydedildi.");
+    });
+  }
+
+  const listRow = "block w-full truncate rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted";
+
+  return (
+    <SiteLayout>
+      <AdminNav />
+      <section className="section-shell py-6 sm:py-8">
+        <h1 className="font-display text-3xl font-bold">Kategori Kütüphanesi</h1>
+        <p className="mt-1 mb-5 text-sm text-muted-foreground">Ana Kategori → Alt Kategori → Hizmet · Türkçe alfabetik sıralama</p>
+        {message && <div role="status" className="mb-4 rounded-xl border bg-card p-3 text-sm">{message}</div>}
+        {loading && <p className="mb-3 text-sm">Kategoriler yükleniyor...</p>}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <section className="rounded-2xl border bg-card p-4">
+            <h2 className="mb-3 text-lg font-bold">1. Ana Kategori (A)</h2>
+            <div className="mb-4 flex items-center gap-2">
+              <input className={inputClass} value={newCategory} maxLength={120}
+                onChange={e => setNewCategory(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addCategory(); }}
+                placeholder="Yeni ana kategori" />
+              <button className={buttonClass} disabled={busy || !newCategory.trim()} onClick={addCategory}>Ekle</button>
+              <button className={buttonClass} disabled={busy || categories.length === 0} onClick={() => openEditor("A")}>Düzenle</button>
+            </div>
+            <div className="max-h-[650px] overflow-y-auto">
+              {categories.map(item => (
+                <button key={item.id} type="button"
+                  className={`${listRow} ${categoryId === item.id ? "bg-primary/10 font-semibold" : ""} ${!item.isActive ? "text-muted-foreground" : ""}`}
+                  title={item.name} onClick={() => { setCategoryId(item.id); setServiceId(""); }}>
+                  {item.name}{!item.isActive ? " (Pasif)" : ""}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-4">
+            <h2 className="mb-1 text-lg font-bold">2. Alt Kategori (B)</h2>
+            <p className="mb-3 truncate text-xs text-muted-foreground">{category?.name ?? "Önce ana kategori seçin."}</p>
+            <div className="mb-4 flex items-center gap-2">
+              <input className={inputClass} value={newService} maxLength={150}
+                disabled={!categoryId || busy} onChange={e => setNewService(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addService(); }}
+                placeholder="Yeni alt kategori" />
+              <button className={buttonClass} disabled={busy || !categoryId || !newService.trim()} onClick={addService}>Ekle</button>
+              <button className={buttonClass} disabled={busy || services.length === 0} onClick={() => openEditor("B")}>Düzenle</button>
+            </div>
+            <div className="max-h-[650px] overflow-y-auto">
+              {services.map(item => (
+                <button key={item.id} type="button"
+                  className={`${listRow} ${serviceId === item.id ? "bg-primary/10 font-semibold" : ""} ${!item.isActive ? "text-muted-foreground" : ""}`}
+                  title={item.name} onClick={() => setServiceId(item.id)}>
+                  {item.name}{!item.isActive ? " (Pasif)" : ""}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-4">
+            <h2 className="mb-1 text-lg font-bold">3. Hizmet (C)</h2>
+            <p className="mb-3 truncate text-xs text-muted-foreground">{service?.name ?? "Önce alt kategori seçin."}</p>
+            <div className="mb-4 flex items-center gap-2">
+              <input className={inputClass} value={newWork} maxLength={200}
+                disabled={!serviceId || busy} onChange={e => setNewWork(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") addWork(); }}
+                placeholder="Yeni hizmet" />
+              <button className={buttonClass} disabled={busy || !serviceId || !newWork.trim()} onClick={addWork}>Ekle</button>
+              <button className={buttonClass} disabled={busy || works.length === 0} onClick={() => openEditor("C")}>Düzenle</button>
+            </div>
+            <div className="max-h-[650px] overflow-y-auto">
+              {works.map(item => (
+                <label key={item.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                  <input type="checkbox" checked={item.isActive} disabled={busy}
+                    onChange={() => toggleWork(item)} aria-label={`${item.name} aktif`} className="size-4 shrink-0 accent-primary" />
+                  <span className={`truncate ${!item.isActive ? "text-muted-foreground" : ""}`} title={item.name}>{item.name}</span>
+                </label>
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
+
+      {editor && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onMouseDown={e => { if (e.target === e.currentTarget && !busy) setEditor(null); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="category-edit-title" className="w-full max-w-md rounded-2xl bg-background p-6 shadow-xl">
+            <h2 id="category-edit-title" className="mb-4 text-xl font-bold">{editor.level === "A" ? "Ana Kategori" : editor.level === "B" ? "Alt Kategori" : "Hizmet"} Düzenle</h2>
+            <label className="mb-2 block text-sm font-medium" htmlFor="edit-select">Düzenlenecek başlık</label>
+            <select id="edit-select" className="mb-4 h-11 w-full rounded-lg border bg-background px-3 text-sm" value={editor.id}
+              onChange={e => {
+                const items = editor.level === "A" ? categories : editor.level === "B" ? services : works;
+                const item = items.find(x => x.id === e.target.value);
+                if (item) { setEditor({ ...editor, id: item.id, name: item.name }); setEditName(item.name); }
+              }}>
+              {(editor.level === "A" ? categories : editor.level === "B" ? services : works).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <label className="mb-2 block text-sm font-medium" htmlFor="edit-name">Yeni isim</label>
+            <input id="edit-name" className="mb-5 h-11 w-full rounded-lg border bg-background px-3 text-sm" value={editName}
+              maxLength={editor.level === "A" ? 120 : editor.level === "B" ? 150 : 200}
+              onChange={e => setEditName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") saveEdit(); }} />
+            <div className="flex justify-end gap-2">
+              <button className={buttonClass} disabled={busy} onClick={() => setEditor(null)}>İptal</button>
+              <button className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40"
+                disabled={busy || editName.trim().length < 2} onClick={saveEdit}>Kaydet</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </SiteLayout>
+  );
 }

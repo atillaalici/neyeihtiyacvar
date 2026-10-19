@@ -80,16 +80,6 @@ export function AuthMenu({
     if (mobile) {
       return (
         <div className="grid gap-1">
-          {user.role === "provider" && (
-            <Link
-              href="/panel"
-              onClick={handleNavigate}
-              className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
-            >
-              İşletme Paneli
-            </Link>
-          )}
-
           {user.role === "admin" && (
             <Link
               href="/admin"
@@ -108,6 +98,15 @@ export function AuthMenu({
             <NotificationBell />
           </div>
 
+          {user.role === "provider" ? (
+            <Link
+              href="/panel"
+              onClick={handleNavigate}
+              className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted"
+            >
+              {user.displayName}
+            </Link>
+          ) : (
           <div ref={accountMenuRef}>
             <button
               type="button"
@@ -160,6 +159,8 @@ export function AuthMenu({
             )}
           </div>
 
+          )}
+
           <button
             type="button"
             onClick={handleLogout}
@@ -173,19 +174,10 @@ export function AuthMenu({
 
     return (
       <div className="flex items-center gap-2">
-        {user.role === "provider" && (
-          <Link
-            href="/panel"
-            className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            İşletme Paneli
-          </Link>
-        )}
-
         {user.role === "admin" && (
           <Link
             href="/admin"
-            className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+            className="whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
           >
             <span className="relative inline-block">
               Yönetim Paneli
@@ -199,6 +191,14 @@ export function AuthMenu({
         <MessageBell />
         <NotificationBell />
 
+        {user.role === "provider" ? (
+          <Link
+            href="/panel"
+            className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            {user.displayName}
+          </Link>
+        ) : (
         <div ref={accountMenuRef} className="relative">
           <button
             type="button"
@@ -251,6 +251,8 @@ export function AuthMenu({
           )}
         </div>
 
+        )}
+
         <button
           type="button"
           onClick={handleLogout}
@@ -288,7 +290,7 @@ export function AuthMenu({
     <div className="flex items-center gap-2">
       <Link
         href="/giris"
-        className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+        className="whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
       >
         Giriş Yap
       </Link>

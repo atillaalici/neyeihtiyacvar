@@ -543,3 +543,21 @@
   }
 }
 /* NIYV MOBILE COMPACT END */
+
+/* NIYV HOME SECTION SPACING 12PX */
+.home-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-page > section {
+  padding-block: 0;
+}
+
+@media (max-width: 700px) {
+  .home-page > section {
+    padding-block: 0;
+  }
+}
+/* NIYV HOME SECTION SPACING END */

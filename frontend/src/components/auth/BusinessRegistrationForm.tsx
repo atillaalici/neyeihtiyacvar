@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { TaxonomyV3Picker } from "@/components/auth/TaxonomyV3Picker";
+import { CategoryABCSelector, type ABCSelection } from "@/components/auth/CategoryABCSelector";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,8 @@ type BusinessRegistrationDraft = {
   additionalServiceSlug?: string | null;
   additionalCategorySlug?: string | null;
   additionalServiceSelections?: Array<{ categorySlug: string; serviceSlug: string }>;
+  categoryServiceIds?: string[];
+  categoryLibraryWorkIds?: string[];
 };
 type BusinessRegisterResponse = AuthResponse & {
   applicationId: string | null;
@@ -132,6 +134,10 @@ export function BusinessRegistrationForm({
   const [serviceSlug, setServiceSlug] = useState("");
   const [additionalCategorySlug, setAdditionalCategorySlug] = useState("");
   const [additionalServiceSlug, setAdditionalServiceSlug] = useState("");
+  const [abcSelection, setAbcSelection] = useState<ABCSelection>({
+    categoryServiceIds: [],
+    categoryLibraryWorkIds: [],
+  });
   const [extraServices, setExtraServices] = useState<
     Array<{ categorySlug: string; serviceSlug: string }>
   >([]);
@@ -255,6 +261,14 @@ export function BusinessRegistrationForm({
         draft?.additionalServiceSlug?.trim() ||
         firstSavedAdditional?.serviceSlug?.trim() ||
         "",
+      );
+      setAbcSelection((current) =>
+        current.categoryServiceIds.length || current.categoryLibraryWorkIds.length
+          ? current
+          : {
+              categoryServiceIds: draft?.categoryServiceIds ?? [],
+              categoryLibraryWorkIds: draft?.categoryLibraryWorkIds ?? [],
+            },
       );
       setExtraServices((current) =>
         current.length > 0
@@ -499,8 +513,8 @@ export function BusinessRegistrationForm({
       !phoneDigits.startsWith("5") ||
       !citySlug ||
       !districtSlug ||
-      !categorySlug ||
-      !serviceSlug ||
+      abcSelection.categoryServiceIds.length === 0 ||
+      abcSelection.categoryLibraryWorkIds.length === 0 ||
       !businessTermsAccepted ||
       !termsAccepted ||
       (!existingAccountMode &&
@@ -583,6 +597,9 @@ export function BusinessRegistrationForm({
               additionalCategorySlug || null,
             additionalServiceSlug:
               additionalServiceSlug || null,
+            categoryServiceIds: abcSelection.categoryServiceIds,
+            categoryLibraryWorkIds: abcSelection.categoryLibraryWorkIds,
+            planCode: selectedPlanCode,
             password:
               existingAccountMode
                 ? null
@@ -631,6 +648,8 @@ export function BusinessRegistrationForm({
           longitude: mapLongitude,
           categorySlug,
           serviceSlug,
+          categoryServiceIds: abcSelection.categoryServiceIds,
+          categoryLibraryWorkIds: abcSelection.categoryLibraryWorkIds,
           additionalServiceSelections:
             allAdditionalSelections
               .filter(
@@ -1053,41 +1072,6 @@ export function BusinessRegistrationForm({
                 </label>
               </div>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-800">
-                  Açık Adres
-                </span>
-                <textarea
-                  value={mapAddress}
-                  onChange={(event) => setMapAddress(event.target.value)}
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Mahalle, cadde/sokak, bina no ve diğer adres bilgileri"
-                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-                />
-                <span className="mt-1 block text-xs text-slate-500">
-                  Haritadan konum seçtiğinizde adres otomatik doldurulur; isterseniz elle düzenleyebilirsiniz.
-                </span>
-              </label>
-
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                <BusinessLocationMap
-                  latitude={mapLatitude}
-                  longitude={mapLongitude}
-                  cityName={selectedCity?.name}
-                  districtName={districtOptions.find((item) => item.slug === districtSlug)?.name}
-                  onChange={({ latitude, longitude, address, city, district, districtCandidates }) => {
-                    setMapLatitude(latitude);
-                    setMapLongitude(longitude);
-                    if (address) setMapAddress(address);
-                    applyMapAdministrativeArea(city, district, districtCandidates);
-                  }}
-                />
-              </div>
-
-              <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-3 py-3 text-xs leading-5 text-slate-600">
-                Haritada bir noktaya dokunabilir veya işaretçiyi sürükleyebilirsiniz. Telefonda “Mevcut Konumumu Kullan” seçeneğiyle GPS konumunuz alınabilir.
-              </div>
             </div>
           </section>
 <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/20 p-3">
@@ -1159,8 +1143,21 @@ export function BusinessRegistrationForm({
     "h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary/15";
   if (wizardStep === 3) {
     const goNextFromStep3 = () => {
-      if (!citySlug || !districtSlug || !categorySlug || !serviceSlug) {
-        setError("İl, ilçe, kategori ve ana hizmet alanlarını seçin.");
+      if (!citySlug || !districtSlug) {
+        setError("İl ve ilçe alanlarını seçin.");
+        return;
+      }
+
+      if (
+        abcSelection.categoryServiceIds.length === 0 ||
+        abcSelection.categoryLibraryWorkIds.length === 0
+      ) {
+        setError("En az bir B hizmet grubu ve bu gruba ait bir C işi seçin.");
+        return;
+      }
+
+      if (abcSelection.categoryServiceIds.length > planServiceLimit) {
+        setError("Seçilen hizmet grubu sayısı paket hakkınızı aşıyor.");
         return;
       }
 
@@ -1234,76 +1231,27 @@ export function BusinessRegistrationForm({
             </Select>
           </div>
 
-          <div className="sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
-  <div className="mb-3">
-    <div className="text-sm font-semibold">
-      İşletmenin ana hizmetini seç
-    </div>
+        </div>
 
-    <div className="mt-1 text-xs text-muted-foreground">
-      Ana Alan → Hizmet Grubu → Hizmet → Alt Uzmanlık
-    </div>
-  </div>
-
-  <TaxonomyV3Picker
-    initialCategorySlug={categorySlug}
-    initialServiceSlug={serviceSlug}
-    onChange={(selection) => {
-      setCategorySlug(
-        selection?.legacyCategorySlug ?? "",
-      );
-
-      setServiceSlug(
-        selection?.legacyServiceSlug ?? "",
-      );
-
-      setAdditionalCategorySlug("");
-      setAdditionalServiceSlug("");
-    }}
-  />
-</div>
-<div className="sm:col-span-2 rounded-2xl border border-border bg-muted/20 p-4">
-  <div className="mb-3">
-    <div className="text-sm font-bold text-foreground">
-      2. Hizmet
-    </div>
-
-    <div className="mt-1 text-xs text-muted-foreground">
-      İsteğe bağlıdır. İşletmenin sunduğu ikinci hizmeti seçebilirsin.
-    </div>
-
-    <div className="mt-1 text-xs text-muted-foreground">
-      Ana Alan → Hizmet Grubu → Hizmet → Alt Uzmanlık
-    </div>
-  </div>
-
-  <TaxonomyV3Picker
-    initialCategorySlug={additionalCategorySlug}
-    initialServiceSlug={additionalServiceSlug}
-    onChange={(selection) => {
-      setAdditionalCategorySlug(
-        selection?.legacyCategorySlug ?? "",
-      );
-
-      setAdditionalServiceSlug(
-        selection?.legacyServiceSlug ?? "",
-      );
-    }}
-  />
-
-  {additionalCategorySlug || additionalServiceSlug ? (
-    <button
-      type="button"
-      onClick={() => {
-        setAdditionalCategorySlug("");
-        setAdditionalServiceSlug("");
-      }}
-      className="mt-3 text-xs font-semibold text-primary hover:underline"
-    >
-      2. Hizmeti temizle
-    </button>
-  ) : null}
-</div>
+        <div className="mt-4 rounded-2xl border border-orange-200 bg-white p-4">
+          <h3 className="text-base font-bold">
+            Yeni hizmet kütüphanesi (A → B → C)
+          </h3>
+          <p className="mt-1 mb-4 text-sm text-slate-600">
+            Hizmet gruplarınızı ve bu gruplarda yaptığınız işleri seçin.
+          </p>
+          <CategoryABCSelector
+            value={abcSelection}
+            onChange={setAbcSelection}
+            serviceLimit={planServiceLimit}
+            workLimit={
+              selectedPlanCode === "profesyonel"
+                ? null
+                : selectedPlanCode === "avantaj"
+                  ? 5
+                  : 3
+            }
+          />
         </div>
 
         {error ? (

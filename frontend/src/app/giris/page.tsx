@@ -92,8 +92,12 @@ function LoginPageContent() {
         return;
       }
 
-      saveAuth(data as AuthResponse);
-      router.push(returnUrl);
+      const auth = data as AuthResponse;
+      saveAuth(auth);
+      const destination = returnUrl === "/" && auth.user.role === "provider"
+        ? "/panel"
+        : returnUrl;
+      router.push(destination);
       router.refresh();
     } catch {
       setError("Sunucuya bağlanılamadı. Backend bağlantısını kontrol et.");

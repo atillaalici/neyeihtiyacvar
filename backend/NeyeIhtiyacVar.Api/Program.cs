@@ -161,7 +161,10 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await SeedData.InitializeAsync(dbContext);
-    await ExpandedCatalogSeeder.EnsureAsync(dbContext);
+    if (!app.Environment.IsDevelopment())
+    {
+        await ExpandedCatalogSeeder.EnsureAsync(dbContext);
+    }
 }
 
 app.MapGet("/", () => Results.Ok(new
@@ -177,6 +180,7 @@ app.MapCatalogEndpoints();
 app.MapLocationEndpoints();
 app.MapProviderEndpoints();
 app.MapFeaturedProviderEndpoints();
+app.MapEmergencyServiceEndpoints();
 app.MapRecommendationEndpoints();
 app.MapSmartSearchEndpoints();
 app.MapSearchIntentLibraryEndpoints();

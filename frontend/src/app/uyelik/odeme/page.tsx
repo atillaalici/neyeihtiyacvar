@@ -14,7 +14,7 @@ import {
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { apiBaseUrl } from "@/lib/api";
-import { getAccessToken, getStoredUser } from "@/lib/auth";
+import { getAccessToken, getStoredUser, updateStoredUser, type AuthUser } from "@/lib/auth";
 import {
   getLegalDocument,
   type LegalDocumentData,
@@ -153,6 +153,7 @@ function MembershipPaymentContent() {
   }, [searchParams]);
 
   const plan = plans[planCode];
+  const giftMode = planCode === "kobi" && first500?.available === true;
 
   const registrationNames = useMemo(() => {
     if (typeof window === "undefined") {
@@ -237,7 +238,8 @@ function MembershipPaymentContent() {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) return;
-        const data = await response.json();
+        const body = await response.text();
+        const data = body ? JSON.parse(body) : null;
         if (!cancelled && data) {
           setBilling({
             billingType: data.billingType ?? "individual",
@@ -379,7 +381,7 @@ function MembershipPaymentContent() {
       return;
     }
 
-    if (!billingSaved || billingLoading || billingSaving) {
+    if (!autoCampaign && (!billingSaved || billingLoading || billingSaving)) {
       setPromoError("Önce fatura bilgilerini kaydetmelisin.");
       return;
     }
@@ -479,11 +481,17 @@ function MembershipPaymentContent() {
         },
       );
 
-      const data = await response.json();
+      const responseBody = await response.text();
+      let data: { message?: string } | null = null;
+      try {
+        data = responseBody ? JSON.parse(responseBody) : null;
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
         setPromoError(
-          data?.message ?? "Kayıt işlemi tamamlanamadı.",
+          data?.message ?? `Kayıt işlemi tamamlanamadı (HTTP ${response.status}).`,
         );
         return;
       }
@@ -498,9 +506,28 @@ function MembershipPaymentContent() {
         "neyeihtiyacvar.appliedPromotion",
       );
 
-      router.replace(
-        "/hesabim?kayit=tamamlandi&promosyon=1",
-      );
+      const meResponse = await fetch(`${apiBaseUrl}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+
+      if (!meResponse.ok) {
+        setPromoError(
+          "İşletme kaydı tamamlandı ancak oturum güncellenemedi. Lütfen yeniden giriş yapın.",
+        );
+        return;
+      }
+
+      const meData = (await meResponse.json()) as { user?: AuthUser };
+      if (!meData.user || meData.user.role !== "provider") {
+        setPromoError(
+          "İşletme kaydı tamamlandı ancak işletme yetkisi doğrulanamadı. Lütfen yeniden giriş yapın.",
+        );
+        return;
+      }
+
+      updateStoredUser(meData.user);
+      router.replace("/panel?kayit=tamamlandi&promosyon=1");
     } catch {
       setPromoError(
         "Kayıt tamamlanırken sunucuya bağlanılamadı.",
@@ -650,6 +677,7 @@ function MembershipPaymentContent() {
         <div className="mx-auto max-w-2xl">
           <RegistrationProgress current={6} />
 
+          {!giftMode ? (
           <div className="text-center">
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
               ÜYELİK / SON ADIM
@@ -662,8 +690,10 @@ function MembershipPaymentContent() {
             </p>
           </div>
 
+          ) : null}
+
           <div className="mt-3 rounded-[22px] border border-border bg-card p-4 shadow-sm">
-            {billingOpen ? (
+            {!giftMode && billingOpen ? (
               <div className="mt-3 border-t border-border pt-3">
                 <div className="mb-3">
                   <div className="text-sm font-bold">Fatura Bilgileri</div>
@@ -951,6 +981,7 @@ function MembershipPaymentContent() {
             ) : null}
 
             
+            {!giftMode ? (
             <div className="mt-3 hidden border-t border-border pt-3">
               <label className="mb-1 block text-[13px] font-medium">
                 Promosyon kodu
@@ -1021,8 +1052,9 @@ function MembershipPaymentContent() {
                 </>
               ) : null}
             </div>
+            ) : null}
 
-            {billingSaved ? (
+            {!giftMode && billingSaved ? (
               <div className="mt-4 rounded-2xl border border-orange-200 bg-orange-50/60 p-4">
                 <div className="text-sm font-black text-slate-950">
                   Sipariş Özeti
@@ -1176,9 +1208,6 @@ function MembershipPaymentContent() {
                   onClick={() => void completeFreeRegistration(true)}
                   disabled={
                     completingRegistration ||
-                    billingLoading ||
-                    billingSaving ||
-                    !billingSaved ||
                     !legalAccepted
                   }
                   className="mt-5 w-full rounded-xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1189,13 +1218,17 @@ function MembershipPaymentContent() {
                 </button>
 
                 <p className="mt-2 text-center text-[11px] leading-5 text-slate-600">
-                  Hediyenizi kullanmak için fatura bilgilerinizi kaydedin
-                  ve yukarıdaki üyelik sözleşmesini onaylayın.
+                  Hediyenizi kullanmak için yukarıdaki üyelik sözleşmesini onaylayın.
                   Kontenjan, kayıt tamamlandığında kesinleşir.
                 </p>
               </div>
             ) : null}
 
+            {promoError && giftMode ? (
+              <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{promoError}</p>
+            ) : null}
+
+            {!giftMode ? (
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
               <button
                 type="button"
@@ -1237,6 +1270,7 @@ function MembershipPaymentContent() {
                 </button>
               )}
             </div>
+            ) : null}
           </div>
         </div>
       </section>

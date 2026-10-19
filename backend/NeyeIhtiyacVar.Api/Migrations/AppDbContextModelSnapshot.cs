@@ -946,6 +946,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<Guid?>("CategoryLibraryWorkId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("CategorySlug")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -1023,6 +1026,8 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryLibraryWorkId");
 
                     b.HasIndex("OwnerUserId");
 
@@ -1602,6 +1607,45 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.ToTable("ProviderApplications");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderCategoryLibraryWork", b =>
+                {
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryLibraryWorkId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ProviderId", "CategoryLibraryWorkId");
+
+                    b.HasIndex("CategoryLibraryWorkId");
+
+                    b.ToTable("ProviderCategoryLibraryWorks");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderEmergencyDeclaration", b =>
+                {
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DeclaredByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("WithdrawnAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ProviderId");
+
+                    b.HasIndex("DeclaredByUserId");
+
+                    b.ToTable("ProviderEmergencyDeclarations");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderInteraction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2075,6 +2119,11 @@ namespace NeyeIhtiyacVar.Api.Migrations
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedRequest", b =>
                 {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", "CategoryLibraryWork")
+                        .WithMany()
+                        .HasForeignKey("CategoryLibraryWorkId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "OwnerUser")
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
@@ -2084,6 +2133,8 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .WithMany()
                         .HasForeignKey("TargetProviderId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CategoryLibraryWork");
 
                     b.Navigation("OwnerUser");
 
@@ -2165,6 +2216,40 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("OwnerUser");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderCategoryLibraryWork", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", "CategoryLibraryWork")
+                        .WithMany()
+                        .HasForeignKey("CategoryLibraryWorkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CategoryLibraryWork");
+
+                    b.Navigation("Provider");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderEmergencyDeclaration", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("DeclaredByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", null)
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.ProviderInteraction", b =>

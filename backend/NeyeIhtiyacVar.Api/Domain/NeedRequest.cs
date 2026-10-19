@@ -12,6 +12,9 @@ public sealed class NeedRequest
     public string District { get; set; } = string.Empty;
     public string? CategorySlug { get; set; }
     public string? ServiceSlug { get; set; }
+
+    public Guid? CategoryLibraryWorkId { get; set; }
+    public CategoryLibraryWork? CategoryLibraryWork { get; set; }
     public string? CitySlug { get; set; }
     public string? DistrictSlug { get; set; }
     public Guid? TargetProviderId { get; set; }

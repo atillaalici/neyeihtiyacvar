@@ -45,7 +45,7 @@ export function Navbar() {
       <div className="section-shell flex h-16 items-center justify-between gap-4">
         <BrandLogo />
 
-        <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
+        <nav className="hidden shrink-0 items-center gap-4 whitespace-nowrap text-sm font-medium text-muted-foreground md:flex">
           <Link href="/">Ana Sayfa</Link>
           <Link href="/kesfet">Keşfet</Link>
           <Link href="/kategoriler">Kategoriler</Link>

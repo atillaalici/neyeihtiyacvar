@@ -15,18 +15,23 @@ public static class AdminCategoryLibraryEndpoints
 
         group.MapGet("/", async (AppDbContext db) =>
         {
-            var categories = await db.Categories.AsNoTracking().Where(x => x.IsActive)
-                .Include(x => x.Services).OrderBy(x => x.SortOrder).ToListAsync();
-            var works = await db.CategoryLibraryWorks.AsNoTracking().Where(x => x.IsActive)
-                .Include(x => x.Phrases).OrderBy(x => x.SortOrder).ThenBy(x => x.Name).ToListAsync();
+            var categories = await db.Categories.AsNoTracking()
+                .Include(x => x.Services).ToListAsync();
+            var works = await db.CategoryLibraryWorks.AsNoTracking()
+                .Include(x => x.Phrases).ToListAsync();
 
-            return Results.Ok(categories.Select(c => new {
-                c.Id, c.Name, c.Slug,
-                services = c.Services.Where(s => s.IsActive).OrderBy(s => s.SortOrder).Select(s => new {
-                    s.Id, s.Name,
-                    works = works.Where(w => w.CategoryServiceId == s.Id).Select(w => new {
+            var comparer = StringComparer.Create(
+                new CultureInfo("tr-TR"), ignoreCase: true);
+
+            return Results.Ok(categories.OrderBy(c => c.Name, comparer).Select(c => new {
+                c.Id, c.Name, c.Slug, c.IsActive,
+                services = c.Services.OrderBy(s => s.Name, comparer).Select(s => new {
+                    s.Id, s.Name, s.IsActive,
+                    works = works.Where(w => w.CategoryServiceId == s.Id)
+                        .OrderBy(w => w.Name, comparer).Select(w => new {
                         w.Id, w.Name, w.SortOrder, w.IsActive,
-                        phrases = w.Phrases.Where(p => p.IsActive).OrderBy(p => p.Phrase)
+                        phrases = w.Phrases.Where(p => p.IsActive)
+                            .OrderBy(p => p.Phrase, comparer)
                             .Select(p => new { p.Id, p.Phrase, p.IsActive })
                     })
                 })
@@ -103,6 +108,79 @@ public static class AdminCategoryLibraryEndpoints
             return Results.Ok(new { entity.Id, entity.Name, entity.Slug });
         });
 
+        group.MapPut("/categories/{id:guid}", async (
+            Guid id,
+            UpdateCategoryNameRequest request,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var name = (request.Name ?? string.Empty).Trim();
+
+            if (name.Length < 2 || name.Length > 120)
+                return Results.BadRequest("Ana kategori adı 2-120 karakter olmalıdır.");
+
+            var category = await db.Categories
+                .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+            if (category is null)
+                return Results.NotFound("Ana kategori bulunamadı.");
+
+            var normalized = Normalize(name);
+            var names = await db.Categories
+                .Where(x => x.Id != id && x.IsActive)
+                .Select(x => x.Name)
+                .ToListAsync(ct);
+
+            if (names.Any(x => Normalize(x) == normalized))
+                return Results.Conflict("Bu ana kategori adı zaten kullanılıyor.");
+
+            category.Name = name;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new {
+                category.Id,
+                category.Name,
+                category.Slug,
+                category.IsActive
+            });
+        });
+
+        group.MapPatch("/categories/{id:guid}/status", async (
+            Guid id,
+            UpdateCategoryStatusRequest request,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var category = await db.Categories
+                .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+            if (category is null)
+                return Results.NotFound("Ana kategori bulunamadı.");
+
+            category.IsActive = request.IsActive;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { category.Id, category.IsActive });
+        });
+
+        group.MapPatch("/services/{id:guid}/status", async (
+            Guid id,
+            UpdateCategoryStatusRequest request,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var service = await db.CategoryServices
+                .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+            if (service is null)
+                return Results.NotFound("Alt kategori bulunamadı.");
+
+            service.IsActive = request.IsActive;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new { service.Id, service.IsActive });
+        });
+
         group.MapDelete("/categories/{id:guid}", async (
             Guid id, AppDbContext dbContext, CancellationToken cancellationToken) =>
         {
@@ -145,6 +223,44 @@ public static class AdminCategoryLibraryEndpoints
             dbContext.CategoryServices.Add(entity);
             await dbContext.SaveChangesAsync(cancellationToken);
             return Results.Ok(new { entity.Id, entity.Name });
+        });
+
+        group.MapPut("/services/{id:guid}", async (
+            Guid id,
+            UpdateCategoryServiceNameRequest request,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            var name = (request.Name ?? string.Empty).Trim();
+
+            if (name.Length < 2 || name.Length > 150)
+                return Results.BadRequest("Alt kategori adı 2-150 karakter olmalıdır.");
+
+            var service = await db.CategoryServices
+                .FirstOrDefaultAsync(x => x.Id == id, ct);
+
+            if (service is null)
+                return Results.NotFound("Alt kategori bulunamadı.");
+
+            var otherNames = await db.CategoryServices
+                .Where(x => x.CategoryId == service.CategoryId && x.Id != id)
+                .Select(x => x.Name)
+                .ToListAsync(ct);
+
+            var normalized = Normalize(name);
+
+            if (otherNames.Any(x => Normalize(x) == normalized))
+                return Results.Conflict("Bu alt kategori adı zaten mevcut.");
+
+            service.Name = name;
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new {
+                service.Id,
+                service.CategoryId,
+                service.Name,
+                service.IsActive
+            });
         });
 
         group.MapDelete("/services/{id:guid}", async (
@@ -338,8 +454,12 @@ public static class AdminCategoryLibraryEndpoints
 }
 
 public sealed record CreateCategoryRequest(string Name);
+public sealed record UpdateCategoryNameRequest(string? Name);
+
 
 public sealed record CreateCategoryServiceRequest(Guid CategoryId, string Name);
+public sealed record UpdateCategoryServiceNameRequest(string? Name);
+public sealed record UpdateCategoryStatusRequest(bool IsActive);
 
 public sealed record CreateWorkRequest(Guid CategoryServiceId,string? Name,int SortOrder=0);
 public sealed record UpdateWorkRequest(string? Name,int SortOrder,bool IsActive);

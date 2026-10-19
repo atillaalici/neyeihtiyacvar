@@ -58,6 +58,82 @@ public static class BusinessRegistrationEndpoints
                 });
             }
 
+            // Yeni A-B-C hizmet secimlerinin ilk kayitta dogrulanmasi.
+            var abcGroupIds = request.CategoryServiceIds ?? [];
+            var abcWorkIds = request.CategoryLibraryWorkIds ?? [];
+
+            if (abcGroupIds.Length == 0 || abcWorkIds.Length == 0)
+                return Results.BadRequest(new
+                {
+                    message = "En az bir B hizmet grubu ve C işi seçmelisiniz."
+                });
+
+            if (abcGroupIds.Distinct().Count() != abcGroupIds.Length ||
+                abcWorkIds.Distinct().Count() != abcWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Hizmet seçimlerinde tekrarlanan kayıtlar bulunuyor."
+                });
+
+            var abcLimits = request.PlanCode?.Trim().ToLowerInvariant() switch
+            {
+                "profesyonel" => (GroupLimit: 12, WorkLimit: (int?)null),
+                "avantaj" => (GroupLimit: 5, WorkLimit: (int?)5),
+                "kobi" => (GroupLimit: 2, WorkLimit: (int?)3),
+                _ => (GroupLimit: 2, WorkLimit: (int?)3)
+            };
+
+            if (abcGroupIds.Length > abcLimits.GroupLimit)
+                return Results.BadRequest(new
+                {
+                    message = $"Paketiniz en fazla {abcLimits.GroupLimit} hizmet grubuna izin veriyor."
+                });
+
+            var abcGroups = await dbContext.CategoryServices
+                .AsNoTracking()
+                .Where(x => abcGroupIds.Contains(x.Id) &&
+                            x.IsActive &&
+                            x.Category.IsActive)
+                .CountAsync();
+
+            if (abcGroups != abcGroupIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Seçilen hizmet gruplarından biri geçerli değil."
+                });
+
+            var abcWorks = await dbContext.CategoryLibraryWorks
+                .AsNoTracking()
+                .Where(x => abcWorkIds.Contains(x.Id) &&
+                            x.IsActive &&
+                            abcGroupIds.Contains(x.CategoryServiceId))
+                .GroupBy(x => x.CategoryServiceId)
+                .Select(x => new
+                {
+                    GroupId = x.Key,
+                    Count = x.Count()
+                })
+                .ToListAsync();
+
+            if (abcWorks.Sum(x => x.Count) != abcWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Seçilen C işlerinden biri geçerli değil."
+                });
+
+            if (abcWorks.Count != abcGroupIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Her B hizmet grubu için en az bir C işi seçmelisiniz."
+                });
+
+            if (abcLimits.WorkLimit.HasValue &&
+                abcWorks.Any(x => x.Count > abcLimits.WorkLimit.Value))
+                return Results.BadRequest(new
+                {
+                    message = $"Her B grubunda en fazla {abcLimits.WorkLimit.Value} C işi seçebilirsiniz."
+                });
+
             var email = request.Email.Trim().ToLowerInvariant();
             var normalizedEmail = email.ToUpperInvariant();
             var normalizedPhone = NormalizePhone(request.PhoneNumber)!;
@@ -261,7 +337,8 @@ public static class BusinessRegistrationEndpoints
                     message = "Ücretsiz üyelik için önce e-posta adresinizi doğrulamalısınız."
                 });
 
-            if (!await dbContext.Set<BillingInformation>().AsNoTracking().AnyAsync(x => x.UserId == userId))
+            if (!string.Equals(request.PromotionCode?.Trim(), "AUTO-FIRST500", StringComparison.OrdinalIgnoreCase) &&
+                !await dbContext.Set<BillingInformation>().AsNoTracking().AnyAsync(x => x.UserId == userId))
                 return Results.BadRequest(new { message = "Önce fatura bilgilerini kaydetmelisin." });
 
             if (await dbContext.Providers.AsNoTracking().AnyAsync(x => x.OwnerUserId == userId) ||
@@ -270,8 +347,10 @@ public static class BusinessRegistrationEndpoints
 
             if (string.IsNullOrWhiteSpace(request.BusinessName) || string.IsNullOrWhiteSpace(request.ApplicantName) ||
                 string.IsNullOrWhiteSpace(request.PhoneNumber) || string.IsNullOrWhiteSpace(request.CitySlug) ||
-                string.IsNullOrWhiteSpace(request.DistrictSlug) || string.IsNullOrWhiteSpace(request.CategorySlug) ||
-                string.IsNullOrWhiteSpace(request.ServiceSlug))
+                string.IsNullOrWhiteSpace(request.DistrictSlug) ||
+                ((request.CategoryServiceIds is null || request.CategoryServiceIds.Length == 0) &&
+                 (string.IsNullOrWhiteSpace(request.CategorySlug) ||
+                  string.IsNullOrWhiteSpace(request.ServiceSlug))))
                 return Results.BadRequest(new { message = "İşletme kayıt bilgileri eksik." });
 
             if (NormalizePhone(request.PhoneNumber) is null)
@@ -350,11 +429,133 @@ public static class BusinessRegistrationEndpoints
             if (finalPrice != 0m)
                 return Results.BadRequest(new { message = "Bu işlem yalnızca son tutarı 0 TL olan promosyonlarda kullanılabilir.", finalPrice });
 
-            var category = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
-                .FirstOrDefaultAsync(x => x.Slug == request.CategorySlug.Trim() && x.IsActive);
-            if (category is null || !category.Services.Where(x => x.IsActive).Select(x => RegistrationValidationHelper.ToSlug(x.Name))
-                    .Contains(request.ServiceSlug.Trim(), StringComparer.OrdinalIgnoreCase))
-                return Results.BadRequest(new { message = "Kategori veya hizmet bilgisi geçerli değil." });
+            // Yeni A-B-C secimlerinde eski kategori/hizmet alanlarini
+            // sunucuda, secilen ilk B grubundan otomatik olustur.
+            var legacyCategorySlug = request.CategorySlug?.Trim() ?? string.Empty;
+            var legacyServiceSlug = request.ServiceSlug?.Trim() ?? string.Empty;
+
+            if (request.CategoryServiceIds is { Length: > 0 })
+            {
+                var primaryGroupId = request.CategoryServiceIds[0];
+
+                var primaryGroup = await dbContext.CategoryServices
+                    .AsNoTracking()
+                    .Where(x => x.Id == primaryGroupId &&
+                                x.IsActive &&
+                                x.Category.IsActive)
+                    .Select(x => new
+                    {
+                        CategorySlug = x.Category.Slug,
+                        ServiceName = x.Name
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (primaryGroup is null)
+                    return Results.BadRequest(new { message = "Ana hizmet grubu geçerli değil." });
+
+                legacyCategorySlug = primaryGroup.CategorySlug;
+                legacyServiceSlug = RegistrationValidationHelper.ToSlug(primaryGroup.ServiceName);
+            }
+            else
+            {
+                var category = await dbContext.Categories.AsNoTracking().Include(x => x.Services)
+                    .FirstOrDefaultAsync(x => x.Slug == legacyCategorySlug && x.IsActive);
+
+                if (category is null ||
+                    !category.Services.Where(x => x.IsActive)
+                        .Select(x => RegistrationValidationHelper.ToSlug(x.Name))
+                        .Contains(legacyServiceSlug, StringComparer.OrdinalIgnoreCase))
+                    return Results.BadRequest(new { message = "Kategori veya hizmet bilgisi geçerli değil." });
+            }
+
+            // Yeni A-B-C katalog secimlerinin sunucu tarafinda dogrulanmasi.
+            var selectedGroupIds = request.CategoryServiceIds ?? [];
+            var selectedWorkIds = request.CategoryLibraryWorkIds ?? [];
+            var hasNewSelections =
+                request.CategoryServiceIds is not null ||
+                request.CategoryLibraryWorkIds is not null;
+
+            if (hasNewSelections)
+            {
+                if (selectedGroupIds.Length == 0 || selectedWorkIds.Length == 0)
+                    return Results.BadRequest(new
+                    {
+                        message = "En az bir hizmet grubu ve bu gruba bağlı bir iş seçmelisiniz."
+                    });
+
+                if (selectedGroupIds.Distinct().Count() != selectedGroupIds.Length ||
+                    selectedWorkIds.Distinct().Count() != selectedWorkIds.Length)
+                    return Results.BadRequest(new
+                    {
+                        message = "Hizmet seçimlerinde tekrarlanan kayıtlar bulunuyor."
+                    });
+
+                if (selectedGroupIds.Length > plan.ServiceLimit)
+                    return Results.BadRequest(new
+                    {
+                        message = $"Paketiniz en fazla {plan.ServiceLimit} hizmet grubuna izin veriyor."
+                    });
+
+                var validGroups = await dbContext.CategoryServices
+                    .AsNoTracking()
+                    .Where(x => selectedGroupIds.Contains(x.Id) &&
+                                x.IsActive &&
+                                x.Category.IsActive)
+                    .CountAsync();
+
+                if (validGroups != selectedGroupIds.Length)
+                    return Results.BadRequest(new
+                    {
+                        message = "Seçilen hizmet gruplarından biri geçerli değil."
+                    });
+
+                var validWorks = await dbContext.CategoryLibraryWorks
+                    .AsNoTracking()
+                    .Where(x => selectedWorkIds.Contains(x.Id) &&
+                                x.IsActive &&
+                                selectedGroupIds.Contains(x.CategoryServiceId))
+                    .CountAsync();
+
+                if (validWorks != selectedWorkIds.Length)
+                    return Results.BadRequest(new
+                    {
+                        message = "Seçilen işlerden biri hizmet gruplarınızla eşleşmiyor."
+                    });
+
+                // Her B grubunun kendi C secim limiti vardir.
+                // Profesyonel pakette C secimi sinirsizdir.
+                int? workLimit = plan.ServiceLimit switch
+                {
+                    2 => 3,
+                    5 => 5,
+                    12 => null,
+                    _ => 3
+                };
+
+                var workCounts = await dbContext.CategoryLibraryWorks
+                    .AsNoTracking()
+                    .Where(x => selectedWorkIds.Contains(x.Id))
+                    .GroupBy(x => x.CategoryServiceId)
+                    .Select(x => new
+                    {
+                        GroupId = x.Key,
+                        Count = x.Count()
+                    })
+                    .ToListAsync();
+
+                if (workCounts.Count != selectedGroupIds.Length)
+                    return Results.BadRequest(new
+                    {
+                        message = "Her hizmet grubu için en az bir iş seçmelisiniz."
+                    });
+
+                if (workLimit.HasValue &&
+                    workCounts.Any(x => x.Count > workLimit.Value))
+                    return Results.BadRequest(new
+                    {
+                        message = $"Her hizmet grubunda en fazla {workLimit.Value} iş seçebilirsiniz."
+                    });
+            }
 
             var city = await dbContext.Cities.AsNoTracking().Include(x => x.Districts)
                 .FirstOrDefaultAsync(x => x.Slug == request.CitySlug.Trim() && x.IsActive);
@@ -364,7 +565,7 @@ public static class BusinessRegistrationEndpoints
             var application = new ProviderApplication
             {
                 OwnerUserId = userId, BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
-                CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
+                CategorySlug = legacyCategorySlug, ServiceSlug = legacyServiceSlug,
                 CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
                 PublicAddress = request.PublicAddress?.Trim(),
                 Latitude = request.Latitude, Longitude = request.Longitude,
@@ -379,7 +580,7 @@ public static class BusinessRegistrationEndpoints
                 SourceApplicationId = application.Id, OwnerUserId = userId,
                 Slug = $"{RegistrationValidationHelper.ToSlug(request.BusinessName)}-{Guid.NewGuid().ToString("N")[..8]}",
                 BusinessName = request.BusinessName.Trim(), ShortDescription = string.Empty,
-                CategorySlug = request.CategorySlug.Trim(), ServiceSlug = request.ServiceSlug.Trim(),
+                CategorySlug = legacyCategorySlug, ServiceSlug = legacyServiceSlug,
                 AdditionalServices = string.IsNullOrWhiteSpace(request.AdditionalServiceSlug) ? [] : [request.AdditionalServiceSlug.Trim()],
                 CitySlug = request.CitySlug.Trim(), DistrictSlug = request.DistrictSlug.Trim(),
                 PublicAddress = request.PublicAddress?.Trim(),
@@ -389,6 +590,17 @@ public static class BusinessRegistrationEndpoints
                 CreatedAtUtc = now, UpdatedAtUtc = now
             };
             dbContext.Providers.Add(provider);
+
+            if (hasNewSelections)
+            {
+                dbContext.ProviderCategoryLibraryWorks.AddRange(
+                    selectedWorkIds.Select(workId =>
+                        new ProviderCategoryLibraryWork
+                        {
+                            ProviderId = provider.Id,
+                            CategoryLibraryWorkId = workId
+                        }));
+            }
 
             var membership = new ProviderMembership
             {
@@ -521,19 +733,24 @@ public static class BusinessRegistrationEndpoints
             100,
             "İlçe");
 
-        Required(
-            errors,
-            "categorySlug",
-            request.CategorySlug,
-            100,
-            "Ana kategori");
+        // Yeni A-B-C secimlerinde eski kategori alanlari zorunlu degildir.
+        if (request.CategoryServiceIds is not { Length: > 0 })
+        {
+            Required(
+                errors,
+                "categorySlug",
+                request.CategorySlug,
+                100,
+                "Ana kategori");
 
-        Required(
-            errors,
-            "serviceSlug",
-            request.ServiceSlug,
-            150,
-            "Ana hizmet");
+            Required(
+                errors,
+                "serviceSlug",
+                request.ServiceSlug,
+                150,
+                "Ana hizmet");
+
+        }
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
@@ -573,6 +790,8 @@ public static class BusinessRegistrationEndpoints
             return errors;
         }
 
+        if (request.CategoryServiceIds is not { Length: > 0 })
+        {
         var category =
             await dbContext.Categories
                 .AsNoTracking()
@@ -657,6 +876,8 @@ public static class BusinessRegistrationEndpoints
                         ["Ek hizmet ana hizmet ile aynı olamaz."];
                 }
             }
+        }
+
         }
 
         var city =
@@ -814,7 +1035,9 @@ public sealed record CompleteFreeBusinessRegistrationRequest(
     bool LegalAccepted,
     string? PublicAddress = null,
     double? Latitude = null,
-    double? Longitude = null);
+    double? Longitude = null,
+    Guid[]? CategoryServiceIds = null,
+    Guid[]? CategoryLibraryWorkIds = null);
 
 public sealed record BusinessRegisterRequest(
     string BusinessName,
@@ -827,4 +1050,7 @@ public sealed record BusinessRegisterRequest(
     string ServiceSlug,
     string? AdditionalCategorySlug,
     string? AdditionalServiceSlug,
-    string? Password);
+    string? Password,
+    Guid[]? CategoryServiceIds = null,
+    Guid[]? CategoryLibraryWorkIds = null,
+    string? PlanCode = null);

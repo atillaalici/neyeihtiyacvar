@@ -81,8 +81,12 @@ export function GoogleSignInButton({
             return;
           }
 
-          saveAuth(data as AuthResponse);
-          window.location.assign(returnUrl || "/");
+          const auth = data as AuthResponse;
+          saveAuth(auth);
+          const destination = (!returnUrl || returnUrl === "/") && auth.user.role === "provider"
+            ? "/panel"
+            : returnUrl || "/";
+          window.location.assign(destination);
         } catch {
           onError?.("Google ile giriş sırasında sunucuya bağlanılamadı.");
         }

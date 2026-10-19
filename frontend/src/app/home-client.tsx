@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
+import { EmergencyServicesSlider } from "@/components/site/EmergencyServicesSlider";
+import { SeasonalNeedsSlider } from "@/components/site/SeasonalNeedsSlider";
 import { ShowcaseSection } from "@/components/site/ShowcaseSection";
 import { HeroSearch } from "@/components/site/HeroSearch";
 import { HowItWorks } from "@/components/site/HowItWorks";
@@ -20,6 +22,9 @@ export function HomeClient() {
       <First500CampaignPopup />
       <div className="home-page">
         <HeroSearch />
+
+        <EmergencyServicesSlider />
+        <SeasonalNeedsSlider />
 
         <ShowcaseSection />
 
