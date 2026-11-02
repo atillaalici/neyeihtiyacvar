@@ -19,12 +19,22 @@ public sealed class NeedRequest
     public string? DistrictSlug { get; set; }
     public Guid? TargetProviderId { get; set; }
     public Provider? TargetProvider { get; set; }
+    public bool ContactPreferencesSet { get; set; }
+    public bool ShowFullName { get; set; }
     public bool ContactByPhone { get; set; } = true;
     public bool ContactByWhatsapp { get; set; }
     public bool ContactByEmail { get; set; }
+    public bool ContactBySystemMessage { get; set; }
     public bool ContactByPush { get; set; }
     public NeedStatus Status { get; set; } = NeedStatus.Open;
     public bool IsActive { get; set; } = true;
+
+    public bool DistributionEnabled { get; set; } = false;
+    public string DistributionStage { get; set; } = "District";
+    public DateTime? DistributionUpdatedAtUtc { get; set; }
+    public bool AcceptingNewOffers { get; set; } = true;
+    public DateTime? AutoClosedAtUtc { get; set; }
+
 
     // Talep ilk olusturuldugunda 7 gun boyunca takip edilir.
     // Eski kayitlarda null olabilir; endpointler CreatedAtUtc + 7 gun fallback kullanir.

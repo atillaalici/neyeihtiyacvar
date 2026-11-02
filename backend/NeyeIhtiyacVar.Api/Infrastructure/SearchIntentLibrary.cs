@@ -20,7 +20,8 @@ public sealed record SearchIntentSuggestion(
     string ServiceSlug,
     string Intent,
     int Score,
-    string MatchReason);
+    string MatchReason,
+    string? ServiceGroupName = null);
 
 public static class SearchIntentLibrary
 {

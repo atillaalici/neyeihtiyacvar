@@ -142,11 +142,17 @@ public static class MessagingEndpoints
                     x.LastMessageAtUtc,
 
                     lastMessage = x.Messages
+                        .Where(m =>
+                            (m.SenderUserId == userId
+                                ? m.DeletedForSenderAtUtc == null
+                                : m.DeletedForRecipientAtUtc == null))
                         .OrderByDescending(m => m.CreatedAtUtc)
                         .Select(m => new
                         {
                             m.Id,
-                            m.Body,
+                            Body = m.DeletedForEveryoneAtUtc != null
+                                ? "Bu mesaj silindi"
+                                : m.Body,
                             m.SenderUserId,
                             m.CreatedAtUtc,
                             m.ReadAtUtc
@@ -155,7 +161,9 @@ public static class MessagingEndpoints
 
                     unreadCount = x.Messages.Count(m =>
                         m.SenderUserId != userId &&
-                        m.ReadAtUtc == null)
+                        m.ReadAtUtc == null &&
+                        m.DeletedForRecipientAtUtc == null &&
+                        m.DeletedForEveryoneAtUtc == null)
                 })
                 .ToListAsync();
 
@@ -188,7 +196,11 @@ public static class MessagingEndpoints
 
             var messages = await dbContext.Messages
                 .AsNoTracking()
-                .Where(x => x.ConversationId == conversationId)
+                .Where(x =>
+                    x.ConversationId == conversationId &&
+                    (x.SenderUserId == userId
+                        ? x.DeletedForSenderAtUtc == null
+                        : x.DeletedForRecipientAtUtc == null))
                 .OrderBy(x => x.CreatedAtUtc)
                 .Select(x => new
                 {
@@ -196,7 +208,10 @@ public static class MessagingEndpoints
                     x.ConversationId,
                     x.SenderUserId,
                     senderName = x.SenderUser.DisplayName,
-                    x.Body,
+                    Body = x.DeletedForEveryoneAtUtc != null
+                        ? "Bu mesaj silindi"
+                        : x.Body,
+                    isDeletedForEveryone = x.DeletedForEveryoneAtUtc != null,
                     x.CreatedAtUtc,
                     x.ReadAtUtc
                 })
@@ -324,7 +339,9 @@ public static class MessagingEndpoints
                 .Where(x =>
                     x.ConversationId == conversationId &&
                     x.SenderUserId != userId &&
-                    x.ReadAtUtc == null)
+                    x.ReadAtUtc == null &&
+                    x.DeletedForRecipientAtUtc == null &&
+                    x.DeletedForEveryoneAtUtc == null)
                 .ToListAsync();
 
             foreach (var message in unreadMessages)
@@ -364,6 +381,8 @@ public static class MessagingEndpoints
                 .Where(m =>
                     m.SenderUserId != userId &&
                     m.ReadAtUtc == null &&
+                    m.DeletedForRecipientAtUtc == null &&
+                    m.DeletedForEveryoneAtUtc == null &&
                     (
                         m.Conversation.UserId == userId ||
                         (ownedProviderId.HasValue &&
@@ -371,11 +390,88 @@ public static class MessagingEndpoints
                     ))
                 .CountAsync();
 
+            var needCount = await dbContext.NeedConversations
+                .AsNoTracking()
+                .Where(x =>
+                    x.NeedRequest.OwnerUserId == userId ||
+                    x.Provider.OwnerUserId == userId)
+                .SelectMany(x => x.Messages)
+                .CountAsync(m =>
+                    m.SenderUserId != userId &&
+                    m.ReadAtUtc == null &&
+                    m.DeletedForRecipientAtUtc == null &&
+                    m.DeletedForEveryoneAtUtc == null);
+
             return Results.Ok(new
             {
-                unreadCount = count
+                unreadCount = count + needCount
             });
         });
+
+
+        // Mesajı yalnızca kendimden veya herkesten sil.
+        group.MapPost(
+            "/conversations/{conversationId:guid}/messages/{messageId:guid}/delete",
+            async (
+                Guid conversationId,
+                Guid messageId,
+                DeleteMessageRequest request,
+                ClaimsPrincipal principal,
+                AppDbContext dbContext) =>
+            {
+                if (!TryGetUserId(principal, out var userId))
+                    return Results.Unauthorized();
+
+                var conversation = await GetConversationAccessAsync(
+                    conversationId, userId, dbContext);
+
+                if (conversation is null)
+                    return Results.NotFound();
+
+                var message = await dbContext.Messages
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == messageId &&
+                        x.ConversationId == conversationId);
+
+                if (message is null)
+                    return Results.NotFound();
+
+                if (message.DeletedForEveryoneAtUtc != null)
+                    return Results.Conflict(new {
+                        message = "Bu mesaj zaten herkesten silinmiş."
+                    });
+
+                var now = DateTime.UtcNow;
+
+                if (request.Scope == "me")
+                {
+                    if (message.SenderUserId == userId)
+                        message.DeletedForSenderAtUtc ??= now;
+                    else
+                        message.DeletedForRecipientAtUtc ??= now;
+                }
+                else if (request.Scope == "everyone")
+                {
+                    if (message.SenderUserId != userId)
+                        return Results.Forbid();
+
+                    message.DeletedForEveryoneAtUtc ??= now;
+                    message.Body = string.Empty;
+                }
+                else
+                {
+                    return Results.BadRequest(new {
+                        message = "Geçersiz silme seçeneği."
+                    });
+                }
+
+                await dbContext.SaveChangesAsync();
+
+                return Results.Ok(new {
+                    success = true,
+                    scope = request.Scope
+                });
+            });
 
         return app;
     }
@@ -410,6 +506,8 @@ public static class MessagingEndpoints
 
     public sealed record StartConversationRequest(
         string ProviderSlug);
+
+    public sealed record DeleteMessageRequest(string Scope);
 
     public sealed record SendMessageRequest(
         string Body);

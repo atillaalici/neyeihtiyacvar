@@ -6,9 +6,34 @@ import { Menu, X } from "lucide-react";
 
 import { BrandLogo } from "@/components/site/BrandLogo";
 import { AuthMenu } from "@/components/site/AuthMenu";
+import { NotificationBell } from "@/components/site/NotificationBell";
+import { getStoredUser } from "@/lib/auth";
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileAuthenticated, setMobileAuthenticated] = useState(false);
+  const [showBusinessRegistration, setShowBusinessRegistration] = useState(false);
+
+  useEffect(() => {
+    function updateBusinessRegistrationVisibility() {
+      const user = getStoredUser();
+      setMobileAuthenticated(Boolean(user));
+      setShowBusinessRegistration(
+        !user || (user.role !== "provider" && user.role !== "admin")
+      );
+    }
+
+    updateBusinessRegistrationVisibility();
+    window.addEventListener("storage", updateBusinessRegistrationVisibility);
+    window.addEventListener("focus", updateBusinessRegistrationVisibility);
+    window.addEventListener("auth-changed", updateBusinessRegistrationVisibility);
+
+    return () => {
+      window.removeEventListener("storage", updateBusinessRegistrationVisibility);
+      window.removeEventListener("focus", updateBusinessRegistrationVisibility);
+      window.removeEventListener("auth-changed", updateBusinessRegistrationVisibility);
+    };
+  }, []);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -41,7 +66,7 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur responsive-site-navbar">
+    <header className="sticky top-0 z-[70] border-b border-border bg-background/95 backdrop-blur responsive-site-navbar">
       <div className="section-shell flex h-16 items-center justify-between gap-4">
         <BrandLogo />
 
@@ -55,15 +80,27 @@ export function Navbar() {
         <div className="hidden items-center gap-2 md:flex">
           <AuthMenu />
 
+{showBusinessRegistration && (
           <Link
-            href="/ihtiyac-olustur"
+            href="/kayit?hesap=isletme"
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            İhtiyaç Oluştur
+            İşletme Ol
           </Link>
+          )}
         </div>
 
-        <div ref={mobileMenuRef} className="relative md:hidden">
+        <div className="flex shrink-0 items-center gap-2 md:hidden">
+          <Link
+            href="/kayit?hesap=isletme"
+            className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            İşletme Ol
+          </Link>
+
+          {mobileAuthenticated && <NotificationBell />}
+
+          <div ref={mobileMenuRef} className="relative">
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
@@ -120,16 +157,11 @@ export function Navbar() {
                   onNavigate={closeMobileMenu}
                 />
 
-                <Link
-                  href="/ihtiyac-olustur"
-                  onClick={closeMobileMenu}
-                  className="mt-2 block rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  İhtiyaç Oluştur
-                </Link>
+
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </header>

@@ -22,7 +22,8 @@ public interface IEmailSender
     Task<EmailSendResult> SendOperationalMessageAsync(
         string toEmail, string displayName, string subject,
         string heading, string message,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? customHtml = null);
 }
 
 public sealed record EmailSendResult(
@@ -123,7 +124,8 @@ public sealed class ResendEmailSender : IEmailSender
     public async Task<EmailSendResult> SendOperationalMessageAsync(
         string toEmail, string displayName, string subject,
         string heading, string message,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? customHtml = null)
     {
         var apiKey = _configuration["Email:ResendApiKey"];
         var fromAddress = _configuration["Email:FromAddress"];
@@ -133,7 +135,7 @@ public sealed class ResendEmailSender : IEmailSender
         var safeName = HtmlEncoder.Default.Encode(string.IsNullOrWhiteSpace(displayName) ? "Değerli kullanıcımız" : displayName.Trim());
         var safeHeading = HtmlEncoder.Default.Encode(heading);
         var safeMessage = HtmlEncoder.Default.Encode(message);
-        var html = $"<html><body style='font-family:Arial'><h2>Neye İhtiyaç Var?</h2><h1>{safeHeading}</h1><p>Merhaba {safeName},</p><p>{safeMessage}</p><p>Bu e-posta hesabınızla ilgili operasyonel bir bilgilendirmedir.</p></body></html>";
+        var html = customHtml ?? $"<html><body style='font-family:Arial'><h2>Neye İhtiyaç Var?</h2><h1>{safeHeading}</h1><p>Merhaba {safeName},</p><p>{safeMessage}</p><p>Bu e-posta hesabınızla ilgili operasyonel bir bilgilendirmedir.</p></body></html>";
         using var request = new HttpRequestMessage(HttpMethod.Post, "emails");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = JsonContent.Create(new { from = $"{fromName} <{fromAddress}>", to = new[] { toEmail }, subject, html, text = $"Merhaba {displayName}\\n\\n{message}\\n\\nNeye İhtiyaç Var?" });

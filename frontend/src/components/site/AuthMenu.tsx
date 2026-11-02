@@ -95,7 +95,6 @@ export function AuthMenu({
 
           <div className="flex items-center gap-1 px-2 py-1">
             <MessageBell />
-            <NotificationBell />
           </div>
 
           {user.role === "provider" ? (
@@ -107,57 +106,13 @@ export function AuthMenu({
               {user.displayName}
             </Link>
           ) : (
-          <div ref={accountMenuRef}>
-            <button
-              type="button"
-              onClick={() => setAccountMenuOpen((open) => !open)}
-              className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted"
-              aria-haspopup="menu"
-              aria-expanded={accountMenuOpen}
-            >
-              <span>{user.displayName}</span>
-              <ChevronDown
-                className={`size-4 transition-transform ${
-                  accountMenuOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {accountMenuOpen && (
-              <div
-                className="mx-2 mb-1 grid rounded-xl border border-border bg-muted/30 p-1"
-                role="menu"
-              >
-                <Link
-                  href="/hesabim"
-                  onClick={handleNavigate}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-background"
-                  role="menuitem"
-                >
-                  Hesabım
-                </Link>
-
-                <Link
-                  href="/taleplerim"
-                  onClick={handleNavigate}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-background"
-                  role="menuitem"
-                >
-                  Taleplerim
-                </Link>
-
-                <div
-                  className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm text-muted-foreground opacity-70"
-                  title="Favoriler özelliği yakında"
-                >
-                  <span>Favorilerim</span>
-                  <span className="text-[10px] font-semibold uppercase">
-                    Yakında
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+          <Link
+            href={user.role === "admin" ? "/panel" : "/taleplerim"}
+            onClick={handleNavigate}
+            className="flex w-full items-center rounded-xl px-4 py-3 text-left text-sm font-medium transition-colors hover:bg-muted"
+          >
+            {user.displayName}
+          </Link>
 
           )}
 
@@ -199,64 +154,19 @@ export function AuthMenu({
             {user.displayName}
           </Link>
         ) : (
-        <div ref={accountMenuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setAccountMenuOpen((open) => !open)}
-            className="flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-            aria-haspopup="menu"
-            aria-expanded={accountMenuOpen}
-          >
-            <span>{user.displayName}</span>
-            <ChevronDown
-              className={`size-4 transition-transform ${
-                accountMenuOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {accountMenuOpen && (
-            <div
-              className="absolute right-0 top-full z-[100] mt-2 w-48 overflow-hidden rounded-xl border border-border bg-background p-1.5 shadow-xl"
-              role="menu"
-            >
-              <Link
-                href="/hesabim"
-                onClick={() => setAccountMenuOpen(false)}
-                className="block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-                role="menuitem"
-              >
-                Hesabım
-              </Link>
-
-              <Link
-                href="/taleplerim"
-                onClick={() => setAccountMenuOpen(false)}
-                className="block rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-                role="menuitem"
-              >
-                Taleplerim
-              </Link>
-
-              <div
-                className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2.5 text-sm text-muted-foreground opacity-70"
-                title="Favoriler özelliği yakında"
-              >
-                <span>Favorilerim</span>
-                <span className="text-[10px] font-semibold uppercase">
-                  Yakında
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        <Link
+          href={user.role === "admin" ? "/panel" : "/taleplerim"}
+          className="rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+        >
+          {user.displayName}
+        </Link>
 
         )}
 
         <button
           type="button"
           onClick={handleLogout}
-          className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          className="min-w-[110px] rounded-md bg-orange-600 px-5 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-orange-700"
         >
           Çıkış
         </button>
@@ -275,13 +185,7 @@ export function AuthMenu({
           Giriş Yap
         </Link>
 
-        <Link
-          href="/kayit"
-          onClick={onNavigate}
-          className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-muted"
-        >
-          Kayıt Ol
-        </Link>
+
       </div>
     );
   }
@@ -295,12 +199,7 @@ export function AuthMenu({
         Giriş Yap
       </Link>
 
-      <Link
-        href="/kayit"
-        className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-      >
-        Kayıt Ol
-      </Link>
+
     </div>
   );
 }

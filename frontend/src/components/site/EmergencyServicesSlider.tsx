@@ -185,7 +185,7 @@ export function EmergencyServicesSlider() {
             <div className="p-3">
               <h3 className="font-bold text-sm">{p.businessName}</h3>
               <p className="text-xs">{p.serviceSlug.replaceAll("-", " ")}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{p.districtSlug} / {p.citySlug}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{p.districtSlug.charAt(0).toLocaleUpperCase("tr-TR") + p.districtSlug.slice(1)} / {p.citySlug.charAt(0).toLocaleUpperCase("tr-TR") + p.citySlug.slice(1)}</p>
             </div>
           </article>)}
           </div>

@@ -10,7 +10,11 @@ type LiveCatalogCategory = {
   id: string;
   slug: string;
   name: string;
-  services: string[];
+  services: {
+    id: string;
+    name: string;
+    works: { id: string; name: string }[];
+  }[];
 };
 
 type PublicProvider = {
@@ -27,80 +31,12 @@ type CategoryPresentation = {
   description: string;
 };
 
-const presentation: Record<string, CategoryPresentation> = {
-  "usta-tamir": {
-    image: "/vitrin/usta-tamir.png",
-    description: "Ev ve iş yerindeki tamir, bakım ve usta ihtiyaçların için doğru hizmeti seç.",
-  },
-  "ev-yasam": {
-    image: "/vitrin/ev-yasam.png",
-    description: "Evini daha konforlu ve düzenli hale getirecek hizmetleri keşfet.",
-  },
-  otomotiv: {
-    image: "/vitrin/otomotiv.png",
-    description: "Aracın için bakım, tamir ve teknik servis hizmetlerini keşfet.",
-  },
-  "nakliye-ve-hafriyat": {
-    image: "/vitrin/nakliye-hafriyat-v2.png",
-    description: "Nakliye, taşıma ve hafriyat ihtiyaçların için uygun hizmeti bul.",
-  },
-  "teknoloji-yazilim": {
-    image: "/vitrin/teknoloji.png",
-    description: "Teknoloji, bilgisayar, telefon ve yazılım ihtiyaçların için doğru hizmeti bul.",
-  },
-  organizasyon: {
-    image: "/vitrin/organizasyon.png",
-    description: "Özel günlerin ve etkinliklerin için ihtiyaç duyduğun hizmetleri bul.",
-  },
-  egitim: {
-    image: "/vitrin/egitim.png",
-    description: "Eğitim, özel ders ve gelişim ihtiyaçların için doğru hizmeti bul.",
-  },
-  "saglik-bakim": {
-    image: "/vitrin/saglik-bakim.png",
-    description: "Sağlık ve bakım alanındaki hizmetleri tek noktadan keşfet.",
-  },
-  "guzellik-kisisel-bakim": {
-    image: "/vitrin/guzellik-kisisel-bakim.png",
-    description: "Güzellik ve kişisel bakım ihtiyaçların için uygun hizmetleri keşfet.",
-  },
-  "yeme-icme": {
-    image: "/vitrin/yeme-icme.png",
-    description: "Yeme, içme ve hazır yemek ihtiyaçların için işletmeleri keşfet.",
-  },
-  "alisveris-magazalar": {
-    image: "/vitrin/alisveris-magazalar.png",
-    description: "Aradığın ürün ve mağazaları ihtiyaçlarına göre keşfet.",
-  },
-  emlak: {
-    image: "/vitrin/emlak.png",
-    description: "Konut, arsa, tarla ve ticari gayrimenkul ihtiyaçların için doğru hizmeti bul.",
-  },
-  "insaat-yapi": {
-    image: "/vitrin/insaat-yapi.png",
-    description: "İnşaat, yapı ve proje ihtiyaçların için uygun hizmetleri keşfet.",
-  },
-  "tarim-hayvancilik": {
-    image: "/vitrin/tarim-hayvancilik.png",
-    description: "Tarım ve hayvancılık alanındaki ürün, ekipman ve hizmetleri keşfet.",
-  },
-  "turizm-konaklama": {
-    image: "/vitrin/turizm-konaklama.png",
-    description: "Konaklama, seyahat ve turizm ihtiyaçların için seçenekleri keşfet.",
-  },
-  "profesyonel-hizmetler": {
-    image: "/vitrin/profesyonel-hizmetler.png",
-    description: "İşletmen veya kişisel ihtiyaçların için profesyonel hizmetleri keşfet.",
-  },
-  "spor-fitness": {
-    image: "/vitrin/spor-fitness.png",
-    description: "Spor, fitness ve aktif yaşam ihtiyaçların için doğru hizmeti bul.",
-  },
-  digerleri: {
-    image: "/vitrin/diger.png",
-    description: "Aradığın hizmet listede yoksa ihtiyacını kendi cümlenle yaz.",
-  },
-};
+function getCategoryPresentation(slug: string): CategoryPresentation {
+  return {
+    image: `/kategori-gorselleri/${slug}.png`,
+    description: "Bu kategoriye ait alt kategorileri inceleyerek aradığın hizmete ulaş.",
+  };
+}
 
 function toServiceSlug(value: string) {
   const normalized = value
@@ -127,18 +63,14 @@ export default async function CategoryDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const categoryPresentation = presentation[slug];
-
-  if (!categoryPresentation) {
-    notFound();
-  }
+  const categoryPresentation = getCategoryPresentation(slug);
 
   let category: LiveCatalogCategory | null = null;
   let providers: PublicProvider[] = [];
 
   try {
     const [categoryResponse, providerResponse] = await Promise.all([
-      fetch(`${serverApiBaseUrl}/api/categories`, { cache: "no-store" }),
+      fetch(`${serverApiBaseUrl}/api/categories/tree`, { cache: "no-store" }),
       fetch(
         `${serverApiBaseUrl}/api/providers?kategori=${encodeURIComponent(slug)}`,
         { cache: "no-store" },
@@ -180,25 +112,27 @@ export default async function CategoryDetailPage({
     );
   }
 
-  const providerCountByService = new Map<string, number>();
+  const providerCounts = new Map<string, number>();
 
-  for (const provider of providers) {
-    const providerServices = new Set([
-      provider.serviceSlug,
-      ...(provider.additionalServices ?? []),
-    ]);
-
-    for (const serviceSlug of providerServices) {
-      if (!serviceSlug) {
-        continue;
+  await Promise.all(
+    category.services.map(async (service) => {
+      try {
+        const response = await fetch(
+          `${serverApiBaseUrl}/api/providers?categoryServiceId=${service.id}`,
+          { cache: "no-store" },
+        );
+        if (response.ok) {
+          const matches = (await response.json()) as PublicProvider[];
+          providerCounts.set(
+            service.id,
+            new Set(matches.map((provider) => provider.id)).size,
+          );
+        }
+      } catch {
+        // İşletme servisine erişilemiyorsa sayı sıfır kalır.
       }
-
-      providerCountByService.set(
-        serviceSlug,
-        (providerCountByService.get(serviceSlug) ?? 0) + 1,
-      );
-    }
-  }
+    }),
+  );
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -230,11 +164,11 @@ export default async function CategoryDetailPage({
     "@type": "ItemList",
     name: `${category.name} hizmetleri`,
     numberOfItems: category.services.length,
-    itemListElement: category.services.map((serviceName, index) => ({
+    itemListElement: category.services.map((service, index) => ({
       "@type": "ListItem",
       position: index + 1,
-      name: serviceName,
-      url: `${siteUrl}/hizmet/${toServiceSlug(serviceName)}`,
+      name: service.name,
+      url: `${siteUrl}/alt-kategori/${service.id}`,
     })),
   };
 
@@ -300,33 +234,35 @@ export default async function CategoryDetailPage({
         {category.services.length > 0 ? (
           <section className="mt-8">
             <h2 className="font-display text-2xl font-bold sm:text-3xl">
-              Bu kategoride ne arıyorsun?
+              Alt Kategoriler
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Alt kategoriyi seç; ilgili işletmeleri Keşfet ekranında listeleyelim.
+              İhtiyacına uygun alt kategoriyi seçerek hizmetleri incele.
             </p>
 
             <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              {category.services.map((serviceName) => {
-                const serviceSlug = toServiceSlug(serviceName);
-                const providerCount =
-                  providerCountByService.get(serviceSlug) ?? 0;
+              {[...category.services]
+                .sort((a, b) =>
+                  (providerCounts.get(b.id) ?? 0) -
+                    (providerCounts.get(a.id) ?? 0) ||
+                  a.name.localeCompare(b.name, "tr")
+                )
+                .map((service) => {
+                const providerCount = providerCounts.get(service.id) ?? 0;
 
                 return (
                   <Link
-                    key={serviceName}
-                    href={`/hizmet/${encodeURIComponent(serviceSlug)}`}
+                    key={service.id}
+                    href={`/alt-kategori/${service.id}`}
                     className="group flex min-h-24 items-center justify-between rounded-2xl border border-border bg-card px-4 py-4 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
                   >
                     <div className="min-w-0">
                       <h3 className="font-semibold text-foreground">
-                        {serviceName}
+                        {service.name}
                       </h3>
-                      <p className="mt-1 text-xs font-semibold text-primary">
-                        {providerCount} uygun işletme
-                      </p>
+
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Uygun işletmeleri gör
+                        {providerCount} işletme
                       </p>
                     </div>
 

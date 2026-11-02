@@ -22,13 +22,28 @@ type Props = {
   onChange: (value: ABCSelection) => void;
   serviceLimit: number;
   workLimit: number | null;
+  compact?: boolean;
+  disabledWorkIds?: string[];
 };
+
+
+function limitReachedMessage(count: number, limit: number) {
+  if (count < limit) return null;
+  return (
+    <p className="mt-2 text-xs text-amber-700">
+      Paketiniz en fazla {limit} iş seçimine izin veriyor.
+      Daha fazlası için paketinizi yükseltebilirsiniz.
+    </p>
+  );
+}
 
 export function CategoryABCSelector({
   value,
   onChange,
   serviceLimit,
   workLimit,
+  compact = false,
+  disabledWorkIds = [],
 }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +103,22 @@ export function CategoryABCSelector({
 
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (!compact || categories.length === 0) return;
+
+    const selectedId = value.categoryServiceIds[0];
+    if (!selectedId) return;
+
+    const category = categories.find((item) =>
+      item.services.some((service) => service.id === selectedId)
+    );
+
+    if (!category) return;
+
+    setActiveCategoryId(category.id);
+    setActiveServiceId(selectedId);
+  }, [compact, categories, value.categoryServiceIds]);
 
   const activeCategory = categories.find(
     (item) => item.id === activeCategoryId,
@@ -153,6 +184,11 @@ export function CategoryABCSelector({
     if (!activeService) return;
     if (!value.categoryServiceIds.includes(activeService.id)) return;
 
+    if (disabledWorkIds.includes(workId)) {
+      setError("Bu iş başka bir hizmet kartında zaten seçilmiş.");
+      return;
+    }
+
     const selected = value.categoryLibraryWorkIds.includes(workId);
 
     const selectedWorkCount = activeService.works.filter((work) =>
@@ -172,6 +208,153 @@ export function CategoryABCSelector({
         ? value.categoryLibraryWorkIds.filter((id) => id !== workId)
         : [...value.categoryLibraryWorkIds, workId],
     });
+  }
+
+
+  if (compact) {
+    const selectedCount = activeService?.works.filter((work) =>
+      value.categoryLibraryWorkIds.includes(work.id)
+    ).length ?? 0;
+
+    function selectService(category: Category, service: Service) {
+      setActiveCategoryId(category.id);
+      setActiveServiceId(service.id);
+      setSearch("");
+      setError("");
+
+      if (!value.categoryServiceIds.includes(service.id)) {
+        onChange({
+          categoryServiceIds: [service.id],
+          categoryLibraryWorkIds: [],
+        });
+      }
+    }
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Hizmet Ara</label>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Hizmet veya iş adı yazın..."
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500"
+          />
+          {search.trim().length >= 2 && (
+            <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200">
+              {searchResults.length === 0 ? (
+                <p className="p-3 text-sm text-slate-500">Sonuç bulunamadı.</p>
+              ) : (
+                searchResults.map(({ category, service }) => (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => selectService(category, service)}
+                    className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50 last:border-0"
+                  >
+                    <span className="block font-medium">{service.name}</span>
+                    <span className="text-xs text-slate-500">{category.name}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {loading && <p className="text-sm text-slate-500">Yükleniyor...</p>}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">
+            Kategori
+            <select
+              value={activeCategoryId}
+              onChange={(event) => {
+                setActiveCategoryId(event.target.value);
+                setActiveServiceId("");
+              }}
+              className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm"
+            >
+              <option value="">Kategori seçin</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm font-medium">
+            Hizmet Grubu
+            <select
+              value={activeServiceId}
+              disabled={!activeCategory}
+              onChange={(event) => {
+                const service = activeCategory?.services.find(
+                  (item) => item.id === event.target.value
+                );
+                if (activeCategory && service) {
+                  selectService(activeCategory, service);
+                } else {
+                  setActiveServiceId("");
+                }
+              }}
+              className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm disabled:opacity-50"
+            >
+              <option value="">Hizmet seçin</option>
+              {activeCategory?.services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {activeService && (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Yapılan İşler</p>
+            {activeService.works.length === 0 && (
+              <p className="text-sm text-slate-500">Bu grupta kayıtlı iş yok.</p>
+            )}
+            {activeService.works.map((work) => {
+              const checked = value.categoryLibraryWorkIds.includes(work.id);
+              const usedInAnotherCard = disabledWorkIds.includes(work.id);
+              const limitReached =
+                workLimit !== null && selectedCount >= workLimit;
+              const unavailable = usedInAnotherCard || (!checked && limitReached);
+
+              return (
+                <label
+                  key={work.id}
+                  className={`flex items-center gap-3 py-1 text-sm ${
+                    unavailable ? "cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                  title={usedInAnotherCard ? "Bu iş başka bir hizmet kartında seçilmiş." : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={unavailable}
+                    onChange={() => toggleWork(work.id)}
+                    className="h-4 w-4 accent-slate-800"
+                  />
+                  <span className={unavailable ? "text-slate-400" : ""}>
+                    {work.name}
+                    {usedInAnotherCard && (
+                      <span className="ml-2 text-xs">(Başka kartta seçili)</span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+            {workLimit !== null && limitReachedMessage(selectedCount, workLimit)}
+          </div>
+        )}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
+    );
   }
 
   return (

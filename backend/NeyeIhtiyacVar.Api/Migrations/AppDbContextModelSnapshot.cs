@@ -660,6 +660,77 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.ToTable("Districts");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.EmailOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Heading")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("NeedRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProcessingStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ToEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedRequestId", "RecipientUserId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "NextAttemptAtUtc");
+
+                    b.ToTable("EmailOutbox");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.LegalAcceptance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -920,6 +991,15 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("DeletedForEveryoneAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedForRecipientAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedForSenderAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("ReadAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -935,11 +1015,156 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.ToTable("Messages");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastMessageAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NeedRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProviderOfferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderId");
+
+                    b.HasIndex("ProviderOfferId")
+                        .IsUnique();
+
+                    b.HasIndex("NeedRequestId", "ProviderId")
+                        .IsUnique();
+
+                    b.ToTable("NeedConversations");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("AutoFinalizedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CustomerConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisputeReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime?>("DisputedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NeedRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProviderCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProviderOfferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NeedRequestId");
+
+                    b.HasIndex("ProviderId");
+
+                    b.HasIndex("ProviderOfferId")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("NeedJobs");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedForEveryoneAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedForRecipientAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedForSenderAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("NeedConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SenderUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SenderUserId");
+
+                    b.HasIndex("NeedConversationId", "CreatedAtUtc");
+
+                    b.ToTable("NeedMessages");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedRequest", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("AcceptingNewOffers")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("AutoClosedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Category")
                         .IsRequired()
@@ -971,7 +1196,13 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<bool>("ContactByPush")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ContactBySystemMessage")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("ContactByWhatsapp")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ContactPreferencesSet")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -981,6 +1212,21 @@ namespace NeyeIhtiyacVar.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("DistributionEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("DistributionStage")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("District");
+
+                    b.Property<DateTime?>("DistributionUpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("District")
                         .IsRequired()
@@ -1002,6 +1248,9 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<string>("ServiceSlug")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
+
+                    b.Property<bool>("ShowFullName")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1028,6 +1277,8 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryLibraryWorkId");
+
+                    b.HasIndex("DistributionStage");
 
                     b.HasIndex("OwnerUserId");
 
@@ -1618,6 +1869,11 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("SlotIndex")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.HasKey("ProviderId", "CategoryLibraryWorkId");
 
                     b.HasIndex("CategoryLibraryWorkId");
@@ -2117,6 +2373,78 @@ namespace NeyeIhtiyacVar.Api.Migrations
                     b.Navigation("SenderUser");
                 });
 
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedConversation", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.NeedRequest", "NeedRequest")
+                        .WithMany()
+                        .HasForeignKey("NeedRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.ProviderOffer", "ProviderOffer")
+                        .WithMany()
+                        .HasForeignKey("ProviderOfferId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("NeedRequest");
+
+                    b.Navigation("Provider");
+
+                    b.Navigation("ProviderOffer");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedJob", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.NeedRequest", "NeedRequest")
+                        .WithMany()
+                        .HasForeignKey("NeedRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.ProviderOffer", "ProviderOffer")
+                        .WithMany()
+                        .HasForeignKey("ProviderOfferId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NeedRequest");
+
+                    b.Navigation("Provider");
+
+                    b.Navigation("ProviderOffer");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedMessage", b =>
+                {
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.NeedConversation", "NeedConversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("NeedConversationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("NeyeIhtiyacVar.Api.Domain.AppUser", "SenderUser")
+                        .WithMany()
+                        .HasForeignKey("SenderUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NeedConversation");
+
+                    b.Navigation("SenderUser");
+                });
+
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedRequest", b =>
                 {
                     b.HasOne("NeyeIhtiyacVar.Api.Domain.CategoryLibraryWork", "CategoryLibraryWork")
@@ -2388,6 +2716,11 @@ namespace NeyeIhtiyacVar.Api.Migrations
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.MembershipPlan", b =>
                 {
                     b.Navigation("Memberships");
+                });
+
+            modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedConversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("NeyeIhtiyacVar.Api.Domain.NeedRequest", b =>

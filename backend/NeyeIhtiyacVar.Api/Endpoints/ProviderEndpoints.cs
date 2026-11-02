@@ -16,6 +16,8 @@ public static class ProviderEndpoints
             string? ilce,
             string? kategori,
             string? hizmet,
+            Guid? workId,
+            Guid? categoryServiceId,
             double? lat,
             double? lon,
             AppDbContext dbContext,
@@ -38,7 +40,29 @@ public static class ProviderEndpoints
                 query = query.Where(x => x.DistrictSlug == ilce.Trim());
             }
 
-            if (!string.IsNullOrWhiteSpace(hizmet))
+            if (categoryServiceId.HasValue)
+            {
+                var selectedCategoryServiceId = categoryServiceId.Value;
+
+                query = query.Where(provider =>
+                    dbContext.ProviderCategoryLibraryWorks.Any(link =>
+                        link.ProviderId == provider.Id &&
+                        link.CategoryLibraryWork.IsActive &&
+                        link.CategoryLibraryWork.CategoryServiceId ==
+                            selectedCategoryServiceId));
+            }
+
+            if (workId.HasValue)
+            {
+                var selectedWorkId = workId.Value;
+
+                query = query.Where(provider =>
+                    dbContext.ProviderCategoryLibraryWorks.Any(link =>
+                        link.ProviderId == provider.Id &&
+                        link.CategoryLibraryWorkId == selectedWorkId));
+            }
+
+            if (!workId.HasValue && !categoryServiceId.HasValue && !string.IsNullOrWhiteSpace(hizmet))
             {
                 var requestedService = hizmet.Trim().ToLowerInvariant();
 
@@ -54,7 +78,7 @@ public static class ProviderEndpoints
                     x.AdditionalServices.Any(additionalService =>
                         compatibleServices.Contains(additionalService)));
             }
-            else if (!string.IsNullOrWhiteSpace(kategori))
+            else if (!workId.HasValue && !categoryServiceId.HasValue && !string.IsNullOrWhiteSpace(kategori))
             {
                 var requestedCategory = kategori.Trim().ToLowerInvariant();
 
@@ -179,34 +203,72 @@ public static class ProviderEndpoints
                     };
                 });
 
+            var providerIds = providers.Select(x => x.Id).ToArray();
+
+            var reviewStats = await dbContext.ProviderReviews
+                .AsNoTracking()
+                .Where(x => providerIds.Contains(x.ProviderId))
+                .GroupBy(x => x.ProviderId)
+                .Select(g => new
+                {
+                    ProviderId = g.Key,
+                    ReviewCount = g.Count(),
+                    PositiveReviewCount = g.Count(x => x.Rating >= 4),
+                    AverageRating = g.Average(x => (double)x.Rating)
+                })
+                .ToDictionaryAsync(x => x.ProviderId);
+
+            var rankedResult = result.Select(x =>
+            {
+                reviewStats.TryGetValue(x.Id, out var stats);
+
+                return new
+                {
+                    Provider = x,
+                    ReviewCount = stats?.ReviewCount ?? 0,
+                    PositiveReviewCount = stats?.PositiveReviewCount ?? 0,
+                    AverageRating = stats?.AverageRating
+                };
+            });
+
             var ordered = hasValidCoordinates
-                ? result
-                    .OrderBy(x => x.distanceKm.HasValue ? 0 : 1)
-                    .ThenBy(x => x.distanceKm ?? double.MaxValue)
-                    .ThenBy(x => x.BusinessName)
-                : result
-                    .OrderByDescending(x => x.PublishedAtUtc)
-                    .ThenBy(x => x.BusinessName);
+                ? rankedResult
+                    .OrderBy(x => x.Provider.distanceKm.HasValue ? 0 : 1)
+                    .ThenBy(x => x.Provider.distanceKm ?? double.MaxValue)
+                    .ThenByDescending(x => x.ReviewCount > 0)
+                    .ThenByDescending(x => x.AverageRating ?? 0)
+                    .ThenByDescending(x => x.PositiveReviewCount)
+                    .ThenByDescending(x => x.ReviewCount)
+                    .ThenBy(x => x.Provider.BusinessName)
+                : rankedResult
+                    .OrderByDescending(x => x.ReviewCount > 0)
+                    .ThenByDescending(x => x.AverageRating ?? 0)
+                    .ThenByDescending(x => x.PositiveReviewCount)
+                    .ThenByDescending(x => x.ReviewCount)
+                    .ThenBy(x => x.Provider.BusinessName);
 
             return Results.Ok(
                 ordered.Select(x => new
                 {
-                    x.Id,
-                    x.Slug,
-                    x.BusinessName,
-                    x.ShortDescription,
-                    x.CategorySlug,
-                    x.ServiceSlug,
-                    x.AdditionalServices,
-                    x.CitySlug,
-                    x.DistrictSlug,
-                    x.PublicPhone,
-                    x.PublicWhatsapp,
-                    x.Latitude,
-                    x.Longitude,
-                    x.distanceKm,
-                    x.isVerifiedBusiness,
-                    x.publicationStatus
+                    x.Provider.Id,
+                    x.Provider.Slug,
+                    x.Provider.BusinessName,
+                    x.Provider.ShortDescription,
+                    x.Provider.CategorySlug,
+                    x.Provider.ServiceSlug,
+                    x.Provider.AdditionalServices,
+                    x.Provider.CitySlug,
+                    x.Provider.DistrictSlug,
+                    x.Provider.PublicPhone,
+                    x.Provider.PublicWhatsapp,
+                    x.Provider.Latitude,
+                    x.Provider.Longitude,
+                    x.Provider.distanceKm,
+                    x.Provider.isVerifiedBusiness,
+                    x.Provider.publicationStatus,
+                    x.ReviewCount,
+                    x.PositiveReviewCount,
+                    x.AverageRating
                 }));
         });
 

@@ -517,6 +517,278 @@ public static class ProviderPanelEndpoints
             });
         });
 
+
+        // Yeni kategori kutuphanesi: kart bazli kayitli isleri getir.
+        group.MapGet("/me/abc-services", async (
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+                return Results.Unauthorized();
+
+            var provider = await dbContext.Providers.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            var now = DateTime.UtcNow;
+            var membership = await dbContext.ProviderMemberships.AsNoTracking()
+                .Where(x => x.ProviderId == provider.Id && x.IsActive &&
+                            x.StartsAtUtc <= now &&
+                            (x.ExpiresAtUtc == null || x.ExpiresAtUtc > now))
+                .OrderByDescending(x => x.StartsAtUtc)
+                .FirstOrDefaultAsync();
+
+            var assignments = await dbContext.ProviderCategoryLibraryWorks
+                .AsNoTracking()
+                .Where(x => x.ProviderId == provider.Id)
+                .Join(dbContext.CategoryLibraryWorks.AsNoTracking(),
+                    assignment => assignment.CategoryLibraryWorkId,
+                    work => work.Id,
+                    (assignment, work) => new
+                    {
+                        assignment.SlotIndex,
+                        assignment.CategoryLibraryWorkId,
+                        work.CategoryServiceId
+                    })
+                .ToListAsync();
+
+            var slots = assignments
+                .GroupBy(x => x.SlotIndex)
+                .OrderBy(x => x.Key)
+                .Select(group => new
+                {
+                    slotIndex = group.Key,
+                    categoryServiceId = group.First().CategoryServiceId,
+                    categoryLibraryWorkIds = group
+                        .Select(x => x.CategoryLibraryWorkId)
+                        .ToArray()
+                })
+                .ToArray();
+
+            var workIds = assignments
+                .Select(x => x.CategoryLibraryWorkId)
+                .ToArray();
+
+            var groupIds = assignments
+                .Select(x => x.CategoryServiceId)
+                .Distinct()
+                .ToArray();
+
+            var serviceLimit = membership?.ServiceLimitSnapshot ?? 0;
+            int? workLimit = serviceLimit switch
+            {
+                2 => 3,
+                5 => 5,
+                12 => null,
+                _ => 3
+            };
+
+            return Results.Ok(new
+            {
+                slots,
+                categoryServiceIds = groupIds,
+                categoryLibraryWorkIds = workIds,
+                serviceLimit,
+                workLimit,
+                version = provider.Version,
+                membershipActive = membership is not null
+            });
+        });
+
+        // Yeni kategori kutuphanesi: hizmet kartlarini ayri kaydet.
+        group.MapPut("/me/abc-services", async (
+            UpdateProviderAbcServicesRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+                return Results.Unauthorized();
+
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (provider.Version != request.ExpectedVersion)
+                return Results.Conflict(new
+                {
+                    message = "Bilgiler değişmiş. Sayfayı yenileyip tekrar deneyin."
+                });
+
+            var now = DateTime.UtcNow;
+            var membership = await dbContext.ProviderMemberships.AsNoTracking()
+                .Where(x => x.ProviderId == provider.Id && x.IsActive &&
+                            x.StartsAtUtc <= now &&
+                            (x.ExpiresAtUtc == null || x.ExpiresAtUtc > now))
+                .OrderByDescending(x => x.StartsAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (membership is null)
+                return Results.BadRequest(new
+                {
+                    message = "Aktif üyelik bulunamadı."
+                });
+
+            var serviceLimit = membership.ServiceLimitSnapshot;
+            int? workLimit = serviceLimit switch
+            {
+                2 => 3,
+                5 => 5,
+                12 => null,
+                _ => 3
+            };
+
+            var slots = request.Slots;
+
+            // Eski istemcilerin gonderdigi liste bicimini de destekle.
+            if (slots is null)
+            {
+                var legacyGroups = request.CategoryServiceIds ?? [];
+                var legacyWorks = request.CategoryLibraryWorkIds ?? [];
+
+                if (legacyGroups.Distinct().Count() != legacyGroups.Length ||
+                    legacyWorks.Distinct().Count() != legacyWorks.Length)
+                    return Results.BadRequest(new
+                    {
+                        message = "Tekrarlanan hizmet veya iş seçimi var."
+                    });
+
+                var legacyWorkGroups = await dbContext.CategoryLibraryWorks
+                    .AsNoTracking()
+                    .Where(x => legacyWorks.Contains(x.Id))
+                    .Select(x => new { x.Id, x.CategoryServiceId })
+                    .ToListAsync();
+
+                slots = legacyGroups.Select((groupId, index) =>
+                    new ProviderAbcServiceSlotRequest(
+                        index,
+                        groupId,
+                        legacyWorkGroups
+                            .Where(x => x.CategoryServiceId == groupId)
+                            .Select(x => x.Id)
+                            .ToArray()
+                    )).ToArray();
+            }
+
+            if (slots.Length == 0 || slots.Length > serviceLimit)
+                return Results.BadRequest(new
+                {
+                    message = $"Paketiniz en fazla {serviceLimit} hizmet kartına izin veriyor. En az bir kart seçmelisiniz."
+                });
+
+            if (slots.Any(x =>
+                    x.SlotIndex < 0 ||
+                    x.SlotIndex >= serviceLimit ||
+                    x.CategoryLibraryWorkIds is null ||
+                    x.CategoryLibraryWorkIds.Length == 0) ||
+                slots.Select(x => x.SlotIndex).Distinct().Count() != slots.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz kart numarası veya boş hizmet kartı."
+                });
+
+            var allWorkIds = slots
+                .SelectMany(x => x.CategoryLibraryWorkIds!)
+                .ToArray();
+
+            if (allWorkIds.Distinct().Count() != allWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Aynı iş birden fazla hizmet kartında seçilemez."
+                });
+
+            if (workLimit.HasValue &&
+                slots.Any(x => x.CategoryLibraryWorkIds!.Length > workLimit.Value))
+                return Results.BadRequest(new
+                {
+                    message = $"Her hizmet kartında en fazla {workLimit.Value} iş seçebilirsiniz."
+                });
+
+            var groupIds = slots
+                .Select(x => x.CategoryServiceId)
+                .Distinct()
+                .ToArray();
+
+            var validGroupCount = await dbContext.CategoryServices.AsNoTracking()
+                .CountAsync(x => groupIds.Contains(x.Id) &&
+                                 x.IsActive && x.Category.IsActive);
+
+            if (validGroupCount != groupIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz kategori veya hizmet grubu."
+                });
+
+            var works = await dbContext.CategoryLibraryWorks.AsNoTracking()
+                .Where(x => allWorkIds.Contains(x.Id) &&
+                            x.IsActive &&
+                            x.CategoryService.IsActive &&
+                            x.CategoryService.Category.IsActive)
+                .Select(x => new { x.Id, x.CategoryServiceId })
+                .ToListAsync();
+
+            if (works.Count != allWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz veya pasif iş seçimi."
+                });
+
+            var workGroupById = works.ToDictionary(x => x.Id, x => x.CategoryServiceId);
+
+            if (slots.Any(slot => slot.CategoryLibraryWorkIds!
+                .Any(id => workGroupById[id] != slot.CategoryServiceId)))
+                return Results.BadRequest(new
+                {
+                    message = "Seçilen işler ait oldukları hizmet grubuyla eşleşmiyor."
+                });
+
+            var existing = await dbContext.ProviderCategoryLibraryWorks
+                .Where(x => x.ProviderId == provider.Id)
+                .ToListAsync();
+
+            var desiredSlots = slots
+                .SelectMany(slot => slot.CategoryLibraryWorkIds!
+                    .Select(id => new { WorkId = id, slot.SlotIndex }))
+                .ToDictionary(x => x.WorkId, x => x.SlotIndex);
+
+            dbContext.ProviderCategoryLibraryWorks.RemoveRange(
+                existing.Where(x => !desiredSlots.ContainsKey(x.CategoryLibraryWorkId)));
+
+            foreach (var assignment in existing)
+            {
+                if (desiredSlots.TryGetValue(assignment.CategoryLibraryWorkId, out var slotIndex))
+                    assignment.SlotIndex = slotIndex;
+            }
+
+            var currentIds = existing
+                .Select(x => x.CategoryLibraryWorkId)
+                .ToHashSet();
+
+            dbContext.ProviderCategoryLibraryWorks.AddRange(
+                desiredSlots
+                    .Where(x => !currentIds.Contains(x.Key))
+                    .Select(x => new ProviderCategoryLibraryWork
+                    {
+                        ProviderId = provider.Id,
+                        CategoryLibraryWorkId = x.Key,
+                        SlotIndex = x.Value,
+                        CreatedAtUtc = now
+                    }));
+
+            provider.Version++;
+            provider.UpdatedAtUtc = now;
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                message = "Hizmetler kaydedildi.",
+                version = provider.Version
+            });
+        });
+
         group.MapPut("/me/location", async (
             UpdateOwnProviderLocationRequest request,
             ClaimsPrincipal principal,
@@ -629,12 +901,45 @@ public static class ProviderPanelEndpoints
                 });
             }
 
+            var neighboringCities =
+                EmergencyProvinceNeighbors.Get(provider.CitySlug);
+
             var needs = await dbContext.NeedRequests
                 .AsNoTracking()
                 .Where(x =>
                     x.IsActive &&
                     x.Status != NeedStatus.Cancelled &&
-                    x.TargetProviderId == provider.Id)
+                    (
+                        x.TargetProviderId == provider.Id ||
+                        (
+                            x.TargetProviderId == null &&
+                            provider.PublicationStatus == PublicationStatus.Published &&
+                            x.OwnerUserId != null &&
+                            x.CategoryLibraryWorkId != null &&
+                            (
+                                !x.DistributionEnabled
+                                    ? x.CitySlug == provider.CitySlug &&
+                                      x.DistrictSlug == provider.DistrictSlug
+                                    : (
+                                        x.AcceptingNewOffers &&
+                                        (
+                                            (x.DistributionStage == "District" &&
+                                             x.CitySlug == provider.CitySlug &&
+                                             x.DistrictSlug == provider.DistrictSlug) ||
+                                            (x.DistributionStage == "Province" &&
+                                             x.CitySlug == provider.CitySlug) ||
+                                            (x.DistributionStage == "NeighborProvinces" &&
+                                             (x.CitySlug == provider.CitySlug ||
+                                              neighboringCities.Contains(x.CitySlug))) ||
+                                            x.DistributionStage == "Nationwide"
+                                        )
+                                    )
+                            ) &&
+                            dbContext.ProviderCategoryLibraryWorks.Any(link =>
+                                link.ProviderId == provider.Id &&
+                                link.CategoryLibraryWorkId == x.CategoryLibraryWorkId)
+                        )
+                    ))
                 .OrderByDescending(x => x.CreatedAtUtc)
                 .Select(x => new
                 {
@@ -649,28 +954,82 @@ public static class ProviderPanelEndpoints
                     x.CitySlug,
                     x.DistrictSlug,
                     x.TargetProviderId,
+                    offerCount = x.Offers.Count(offer =>
+                        offer.Status != OfferStatus.Withdrawn),
                     isDirectRequest = x.TargetProviderId == provider.Id,
-                    contactByPhone = x.ContactByPhone,
-                    contactByWhatsapp = x.ContactByWhatsapp,
-                    contactByEmail = x.ContactByEmail,
+                    contactByPhone = x.ContactPreferencesSet && x.ContactByPhone,
+                    contactByWhatsapp = x.ContactPreferencesSet && x.ContactByWhatsapp,
+                    contactByEmail = x.ContactPreferencesSet && x.ContactByEmail,
+                    contactBySystemMessage =
+                        x.ContactPreferencesSet && x.ContactBySystemMessage,
                     contactByPush = x.ContactByPush,
+                    requesterFullName = x.OwnerUser == null
+                        ? null
+                        : x.OwnerUser.DisplayName,
+                    showFullName = x.ContactPreferencesSet && x.ShowFullName,
                     requesterEmail =
-                        x.TargetProviderId == provider.Id && x.OwnerUser != null
-                            ? x.OwnerUser.Email
-                            : null,
-                    requesterName =
-                        x.TargetProviderId == provider.Id && x.OwnerUser != null
-                            ? x.OwnerUser.DisplayName
+                        x.ContactPreferencesSet &&
+                        x.ContactByEmail &&
+                        x.Offers.Any(offer =>
+                            offer.ProviderId == provider.Id &&
+                            offer.Status != OfferStatus.Withdrawn)
+                            ? x.OwnerUser!.Email
                             : null,
                     requesterPhone =
-                        x.TargetProviderId == provider.Id && x.OwnerUser != null
-                            ? x.OwnerUser.PhoneNumber
+                        x.ContactPreferencesSet &&
+                        x.ContactByPhone &&
+                        x.Offers.Any(offer =>
+                            offer.ProviderId == provider.Id &&
+                            offer.Status != OfferStatus.Withdrawn)
+                            ? x.OwnerUser!.PhoneNumber
+                            : null,
+                    requesterWhatsapp =
+                        x.ContactPreferencesSet &&
+                        x.ContactByWhatsapp &&
+                        x.Offers.Any(offer =>
+                            offer.ProviderId == provider.Id &&
+                            offer.Status != OfferStatus.Withdrawn)
+                            ? x.OwnerUser!.WhatsAppNumber
                             : null,
                     x.CreatedAtUtc
                 })
                 .ToListAsync();
 
-            return Results.Ok(needs);
+            var safeNeeds = needs.Select(x => new
+            {
+                x.Id,
+                x.Title,
+                x.Description,
+                x.Category,
+                x.City,
+                x.District,
+                x.CategorySlug,
+                x.ServiceSlug,
+                x.CitySlug,
+                x.DistrictSlug,
+                x.TargetProviderId,
+                x.offerCount,
+                x.isDirectRequest,
+                x.contactByPhone,
+                x.contactByWhatsapp,
+                x.contactByEmail,
+                x.contactBySystemMessage,
+                x.contactByPush,
+                requesterName = string.IsNullOrWhiteSpace(x.requesterFullName)
+                    ? null
+                    : x.showFullName
+                        ? x.requesterFullName
+                        : string.Join(" ",
+                            x.requesterFullName
+                                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(part => part.Substring(0, 1) + ".")),
+                x.requesterEmail,
+                x.requesterPhone,
+                x.requesterWhatsapp,
+                x.CreatedAtUtc
+            }).ToList();
+
+            return Results.Ok(safeNeeds);
         });
 
         group.MapPut("/notification-preferences", async (
@@ -1024,3 +1383,15 @@ public sealed record UpdateOwnProviderBusinessRequest(
 public sealed record UpdateOwnProviderCatalogRequest(
     int ExpectedVersion, string CategorySlug, string ServiceSlug,
     string? AdditionalCategorySlug, string? AdditionalServiceSlug);
+
+
+public sealed record ProviderAbcServiceSlotRequest(
+    int SlotIndex,
+    Guid CategoryServiceId,
+    Guid[]? CategoryLibraryWorkIds);
+
+public sealed record UpdateProviderAbcServicesRequest(
+    int ExpectedVersion,
+    Guid[]? CategoryServiceIds,
+    Guid[]? CategoryLibraryWorkIds,
+    ProviderAbcServiceSlotRequest[]? Slots = null);

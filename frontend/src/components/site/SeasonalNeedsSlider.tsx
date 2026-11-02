@@ -344,15 +344,16 @@ export function SeasonalNeedsSlider() {
                     aria-hidden={index >= services.length}
                     tabIndex={index >= services.length ? -1 : 0}
                     href={`/kesfet?${params.toString()}`}
-                    className="group w-[180px] shrink-0 snap-start overflow-hidden rounded-md border border-amber-100 bg-white transition hover:border-amber-300 hover:shadow-md"
+                    className="group w-[180px] shrink-0 snap-start overflow-hidden rounded-lg border border-amber-100 bg-white transition hover:border-amber-300 hover:shadow-md"
                   >
-                    <div className="relative h-[130px] overflow-hidden bg-amber-50">
+                    <div className="relative h-[101px] overflow-hidden bg-amber-50">
                       <Image
                         src={image}
                         alt=""
                         fill
                         sizes="180px"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        unoptimized
+                        className="object-cover transition-transform duration-300"
                       />
                     </div>
 

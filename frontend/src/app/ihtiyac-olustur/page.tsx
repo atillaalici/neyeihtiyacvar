@@ -174,6 +174,7 @@ function NeedCreatePageContent() {
   const [liveIntentSuggestions, setLiveIntentSuggestions] =
     useState<SearchIntentSuggestion[]>([]);
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searching, setSearching] = useState(false);
   const [tracking, setTracking] = useState(false);
@@ -218,6 +219,9 @@ function NeedCreatePageContent() {
     // Dogrudan kontrollu Select state'ine yaz.
     setManualCategorySlug(suggestion.categorySlug);
     setManualServiceSlug(suggestion.serviceSlug);
+    setSelectedWorkId(suggestion.id.startsWith("db:")
+      ? suggestion.id.slice(3)
+      : null);
     setSuggestionDismissed(true);
     setLiveIntentSuggestions([]);
     setRecommendationData(null);
@@ -463,6 +467,7 @@ function NeedCreatePageContent() {
           description,
           categorySlug: understoodCategory,
           serviceSlug: understoodService,
+          categoryLibraryWorkId: selectedWorkId,
           citySlug,
           districtSlug,
           trackingDuration,
@@ -549,6 +554,7 @@ function NeedCreatePageContent() {
 
                     }}onChange={(event) => {
                       setQuery(event.target.value);
+                      setSelectedWorkId(null);
                       setSuggestionDismissed(false);
                       setManualCategorySlug("");
                       setManualServiceSlug("");
@@ -694,6 +700,7 @@ function NeedCreatePageContent() {
                       onValueChange={(value) => {
                         const next = value === "auto" ? "" : value;
                         setManualCategorySlug(next);
+                        setSelectedWorkId(null);
                         setManualServiceSlug("");
                         setRecommendationData(null);
                         setLiveIntentSuggestions([]);
@@ -722,6 +729,7 @@ function NeedCreatePageContent() {
                       value={manualServiceSlug || "auto"}
                       onValueChange={(value) => {
                         setManualServiceSlug(value === "auto" ? "" : value);
+                        setSelectedWorkId(null);
                         setRecommendationData(null);
                         setLiveIntentSuggestions([]);
                         setTrackingSuccess("");

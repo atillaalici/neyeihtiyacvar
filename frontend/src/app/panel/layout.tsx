@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "İşletme Paneli",
@@ -14,5 +15,5 @@ export default function PrivateRouteLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return <Suspense fallback={null}>{children}</Suspense>;
 }

@@ -80,7 +80,7 @@ public static class FeaturedProviderEndpoints
                 .ThenBy(x => x.BusinessName)
                 .ToList();
 
-            const int showcaseSize = 8;
+            const int showcaseSize = 25;
 
             var visible = ranked
                 .Take(showcaseSize)

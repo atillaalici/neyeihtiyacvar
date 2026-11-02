@@ -72,14 +72,18 @@ public static class OfferEndpoints
                 });
             }
 
-            if (need.TargetProviderId != provider.Id)
+            if (need.TargetProviderId != null &&
+                need.TargetProviderId != provider.Id)
             {
                 return Results.BadRequest(new
                 {
-                    message = "Bu talep henüz işletmenize iletilmedi. Kullanıcı işletmenizi seçtikten sonra teklif verebilirsiniz."
+                    message = "Bu talep başka bir işletmeye gönderilmiş."
                 });
             }
-            var exactMatch =
+
+            var directRequest = need.TargetProviderId == provider.Id;
+
+            var legacyDirectMatch =
                 need.CitySlug == provider.CitySlug &&
                 need.DistrictSlug == provider.DistrictSlug &&
                 (
@@ -87,6 +91,33 @@ public static class OfferEndpoints
                      need.ServiceSlug == provider.ServiceSlug) ||
                     provider.AdditionalServices.Contains(need.ServiceSlug)
                 );
+
+            var categoryWorkMatch =
+                need.CategoryLibraryWorkId != null &&
+                await dbContext.ProviderCategoryLibraryWorks.AnyAsync(link =>
+                    link.ProviderId == provider.Id &&
+                    link.CategoryLibraryWorkId == need.CategoryLibraryWorkId);
+
+            var sameDistrict =
+                need.CitySlug == provider.CitySlug &&
+                need.DistrictSlug == provider.DistrictSlug;
+
+            var geographicMatch = !need.DistributionEnabled
+                ? sameDistrict
+                : NeedDistributionGeography.IsMatch(
+                    need.CitySlug,
+                    need.DistrictSlug,
+                    provider.CitySlug,
+                    provider.DistrictSlug,
+                    need.DistributionStage);
+
+            var exactMatch = directRequest
+                ? legacyDirectMatch || (sameDistrict && categoryWorkMatch)
+                : need.IsActive &&
+                  need.OwnerUserId != null &&
+                  (!need.DistributionEnabled || need.AcceptingNewOffers) &&
+                  geographicMatch &&
+                  categoryWorkMatch;
 
             if (!exactMatch)
             {
@@ -161,7 +192,7 @@ public static class OfferEndpoints
                     "new_offer_received",
                     "Yeni teklif aldınız",
                     $"{provider.BusinessName} \"{need.Title}\" talebinize teklif verdi.",
-                    "/taleplerim");
+                    $"/taleplerim?talep={need.Id}");
             }
 
             await dbContext.SaveChangesAsync();
@@ -178,6 +209,109 @@ public static class OfferEndpoints
                     status = offer.Status.ToString().ToLowerInvariant(),
                     offer.CreatedAtUtc
                 });
+        });
+
+        providerGroup.MapPut("/offers/{offerId:guid}", async (
+            Guid offerId,
+            CreateProviderOfferRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var provider = await dbContext.Providers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.OwnerUserId == userId);
+
+            if (provider is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "Bu hesaba bağlı işletme bulunamadı."
+                });
+            }
+
+            var message = request.Message?.Trim() ?? string.Empty;
+
+            if (message.Length < 5 || message.Length > 2000)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Teklif mesajı 5 ile 2000 karakter arasında olmalıdır."
+                });
+            }
+
+            if (request.Price is < 0 or > 100000000)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Teklif tutarı geçerli değil."
+                });
+            }
+
+            var offer = await dbContext.ProviderOffers
+                .Include(x => x.NeedRequest)
+                .FirstOrDefaultAsync(x =>
+                    x.Id == offerId &&
+                    x.ProviderId == provider.Id);
+
+            if (offer is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "Teklif bulunamadı."
+                });
+            }
+
+            if (offer.Status != OfferStatus.Pending)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Yalnızca bekleyen teklifler düzenlenebilir."
+                });
+            }
+
+            if (offer.NeedRequest.Status is NeedStatus.Completed or NeedStatus.Cancelled)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Sonuçlanmış veya iptal edilmiş taleplerde teklif düzenlenemez."
+                });
+            }
+
+            var hasChanged = offer.Message != message || offer.Price != request.Price;
+
+            if (hasChanged)
+            {
+                offer.Message = message;
+                offer.Price = request.Price;
+                offer.UpdatedAtUtc = DateTime.UtcNow;
+
+                if (offer.NeedRequest.OwnerUserId is Guid customerId)
+                {
+                    NotificationWriter.Add(
+                        dbContext,
+                        customerId,
+                        "offer_updated",
+                        "Teklifiniz güncellendi",
+                        $"{provider.BusinessName} - {offer.NeedRequest.Title} talebinize verdiği teklifi güncelledi. Yeni teklif detaylarını inceleyebilirsiniz.",
+                        $"/taleplerim?talep={offer.NeedRequestId}");
+                }
+
+                await dbContext.SaveChangesAsync();
+            }
+
+            return Results.Ok(new
+            {
+                offer.Id,
+                offer.Message,
+                offer.Price,
+                status = offer.Status.ToString().ToLowerInvariant(),
+                offer.UpdatedAtUtc
+            });
         });
 
         providerGroup.MapPost("/offers/{offerId:guid}/withdraw", async (
@@ -308,16 +442,95 @@ public static class OfferEndpoints
                     x.Id,
                     x.NeedRequestId,
                     needTitle = x.NeedRequest.Title,
+                    needDescription = x.NeedRequest.Description,
+                    needCategory = x.NeedRequest.Category,
+                    needCity = x.NeedRequest.City,
+                    needDistrict = x.NeedRequest.District,
+                    needCreatedAtUtc = x.NeedRequest.CreatedAtUtc,
                     needStatus = x.NeedRequest.Status.ToString().ToLowerInvariant(),
+                    contactByPhone = x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByPhone,
+                    contactByWhatsapp = x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByWhatsapp,
+                    contactByEmail = x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByEmail,
+                    contactBySystemMessage = x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactBySystemMessage,
+                    requesterFullName = x.NeedRequest.OwnerUser == null
+                        ? null
+                        : x.NeedRequest.OwnerUser.DisplayName,
+                    showFullName = x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ShowFullName,
+                    requesterMemberSinceUtc = x.NeedRequest.OwnerUser == null
+                        ? (DateTime?)null
+                        : x.NeedRequest.OwnerUser.CreatedAtUtc,
+                    requesterCompletedNeedCount = x.NeedRequest.OwnerUserId == null
+                        ? 0
+                        : dbContext.NeedRequests.Count(n =>
+                            n.OwnerUserId == x.NeedRequest.OwnerUserId &&
+                            n.Status == NeedStatus.Completed),
+                    requesterPhone = x.Status != OfferStatus.Withdrawn &&
+                        x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByPhone &&
+                        x.NeedRequest.OwnerUser != null
+                            ? x.NeedRequest.OwnerUser.PhoneNumber
+                            : null,
+                    requesterWhatsapp = x.Status != OfferStatus.Withdrawn &&
+                        x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByWhatsapp &&
+                        x.NeedRequest.OwnerUser != null
+                            ? x.NeedRequest.OwnerUser.WhatsAppNumber
+                            : null,
+                    requesterEmail = x.Status != OfferStatus.Withdrawn &&
+                        x.NeedRequest.ContactPreferencesSet &&
+                        x.NeedRequest.ContactByEmail &&
+                        x.NeedRequest.OwnerUser != null
+                            ? x.NeedRequest.OwnerUser.Email
+                            : null,
                     x.Message,
                     x.Price,
                     status = x.Status.ToString().ToLowerInvariant(),
-x.CreatedAtUtc,
+                    x.CreatedAtUtc,
                     x.UpdatedAtUtc
                 })
                 .ToListAsync();
 
-            return Results.Ok(offers);
+            var safeOffers = offers.Select(x => new
+            {
+                x.Id,
+                x.NeedRequestId,
+                x.needTitle,
+                x.needDescription,
+                x.needCategory,
+                x.needCity,
+                x.needDistrict,
+                x.needCreatedAtUtc,
+                x.needStatus,
+                x.contactByPhone,
+                x.contactByWhatsapp,
+                x.contactByEmail,
+                x.contactBySystemMessage,
+                requesterName = string.IsNullOrWhiteSpace(x.requesterFullName)
+                    ? null
+                    : x.showFullName
+                        ? x.requesterFullName
+                        : string.Join(" ",
+                            x.requesterFullName
+                                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(part => part.Substring(0, 1) + ".")),
+                x.requesterMemberSinceUtc,
+                x.requesterCompletedNeedCount,
+                x.requesterPhone,
+                x.requesterWhatsapp,
+                x.requesterEmail,
+                x.Message,
+                x.Price,
+                x.status,
+                x.CreatedAtUtc,
+                x.UpdatedAtUtc
+            }).ToList();
+
+            return Results.Ok(safeOffers);
         });
 
         var myNeedsGroup = app
@@ -350,6 +563,10 @@ x.CreatedAtUtc,
                     x.CitySlug,
                     x.DistrictSlug,
                     status = x.Status.ToString().ToLowerInvariant(),
+                    x.DistributionEnabled,
+                    x.AcceptingNewOffers,
+                    acceptedJobCount = dbContext.NeedJobs.Count(
+                        job => job.NeedRequestId == x.Id),
                     trackingExpiresAtUtc = x.TrackingExpiresAtUtc,
                     trackingExpired =
                         x.TrackingExpiresAtUtc != null && x.TrackingExpiresAtUtc <= DateTime.UtcNow,
@@ -360,6 +577,139 @@ x.CreatedAtUtc,
                 .ToListAsync();
 
             return Results.Ok(needs);
+        });
+
+        myNeedsGroup.MapPost("/{needId:guid}/details", async (
+            Guid needId,
+            AddNeedDetailsRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var need = await dbContext.NeedRequests
+                .FirstOrDefaultAsync(x =>
+                    x.Id == needId &&
+                    x.OwnerUserId == userId);
+
+            if (need is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "Talep bulunamadı."
+                });
+            }
+
+            if (need.Status == NeedStatus.Cancelled ||
+                need.Status == NeedStatus.Completed)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Bu talep artık detaylandırılamaz."
+                });
+            }
+
+            var additionalDetails = request.Details?.Trim();
+
+            if (string.IsNullOrWhiteSpace(additionalDetails))
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Ek açıklama boş olamaz."
+                });
+            }
+
+            var updatedDescription =
+                need.Description.TrimEnd() +
+                "\\n\\nEk Açıklama:\\n" +
+                additionalDetails;
+
+            if (updatedDescription.Length > 2000)
+            {
+                return Results.BadRequest(new
+                {
+                    message = "Toplam açıklama 2000 karakteri aşamaz."
+                });
+            }
+
+            need.Description = updatedDescription;
+            need.UpdatedAtUtc = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                need.Id,
+                need.Description,
+                need.UpdatedAtUtc
+            });
+        });
+
+        myNeedsGroup.MapPost("/{needId:guid}/offer-preference", async (
+            Guid needId,
+            UpdateOfferPreferenceRequest request,
+            ClaimsPrincipal principal,
+            AppDbContext dbContext) =>
+        {
+            if (!TryGetUserId(principal, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var need = await dbContext.NeedRequests
+                .FirstOrDefaultAsync(x =>
+                    x.Id == needId &&
+                    x.OwnerUserId == userId);
+
+            if (need is null)
+            {
+                return Results.NotFound(new
+                {
+                    message = "İhtiyaç talebi bulunamadı."
+                });
+            }
+
+            if (!need.DistributionEnabled)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Bu işlem yalnızca yeni teklif sistemi için kullanılabilir."
+                });
+            }
+
+            if (need.Status == NeedStatus.Cancelled ||
+                need.Status == NeedStatus.Completed)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Kapalı veya sonuçlanmış talebin tercihi değiştirilemez."
+                });
+            }
+
+            var hasAcceptedOffer = await dbContext.NeedJobs
+                .AnyAsync(x => x.NeedRequestId == needId);
+
+            if (!hasAcceptedOffer)
+            {
+                return Results.Conflict(new
+                {
+                    message = "Teklif alma tercihi ilk teklif kabul edildikten sonra değiştirilebilir."
+                });
+            }
+
+            need.AcceptingNewOffers = request.AcceptingNewOffers;
+            need.UpdatedAtUtc = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                needId = need.Id,
+                acceptingNewOffers = need.AcceptingNewOffers
+            });
         });
 
         myNeedsGroup.MapPost("/{needId:guid}/cancel", async (
@@ -572,26 +922,59 @@ x.CreatedAtUtc
                 });
             }
 
-            var allOffers = await dbContext.ProviderOffers
-                .Where(x =>
-                    x.NeedRequestId == needId &&
-                    x.Status != OfferStatus.Withdrawn)
-                .ToListAsync();
-
             var now = DateTime.UtcNow;
 
-            foreach (var offer in allOffers)
+            if (need.DistributionEnabled)
             {
-                offer.Status =
-                    offer.Id == selectedOffer.Id
-                        ? OfferStatus.Accepted
-                        : OfferStatus.Rejected;
+                var existingJob = await dbContext.NeedJobs
+                    .AnyAsync(x => x.ProviderOfferId == selectedOffer.Id);
 
-                offer.UpdatedAtUtc = now;
+                if (existingJob)
+                {
+                    return Results.Conflict(new
+                    {
+                        message = "Bu teklif için zaten iş kaydı oluşturulmuş."
+                    });
+                }
+
+                selectedOffer.Status = OfferStatus.Accepted;
+                selectedOffer.UpdatedAtUtc = now;
+
+                dbContext.NeedJobs.Add(new NeedJob
+                {
+                    NeedRequestId = need.Id,
+                    ProviderOfferId = selectedOffer.Id,
+                    ProviderId = selectedOffer.ProviderId,
+                    Status = "Accepted",
+                    AcceptedAtUtc = now,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+
+                need.Status = NeedStatus.OfferReceived;
+                need.UpdatedAtUtc = now;
             }
+            else
+            {
+                var allOffers = await dbContext.ProviderOffers
+                    .Where(x =>
+                        x.NeedRequestId == needId &&
+                        x.Status != OfferStatus.Withdrawn)
+                    .ToListAsync();
 
-            need.Status = NeedStatus.Completed;
-            need.UpdatedAtUtc = now;
+                foreach (var offer in allOffers)
+                {
+                    offer.Status =
+                        offer.Id == selectedOffer.Id
+                            ? OfferStatus.Accepted
+                            : OfferStatus.Rejected;
+
+                    offer.UpdatedAtUtc = now;
+                }
+
+                need.Status = NeedStatus.Completed;
+                need.UpdatedAtUtc = now;
+            }
 
             var acceptedProviderOwnerUserId = await dbContext.Providers
                 .AsNoTracking()
@@ -616,7 +999,7 @@ x.CreatedAtUtc
             {
                 offerId = selectedOffer.Id,
                 status = "accepted",
-                needStatus = "completed"
+                needStatus = need.Status.ToString().ToLowerInvariant()
             });
         });
 
@@ -692,7 +1075,11 @@ x.CreatedAtUtc
                     x.Id != offer.Id &&
                     x.Status == OfferStatus.Pending);
 
-            need.Status = hasOtherPendingOffer
+            var hasAcceptedJob = need.DistributionEnabled &&
+                await dbContext.NeedJobs.AnyAsync(x =>
+                    x.NeedRequestId == needId);
+
+            need.Status = hasOtherPendingOffer || hasAcceptedJob
                 ? NeedStatus.OfferReceived
                 : NeedStatus.Open;
 
@@ -740,3 +1127,5 @@ x.CreatedAtUtc
 public sealed record CreateProviderOfferRequest(
     string? Message,
     decimal? Price);
+public sealed record AddNeedDetailsRequest(string? Details);
+public sealed record UpdateOfferPreferenceRequest(bool AcceptingNewOffers);

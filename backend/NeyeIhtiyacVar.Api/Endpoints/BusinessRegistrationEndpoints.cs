@@ -367,7 +367,7 @@ public static class BusinessRegistrationEndpoints
                 .FirstOrDefaultAsync(x => x.Code == planCode && x.IsActive);
             if (plan is null) return Results.BadRequest(new { message = "Geçerli bir üyelik paketi seçin." });
 
-            var code = Regex.Replace(request.PromotionCode.Trim().ToUpperInvariant(), @"\s+", string.Empty);
+            var code = Regex.Replace((request.PromotionCode ?? string.Empty).Trim().ToUpperInvariant(), @"\s+", string.Empty);
             var now = DateTime.UtcNow;
 
             PromotionCode? promo;
@@ -822,8 +822,8 @@ public static class BusinessRegistrationEndpoints
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(
-                request.AdditionalServiceSlug))
+        if (request.CategoryServiceIds is not { Length: > 0 } &&
+            !string.IsNullOrWhiteSpace(request.AdditionalServiceSlug))
         {
             var additionalCategorySlug =
                 string.IsNullOrWhiteSpace(

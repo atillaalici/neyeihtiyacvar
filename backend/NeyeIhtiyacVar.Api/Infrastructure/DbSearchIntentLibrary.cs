@@ -45,7 +45,7 @@ public static class DbSearchIntentLibrary
             .ToArray();
 
         var matches = phraseMatches
-            .GroupBy(x => x.Work.CategoryServiceId)
+            .GroupBy(x => x.Work.Id)
             .Select(g =>
             {
                 var ordered = g
@@ -97,16 +97,17 @@ public static class DbSearchIntentLibrary
             .ThenBy(x => x.Representative.Work.CategoryService.Name)
             .Take(Math.Clamp(limit, 1, 12))
             .Select(x => new SearchIntentSuggestion(
-                Id: $"db:{x.Representative.Work.CategoryServiceId}",
-                Label: x.Representative.Work.CategoryService.Name,
+                Id: $"db:{x.Representative.Work.Id}",
+                Label: x.Representative.Work.Name,
                 Keywords: x.Keywords,
                 CategorySlug: x.Representative.Work.CategoryService.Category.Slug,
                 ServiceSlug: TaxonomyV3Catalog.ToSlug(
-                    x.Representative.Work.CategoryService.Name),
+                    x.Representative.Work.Name),
                 Intent: "need",
                 Score: x.BestScore,
                 MatchReason:
-                    $"abc-cumle-kaniti:{x.EvidenceCount};en-iyi:{x.Representative.Phrase}"))
+                    $"abc-cumle-kaniti:{x.EvidenceCount};en-iyi:{x.Representative.Phrase}",
+                ServiceGroupName: x.Representative.Work.CategoryService.Name))
             .ToArray();
 
         return matches;
@@ -154,18 +155,29 @@ public static class DbSearchIntentLibrary
                 .ToListAsync(cancellationToken);
 
             var cachedPhrases = works
-                .SelectMany(work => work.Phrases
-                    .Where(phrase => phrase.IsActive)
-                    .Select(phrase =>
-                    {
-                        var normalized = Normalize(phrase.Phrase);
+                .SelectMany(work =>
+                {
+                    var phrases = new List<string> { work.Name };
 
-                        return new CachedPhrase(
-                            work,
-                            phrase.Phrase,
-                            normalized,
-                            Tokens(normalized));
-                    }))
+                    phrases.AddRange(
+                        work.Phrases
+                            .Where(phrase => phrase.IsActive)
+                            .Select(phrase => phrase.Phrase));
+
+                    return phrases
+                        .Where(phrase => !string.IsNullOrWhiteSpace(phrase))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Select(phrase =>
+                        {
+                            var normalized = Normalize(phrase);
+
+                            return new CachedPhrase(
+                                work,
+                                phrase,
+                                normalized,
+                                Tokens(normalized));
+                        });
+                })
                 .ToArray();
 
             _cachedPhrases = cachedPhrases;

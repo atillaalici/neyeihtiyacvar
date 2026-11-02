@@ -23,4 +23,7 @@ public sealed class Message
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
     public DateTime? ReadAtUtc { get; set; }
+    public DateTime? DeletedForSenderAtUtc { get; set; }
+    public DateTime? DeletedForRecipientAtUtc { get; set; }
+    public DateTime? DeletedForEveryoneAtUtc { get; set; }
 }

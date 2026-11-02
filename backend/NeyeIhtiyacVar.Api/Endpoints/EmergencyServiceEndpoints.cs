@@ -43,6 +43,33 @@ public static class EmergencyServiceEndpoints
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.WithdrawnAtUtc, DateTime.UtcNow), ct);
             return Results.NoContent();
         });
+        var onsitePanel = app.MapGroup("/api/provider-panel/me/onsite-service")
+            .RequireAuthorization();
+
+        onsitePanel.MapPut("", async (
+            UpdateOnsiteServiceRequest request,
+            ClaimsPrincipal user,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            if (!Guid.TryParse(
+                user.FindFirstValue(ClaimTypes.NameIdentifier),
+                out var userId))
+                return Results.Unauthorized();
+
+            var updated = await db.Providers
+                .Where(x => x.OwnerUserId == userId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.OnsiteService, request.Enabled)
+                    .SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow)
+                    .SetProperty(x => x.Version, x => x.Version + 1), ct);
+
+            if (updated == 0)
+                return Results.NotFound();
+
+            return Results.Ok(new { onsiteService = request.Enabled });
+        });
+
         app.MapGet("/api/emergency-providers", async (string? city, string? district, AppDbContext db, CancellationToken ct) =>
         {
             city = city?.Trim().ToLowerInvariant();
@@ -71,4 +98,6 @@ public static class EmergencyServiceEndpoints
         select p;
 
     public sealed record ConfirmEmergencyRequest(bool Confirmed);
+    public sealed record UpdateOnsiteServiceRequest(bool Enabled);
+
 }

@@ -56,6 +56,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<ProviderOffer> ProviderOffers => Set<ProviderOffer>();
 
+    public DbSet<NeedJob> NeedJobs => Set<NeedJob>();
+
     public DbSet<ProviderReview> ProviderReviews => Set<ProviderReview>();
 
     public DbSet<ProviderInteraction> ProviderInteractions => Set<ProviderInteraction>();
@@ -64,7 +66,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     public DbSet<Message> Messages => Set<Message>();
 
+    public DbSet<NeedConversation> NeedConversations => Set<NeedConversation>();
+
+    public DbSet<NeedMessage> NeedMessages => Set<NeedMessage>();
+
     public DbSet<Notification> Notifications => Set<Notification>();
+
+    public DbSet<EmailOutbox> EmailOutbox => Set<EmailOutbox>();
 
     public DbSet<AccountVerificationCode> AccountVerificationCodes => Set<AccountVerificationCode>();
 
@@ -73,6 +81,72 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+
+        modelBuilder.Entity<EmailOutbox>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasIndex(x => new { x.NeedRequestId, x.RecipientUserId })
+                .IsUnique();
+
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc });
+
+            entity.Property(x => x.ToEmail).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.RecipientName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Subject).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Heading).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.Message).HasMaxLength(4000).IsRequired();
+            entity.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+        });
+
+
+
+        // Talep ve işletme arasında, tekliften bağımsız özel mesajlaşma.
+        modelBuilder.Entity<NeedConversation>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasOne(x => x.NeedRequest)
+                .WithMany()
+                .HasForeignKey(x => x.NeedRequestId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ProviderOffer)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderOfferId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(x => new { x.NeedRequestId, x.ProviderId })
+                .IsUnique();
+        });
+
+        modelBuilder.Entity<NeedMessage>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Body)
+                .HasMaxLength(4000)
+                .IsRequired();
+
+            entity.HasOne(x => x.NeedConversation)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.NeedConversationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.SenderUser)
+                .WithMany()
+                .HasForeignKey(x => x.SenderUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+
         modelBuilder.Entity<ProviderEmergencyDeclaration>(entity =>
         {
             entity.HasKey(x => x.ProviderId);
@@ -271,6 +345,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         modelBuilder.Entity<ProviderCategoryLibraryWork>(entity =>
         {
             entity.HasKey(x => new { x.ProviderId, x.CategoryLibraryWorkId });
+            entity.Property(x => x.SlotIndex).HasDefaultValue(0);
 
             entity.HasIndex(x => x.CategoryLibraryWorkId);
 
@@ -903,6 +978,19 @@ modelBuilder.Entity<ProviderApplication>(entity =>
             entity.HasIndex(x => x.OwnerUserId);
             entity.HasIndex(x => x.Status);
             entity.HasIndex(x => x.TrackingExpiresAtUtc);
+
+            entity.HasIndex(x => x.DistributionStage);
+
+            entity.Property(x => x.DistributionEnabled)
+                .HasDefaultValue(false);
+
+            entity.Property(x => x.DistributionStage)
+                .HasMaxLength(20)
+                .HasDefaultValue("District");
+
+            entity.Property(x => x.AcceptingNewOffers)
+                .HasDefaultValue(true);
+
             entity.HasIndex(x => x.TargetProviderId);
             entity.HasIndex(x => x.CategoryLibraryWorkId);
 
@@ -958,6 +1046,38 @@ entity.Property(x => x.Title)
                 .WithMany()
                 .HasForeignKey(x => x.TargetProviderId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<NeedJob>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+
+            entity.HasIndex(x => x.ProviderOfferId).IsUnique();
+            entity.HasIndex(x => x.NeedRequestId);
+            entity.HasIndex(x => x.ProviderId);
+            entity.HasIndex(x => x.Status);
+
+            entity.Property(x => x.Status)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(x => x.DisputeReason)
+                .HasMaxLength(4000);
+
+            entity.HasOne(x => x.NeedRequest)
+                .WithMany()
+                .HasForeignKey(x => x.NeedRequestId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.ProviderOffer)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderOfferId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(x => x.Provider)
+                .WithMany()
+                .HasForeignKey(x => x.ProviderId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ProviderOffer>(entity =>

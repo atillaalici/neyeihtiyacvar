@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NeyeIhtiyacVar.Api.Domain;
 using NeyeIhtiyacVar.Api.Infrastructure;
 using NeyeIhtiyacVar.Api.Infrastructure.Notifications;
+using NeyeIhtiyacVar.Api.Infrastructure.Email;
 
 namespace NeyeIhtiyacVar.Api.Endpoints;
 
@@ -16,45 +17,33 @@ public static class NeedRequestEndpoints
     {
         var group = app.MapGroup("/api/needs");
 
-        group.MapGet("/", async (AppDbContext dbContext) =>
+        group.MapGet("/", () =>
         {
-            var requests = await dbContext.NeedRequests
-                .AsNoTracking()
-                .OrderByDescending(x => x.CreatedAtUtc)
-                .Select(x => new
-                {
-                    x.Id,
-                    x.OwnerUserId,
-                    x.Title,
-                    x.Description,
-                    x.Category,
-                    x.City,
-                    x.District,
-                    x.CategorySlug,
-                    x.ServiceSlug,
-                    x.CitySlug,
-                    x.DistrictSlug,
-                    x.TargetProviderId,
-                    status = x.Status.ToString().ToLowerInvariant(),
-                    x.TrackingExpiresAtUtc,
-                    x.TrackingReminderSentAtUtc,
-                    trackingExpired =
-                        x.TrackingExpiresAtUtc != null && x.TrackingExpiresAtUtc <= DateTime.UtcNow,
-                    x.CreatedAtUtc,
-                    x.UpdatedAtUtc
-                })
-                .ToListAsync();
-
-            return Results.Ok(requests);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
         });
 
         group.MapGet("/{id:guid}", async (
             Guid id,
+            ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
+            var userIdValue =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                principal.FindFirstValue("sub");
+
+            if (!Guid.TryParse(userIdValue, out var userId))
+                return Results.Unauthorized();
+
+            var activeUser = await dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == userId && x.IsActive);
+
+            if (!activeUser)
+                return Results.Unauthorized();
+
             var request = await dbContext.NeedRequests
                 .AsNoTracking()
-                .Where(x => x.Id == id)
+                .Where(x => x.Id == id && x.OwnerUserId == userId)
                 .Select(x => new
                 {
                     x.Id,
@@ -86,11 +75,26 @@ public static class NeedRequestEndpoints
 
         group.MapGet("/{id:guid}/matches", async (
             Guid id,
+            ClaimsPrincipal principal,
             AppDbContext dbContext) =>
         {
+            var userIdValue =
+                principal.FindFirstValue(ClaimTypes.NameIdentifier) ??
+                principal.FindFirstValue("sub");
+
+            if (!Guid.TryParse(userIdValue, out var userId))
+                return Results.Unauthorized();
+
+            var activeUser = await dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(x => x.Id == userId && x.IsActive);
+
+            if (!activeUser)
+                return Results.Unauthorized();
+
             var request = await dbContext.NeedRequests
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id);
+                .FirstOrDefaultAsync(x => x.Id == id && x.OwnerUserId == userId);
 
             if (request is null)
             {
@@ -100,10 +104,11 @@ public static class NeedRequestEndpoints
                 });
             }
 
-            if (string.IsNullOrWhiteSpace(request.CategorySlug) ||
-                string.IsNullOrWhiteSpace(request.ServiceSlug) ||
-                string.IsNullOrWhiteSpace(request.CitySlug) ||
-                string.IsNullOrWhiteSpace(request.DistrictSlug))
+            if (string.IsNullOrWhiteSpace(request.CitySlug) ||
+                string.IsNullOrWhiteSpace(request.DistrictSlug) ||
+                (request.CategoryLibraryWorkId is null &&
+                 (string.IsNullOrWhiteSpace(request.CategorySlug) ||
+                  string.IsNullOrWhiteSpace(request.ServiceSlug))))
             {
                 return Results.Ok(new
                 {
@@ -120,10 +125,14 @@ public static class NeedRequestEndpoints
                 .Where(x =>
                     x.PublicationStatus == PublicationStatus.Published &&
                     (request.TargetProviderId == null || x.Id == request.TargetProviderId) &&
-                    x.CategorySlug == request.CategorySlug &&
-                    x.ServiceSlug == request.ServiceSlug &&
                     x.CitySlug == request.CitySlug &&
-                    x.DistrictSlug == request.DistrictSlug)
+                    x.DistrictSlug == request.DistrictSlug &&
+                    (request.CategoryLibraryWorkId != null
+                        ? dbContext.ProviderCategoryLibraryWorks.Any(link =>
+                            link.ProviderId == x.Id &&
+                            link.CategoryLibraryWorkId == request.CategoryLibraryWorkId)
+                        : x.CategorySlug == request.CategorySlug &&
+                          x.ServiceSlug == request.ServiceSlug))
                 .OrderBy(x => x.BusinessName)
                 .Select(x => new
                 {
@@ -152,8 +161,12 @@ public static class NeedRequestEndpoints
         group.MapPost("/", async (
             CreateNeedRequest request,
             ClaimsPrincipal principal,
-            AppDbContext dbContext) =>
+            AppDbContext dbContext,
+            IEmailSender emailSender,
+            ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("NeedRequestEmailNotifications");
+
             var userIdValue =
                 principal.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -200,12 +213,40 @@ public static class NeedRequestEndpoints
                 });
             }
 
-            var category = await dbContext.Categories
-                .AsNoTracking()
-                .Include(x => x.Services)
-                .FirstOrDefaultAsync(x =>
-                    x.Slug == request.CategorySlug.Trim() &&
-                    x.IsActive);
+            var selectedWork = request.CategoryLibraryWorkId is Guid workId
+                ? await dbContext.CategoryLibraryWorks
+                    .AsNoTracking()
+                    .Include(x => x.CategoryService)
+                        .ThenInclude(x => x.Category)
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == workId &&
+                        x.IsActive &&
+                        x.CategoryService.IsActive &&
+                        x.CategoryService.Category.IsActive)
+                : null;
+
+            if (request.CategoryLibraryWorkId.HasValue && selectedWork is null)
+            {
+                validationErrors["categoryLibraryWorkId"] =
+                    ["Geçerli bir hizmet seçin."];
+            }
+
+            var effectiveCategorySlug = selectedWork is not null
+                ? selectedWork.CategoryService.Category.Slug
+                : request.CategorySlug.Trim();
+
+            var effectiveServiceSlug = selectedWork is not null
+                ? ToSlug(selectedWork.CategoryService.Name)
+                : request.ServiceSlug.Trim();
+
+            var category = selectedWork is null
+                ? await dbContext.Categories
+                    .AsNoTracking()
+                    .Include(x => x.Services)
+                    .FirstOrDefaultAsync(x =>
+                        x.Slug == effectiveCategorySlug &&
+                        x.IsActive)
+                : selectedWork.CategoryService.Category;
 
             if (category is null)
             {
@@ -213,14 +254,12 @@ public static class NeedRequestEndpoints
                     ["Geçerli bir kategori seçin."];
             }
 
-            CategoryService? service = null;
-
-            if (category is not null)
+            if (selectedWork is null && category is not null)
             {
-                service = category.Services
+                var service = category.Services
                     .Where(x => x.IsActive)
                     .FirstOrDefault(x =>
-                        ToSlug(x.Name) == request.ServiceSlug.Trim());
+                        ToSlug(x.Name) == effectiveServiceSlug);
 
                 if (service is null)
                 {
@@ -325,13 +364,23 @@ public static class NeedRequestEndpoints
                 City = city!.Name,
                 District = district!.Name,
                 CategorySlug = category.Slug,
-                ServiceSlug = request.ServiceSlug.Trim(),
+                ServiceSlug = effectiveServiceSlug,
+                CategoryLibraryWorkId = selectedWork?.Id,
                 CitySlug = city.Slug,
                 DistrictSlug = district.Slug,
                 TargetProviderId = targetProvider?.Id,
-                ContactByPhone = true,
+                DistributionEnabled = targetProvider == null &&
+                                      selectedWork != null,
+                DistributionStage = NeedDistributionGeography.District,
+                DistributionUpdatedAtUtc = null,
+                AcceptingNewOffers = true,
+                AutoClosedAtUtc = null,
+                ContactPreferencesSet = request.ContactPreferencesSet,
+                ShowFullName = request.ShowFullName,
+                ContactByPhone = request.ContactByPhone,
                 ContactByWhatsapp = request.ContactByWhatsapp,
                 ContactByEmail = request.ContactByEmail,
+                ContactBySystemMessage = request.ContactBySystemMessage,
                 ContactByPush = request.ContactByPush,
                 Status = NeedStatus.Open,
                 TrackingExpiresAtUtc = trackingExpiresAtUtc,
@@ -342,6 +391,77 @@ public static class NeedRequestEndpoints
 
             dbContext.NeedRequests.Add(needRequest);
 
+            // Ilce ve C hizmeti eslesen isletmelerin sahiplerini belirle.
+            // Uygulama ici bildirim e-posta tercihinden bagimsizdir.
+            var matchingOwners = new List<Guid>();
+            var emailRecipients = new List<(Guid UserId, string Email, string Name)>();
+
+            if (needRequest.TargetProviderId is null &&
+                needRequest.CategoryLibraryWorkId is Guid selectedWorkId)
+            {
+                var matchedProviders = await dbContext.Providers
+                    .AsNoTracking()
+                    .Where(provider =>
+                        provider.IsActive &&
+                        provider.PublicationStatus == PublicationStatus.Published &&
+                        provider.OwnerUserId != null &&
+                        provider.CitySlug == needRequest.CitySlug &&
+                        provider.DistrictSlug == needRequest.DistrictSlug &&
+                        dbContext.ProviderCategoryLibraryWorks.Any(link =>
+                            link.ProviderId == provider.Id &&
+                            link.CategoryLibraryWorkId == selectedWorkId))
+                    .Select(provider => new
+                    {
+                        OwnerId = provider.OwnerUserId!.Value,
+                        provider.NotifyByEmail
+                    })
+                    .ToListAsync();
+
+                matchingOwners = matchedProviders
+                    .Select(x => x.OwnerId)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var ownerId in matchingOwners)
+                {
+                    NotificationWriter.Add(
+                        dbContext,
+                        ownerId,
+                        "new_matching_need",
+                        "Yeni İş Fırsatı!",
+                        $"{needRequest.Title} - {needRequest.City} / {needRequest.District} konumunda yeni bir teklif talebi oluşturuldu.",
+                        $"/panel/taleplerim?talep={needRequest.Id}");
+                }
+
+                var emailOwnerIds = matchedProviders
+                    .Where(x => x.NotifyByEmail)
+                    .Select(x => x.OwnerId)
+                    .Distinct()
+                    .ToList();
+
+                if (emailOwnerIds.Count > 0)
+                {
+                    var recipients = await dbContext.Users
+                        .AsNoTracking()
+                        .Where(user =>
+                            emailOwnerIds.Contains(user.Id) &&
+                            user.IsActive &&
+                            user.EmailVerifiedAtUtc != null &&
+                            user.Email != "")
+                        .Select(user => new
+                        {
+                            user.Id,
+                            user.Email,
+                            user.DisplayName
+                        })
+                        .ToListAsync();
+
+                    emailRecipients = recipients
+                        .Select(x => (UserId: x.Id, Email: x.Email, Name: x.DisplayName))
+                        .ToList();
+                }
+            }
+
             if (targetProvider?.OwnerUserId is Guid providerOwnerUserId)
             {
                 NotificationWriter.Add(
@@ -351,6 +471,27 @@ public static class NeedRequestEndpoints
                     "Yeni ihtiyaç talebi",
                     $"{ownerUser.DisplayName}, \"{needRequest.Title}\" ihtiyacı için işletmenizle iletişime geçmek istiyor.",
                     $"/panel?talep={needRequest.Id}");
+            }
+
+            // Talep ve e-posta kuyruk kayitlari birlikte kaydedilir.
+            foreach (var recipient in emailRecipients)
+            {
+                dbContext.EmailOutbox.Add(new EmailOutbox
+                {
+                    NeedRequestId = needRequest.Id,
+                    RecipientUserId = recipient.UserId,
+                    ToEmail = recipient.Email,
+                    RecipientName = recipient.Name,
+                    Subject = ("Yeni İş Fırsatı: " + needRequest.Title)[..Math.Min(300, ("Yeni İş Fırsatı: " + needRequest.Title).Length)],
+                    Heading = "Size uygun yeni bir iş fırsatı var",
+                    Message = (
+                        $"Hizmet: {needRequest.Title} | Konum: {needRequest.City} / {needRequest.District}. " +
+                        $"Talebi görüntülemek için: https://neyeihtiyacvar.com/panel?talep={needRequest.Id}"
+                    )[..Math.Min(4000, (
+                        $"Hizmet: {needRequest.Title} | Konum: {needRequest.City} / {needRequest.District}. " +
+                        $"Talebi görüntülemek için: https://neyeihtiyacvar.com/panel?talep={needRequest.Id}"
+                    ).Length)]
+                });
             }
 
             await dbContext.SaveChangesAsync();
@@ -690,8 +831,11 @@ public static class NeedRequestEndpoints
                 ["Açıklama en fazla 2000 karakter olabilir."];
         }
 
-        ValidateSlug(errors, "categorySlug", request.CategorySlug, "Kategori");
-        ValidateSlug(errors, "serviceSlug", request.ServiceSlug, "Hizmet");
+        if (!request.CategoryLibraryWorkId.HasValue)
+        {
+            ValidateSlug(errors, "categorySlug", request.CategorySlug, "Kategori");
+            ValidateSlug(errors, "serviceSlug", request.ServiceSlug, "Hizmet");
+        }
         ValidateSlug(errors, "citySlug", request.CitySlug, "İl");
         ValidateSlug(errors, "districtSlug", request.DistrictSlug, "İlçe");
 
@@ -781,7 +925,12 @@ public sealed record CreateNeedRequest(
     string TrackingDuration = "1-month",
     bool ContactByWhatsapp = false,
     bool ContactByEmail = false,
-    bool ContactByPush = false);
+    bool ContactByPush = false,
+    Guid? CategoryLibraryWorkId = null,
+    bool ShowFullName = false,
+    bool ContactByPhone = false,
+    bool ContactBySystemMessage = false,
+    bool ContactPreferencesSet = false);
 public sealed record TargetTrackedNeedRequest(
     Guid TargetProviderId,
     string? Description,

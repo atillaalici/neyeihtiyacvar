@@ -17,6 +17,8 @@ export default function AccountSecurity() {
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
   const [working, setWorking] = useState(false);
   const user = getStoredUser();
+  const emailVerified = user?.emailVerified === true;
+  const verificationUrl = "/dogrula?channel=email&returnUrl=%2Fayarlar&autoSend=1";
 
   function logout() {
     clearAuth();
@@ -197,9 +199,15 @@ export default function AccountSecurity() {
                               İşletme hesabınız aktif kullanıcı hesabınıza bağlıdır.
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
-                            Doğrulandı
-                          </span>
+                          <span
+                             className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
+                               emailVerified
+                                 ? "bg-green-100 text-green-700"
+                                 : "bg-amber-100 text-amber-700"
+                             }`}
+                           >
+                             {emailVerified ? "Doğrulandı" : "Doğrulanmadı"}
+                           </span>
                         </div>
 
                         <div className="flex items-center justify-between gap-4 py-4">
@@ -211,15 +219,18 @@ export default function AccountSecurity() {
                               {user?.email ?? ""}
                             </p>
                           </div>
-                          <span
-                            className={`shrink-0 rounded-full px-3 py-1 text-xs font-black ${
-                              user?.emailVerified
-                                ? "bg-green-100 text-green-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {user?.emailVerified ? "Doğrulandı" : "Doğrulanmadı"}
-                          </span>
+                          {emailVerified ? (
+                            <span className="shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-black text-green-700">
+                              Hesabın Doğrulandı
+                            </span>
+                          ) : (
+                            <a
+                              href={verificationUrl}
+                              className="shrink-0 rounded-lg bg-[#f4510b] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#dd4709]"
+                            >
+                              Hesabını Doğrula
+                            </a>
+                          )}
                         </div>
 
                         <div className="flex items-center justify-between gap-4 py-4">

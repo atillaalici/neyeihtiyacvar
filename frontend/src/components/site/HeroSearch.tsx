@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { apiBaseUrl } from "@/lib/api";
+import { QuoteRequestModal } from "@/components/site/QuoteRequestModal";
 import { trackPlatformAnalytics } from "@/lib/platform-analytics";
 import {
   useEffect,
@@ -30,6 +31,7 @@ type IntentType =
   | "service";
 
 type SmartSuggestion = {
+  serviceGroupName?: string;
   id: string;
   label: string;
   keywords: string[];
@@ -251,7 +253,15 @@ function intentText(intent: IntentType) {
   return "Hizmet";
 }
 
-export function HeroSearch() {
+export function HeroSearch({
+  popup = false,
+  searchOnly = false,
+  onQuoteSubmitted,
+}: {
+  popup?: boolean;
+  searchOnly?: boolean;
+  onQuoteSubmitted?: () => void;
+} = {}) {
   const searchApiBaseUrl = apiBaseUrl;
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -260,6 +270,37 @@ export function HeroSearch() {
 
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const [selectedWork, setSelectedWork] = useState<SmartSuggestion | null>(null);
+  const [quoteWork, setQuoteWork] = useState<SmartSuggestion | null>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("quoteResume") !== "1") {
+      return;
+    }
+
+    const raw = sessionStorage.getItem("neyeihtiyacvar.quoteDraft");
+    if (!raw) return;
+
+    try {
+      const draft = JSON.parse(raw);
+      if (
+        typeof draft.workId !== "string" ||
+        typeof draft.workName !== "string"
+      ) {
+        return;
+      }
+
+      setQuoteWork({
+        id: `db:${draft.workId}`,
+        label: draft.workName,
+        keywords: [draft.workName],
+        intent: "service",
+        serviceGroupName: draft.serviceGroupName,
+      });
+    } catch {
+      sessionStorage.removeItem("neyeihtiyacvar.quoteDraft");
+    }
+  }, []);
   const [popularSearches, setPopularSearches] = useState<
     WeightedPopularSuggestion[]
   >([]);
@@ -316,7 +357,7 @@ export function HeroSearch() {
 
     const timer = window.setTimeout(() => {
       fetch(
-        `${searchApiBaseUrl}/api/search/intents/db-suggest?q=${encodeURIComponent(clean)}&limit=8`,
+        `${searchApiBaseUrl}/api/search/intents/db-suggest?q=${encodeURIComponent(clean)}&limit=5`,
         {
           cache: "no-store",
           signal: controller.signal,
@@ -412,10 +453,9 @@ export function HeroSearch() {
   }, [searchApiBaseUrl]);
 
   const librarySuggestions =
-    query.trim().length >= 2 &&
-    remoteSuggestions.length > 0
+    query.trim().length >= 2
       ? remoteSuggestions
-      : suggestions;
+      : [];
 
   // Son kullanıcıya gösterilecek önerileri görünen etiket üzerinden tekilleştir.
   // Aynı ihtiyacın backend'de farklı kayıt/id/serviceSlug ile dönmesi UI'da tekrar oluşturmaz.
@@ -433,7 +473,7 @@ export function HeroSearch() {
 
     return Array.from(unique.values())
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .slice(0, 8);
+      .slice(0, 5);
   }, [librarySuggestions]);
 
   async function goToSearch(
@@ -525,9 +565,11 @@ export function HeroSearch() {
   }
 
   function chooseSuggestion(suggestion: SmartSuggestion) {
+    if (!suggestion.id.startsWith("db:")) return;
+
     setQuery(suggestion.label);
     setFocused(false);
-    goToSearch(suggestion.label, suggestion, "typing");
+    setSelectedWork(suggestion);
   }
 
   const showSuggestions =
@@ -548,8 +590,8 @@ export function HeroSearch() {
 
   return (
     <section
-      className="relative isolate overflow-visible border-b border-border bg-cream bg-no-repeat h-auto min-h-0"
-      style={{
+      className={popup || searchOnly ? "relative isolate overflow-visible bg-transparent" : "relative z-[60] isolate overflow-visible border-b border-border bg-cream bg-no-repeat h-auto min-h-0"}
+      style={popup || searchOnly ? undefined : {
         backgroundImage: "url('/Hero/hero-tokalasma.png')",
         backgroundPosition: "right center",
         backgroundSize: "cover",
@@ -557,59 +599,34 @@ export function HeroSearch() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[360px] opacity-55"
+        className={popup || searchOnly ? "hidden" : "pointer-events-none absolute inset-x-0 top-0 h-[360px] opacity-55"}
         style={{
           background:
             "radial-gradient(65% 72% at 50% 8%, color-mix(in oklab, var(--primary) 14%, transparent), transparent 74%)",
         }}
       />
-      <div className="section-shell relative pt-8 pb-8 sm:pt-14 sm:pb-10">
+      <div className={popup || searchOnly ? "relative p-0" : "section-shell relative pt-8 pb-8 sm:pt-14 sm:pb-10"}>
         <div className="mx-auto flex w-full max-w-[1440px] flex-col">
           
 
-          <p className="relative z-10 ml-0 text-left text-[13px] font-bold uppercase tracking-[0.04em] text-[#0B1930] sm:ml-0 sm:text-[17px] mb-3 sm:mb-4">
+          <p className={popup || searchOnly ? "hidden" : "relative z-10 ml-0 text-left text-[13px] font-bold uppercase tracking-[0.04em] text-[#0B1930] sm:ml-0 sm:text-[17px] mb-3 sm:mb-4"}>
             Türkiye&apos;nin yerel ihtiyaç platformu
           </p>
-          <div className="relative z-10 mt-0 flex w-fit max-w-full items-center justify-start gap-2 sm:mt-0 sm:gap-3">
+          <div className={popup || searchOnly ? "hidden" : "relative z-10 mt-0 flex w-fit max-w-full items-center justify-start gap-2 sm:mt-0 sm:gap-3"}>
 <h1 className="whitespace-nowrap font-display text-[clamp(29.9px,5.6vw,56.35px)] font-bold leading-none tracking-[-0.04em] text-[#0B1930] sm:text-[clamp(41.4px,4.2vw,69.0px)]">
               Neye <span className="text-primary">ihtiyaç</span> var?
             </h1>
           </div>
-          <p className="relative z-10 ml-0 max-w-[600px] text-left text-[13px] font-semibold leading-snug text-[#0B1930] sm:ml-0 sm:text-[19px] mt-3 sm:mt-4">
+          <p className={popup || searchOnly ? "hidden" : "relative z-10 ml-0 max-w-[600px] text-left text-[13px] font-semibold leading-snug text-[#0B1930] sm:ml-0 sm:text-[19px] mt-3 sm:mt-4"}>
             İhtiyacını anlat, sana uygun işletmeyi bulalım.
           </p>
 
-
-          <div className="relative z-10 mt-6 flex w-full max-w-[900px] lg:mt-auto items-center justify-start gap-2 sm:mt-5 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.focus()}
-              className="inline-flex min-h-[54px] items-center gap-3 rounded-xl border-2 border-white bg-primary px-4 py-2 text-left text-white shadow-lg transition hover:bg-primary/90 sm:min-w-[190px] sm:px-6"
-            >
-              <Search className="size-6 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="block text-sm font-bold sm:text-base">Hizmet Ara</span>
-                <span className="block text-[11px] sm:text-xs">İşletmeleri keşfet</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/ihtiyac-olustur")}
-              className="inline-flex min-h-[54px] items-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2 text-left text-slate-900 shadow-lg transition hover:bg-slate-50 sm:min-w-[190px] sm:px-6"
-            >
-              <ClipboardPenLine className="size-6 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="block text-sm font-bold sm:text-base">İhtiyacını Anlat</span>
-                <span className="block text-[11px] text-slate-500 sm:text-xs">Talebini oluştur</span>
-              </span>
-            </button>
-          </div>
 
           <form
             ref={formRef}
             role="search"
             onSubmit={submit}
-            className="relative mt-3 w-full max-w-[760px] sm:mt-3"
+            className={popup || searchOnly ? "relative w-full" : "relative mt-3 w-full max-w-[760px] sm:mt-3"}
           >
             <label htmlFor="ihtiyac-arama" className="sr-only">
               İhtiyacını yaz
@@ -660,7 +677,7 @@ export function HeroSearch() {
                   window.setTimeout(() => setFocused(false), 150);
                 }}
                 autoComplete="off"
-                placeholder="Neye İhtiyaç Var?"
+                placeholder="Neye ihtiyac var? Birkaç kelimeyle yaz..."
                 className="h-9 min-w-0 flex-1 bg-transparent px-2 text-[14px] outline-none placeholder:text-muted-foreground sm:h-9 sm:px-4 sm:text-[16px]"
               />
 
@@ -725,8 +742,90 @@ export function HeroSearch() {
             ) : null}
           </form>
 
+          {selectedWork ? (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.target === event.currentTarget) {
+                  setSelectedWork(null);
+                }
+              }}
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="selected-work-title"
+                className="w-full max-w-md rounded-2xl border border-border bg-background p-6 text-foreground shadow-2xl"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Seçilen hizmet
+                    </p>
+                    <h2
+                      id="selected-work-title"
+                      className="mt-2 text-2xl font-bold"
+                    >
+                      {selectedWork.label}
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {selectedWork.serviceGroupName ?? ""}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Pencereyi kapat"
+                    onClick={() => setSelectedWork(null)}
+                    className="rounded-lg px-2 py-1 text-xl text-muted-foreground hover:bg-muted"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      params.set("q", selectedWork.label);
+                      params.set("workId", selectedWork.id.replace(/^db:/, ""));
+                      setSelectedWork(null);
+                      router.push(`/kesfet?${params.toString()}`);
+                    }}
+                    className="rounded-xl border border-border px-4 py-4 text-left font-semibold transition hover:bg-muted"
+                  >
+                    İşletmeleri Gör
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuoteWork(selectedWork);
+                      setSelectedWork(null);
+                    }}
+                    className="rounded-xl bg-primary px-4 py-4 text-left font-semibold text-primary-foreground transition hover:bg-primary/90"
+                  >
+                    Teklif Al
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
         </div>
       </div>
+
+      {quoteWork ? (
+        <QuoteRequestModal
+          key={quoteWork.id}
+          open={true}
+          onClose={() => setQuoteWork(null)}
+          onSubmitted={onQuoteSubmitted}
+          workId={quoteWork.id.replace(/^db:/, "")}
+          workName={quoteWork.label}
+          serviceGroupName={quoteWork.serviceGroupName}
+        />
+      ) : null}
     </section>
   );
 }

@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { EmergencyServicesSlider } from "@/components/site/EmergencyServicesSlider";
 import { SeasonalNeedsSlider } from "@/components/site/SeasonalNeedsSlider";
 import { ShowcaseSection } from "@/components/site/ShowcaseSection";
+import { PopularServicesSection } from "@/components/site/PopularServicesSection";
 import { HeroSearch } from "@/components/site/HeroSearch";
 import { HowItWorks } from "@/components/site/HowItWorks";
 import { HomeProvidersMap } from "@/components/site/HomeProvidersMap";
 import { LocationSearch } from "@/components/site/LocationSearch";
 import { ProviderCTA } from "@/components/site/ProviderCTA";
 import { SiteLayout } from "@/components/site/SiteLayout";
-import { TrustSection } from "@/components/site/TrustSection";
 
 export function HomeClient() {
   const router = useRouter();
@@ -22,14 +22,14 @@ export function HomeClient() {
       <div className="home-page">
         <HeroSearch />
 
-        <EmergencyServicesSlider />
         <SeasonalNeedsSlider />
 
         <ShowcaseSection />
+        <EmergencyServicesSlider />
+        <PopularServicesSection />
 
         <HowItWorks />
 
-        <TrustSection />
 
         <section className="home-location section-shell py-6 sm:py-8 lg:py-10">
           <h2 className="max-w-2xl font-display text-3xl font-bold text-balance sm:text-4xl">

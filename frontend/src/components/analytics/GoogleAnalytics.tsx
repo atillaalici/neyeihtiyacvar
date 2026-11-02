@@ -1,5 +1,5 @@
 ﻿"use client";
-import {useEffect,useState} from "react";
+import {Suspense,useEffect,useState} from "react";
 import {usePathname,useSearchParams} from "next/navigation";
 import Script from "next/script";
 import {trackEvent} from "@/lib/analytics";
@@ -19,5 +19,5 @@ export function GoogleAnalytics(){
  const [ok,setOk]=useState(false);
  useEffect(()=>{const sync=()=>setOk(!!measurementId&&allowed());sync();window.addEventListener(EVENT,sync);window.addEventListener("storage",sync);return()=>{window.removeEventListener(EVENT,sync);window.removeEventListener("storage",sync)}},[]);
  if(!measurementId||!ok)return null;
- return <><Script src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`} strategy="afterInteractive"/><Script id="google-analytics" strategy="afterInteractive">{`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,send_page_view:false});`}</Script><AnalyticsEvents/></>
+ return <><Script src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`} strategy="afterInteractive"/><Script id="google-analytics" strategy="afterInteractive">{`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=gtag;gtag('js',new Date());gtag('config','${measurementId}',{anonymize_ip:true,send_page_view:false});`}</Script><Suspense fallback={null}><AnalyticsEvents/></Suspense></>
 }

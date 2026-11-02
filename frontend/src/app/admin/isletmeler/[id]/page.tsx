@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 import { AdminBusinessPhotoManager } from "@/components/admin/AdminBusinessPhotoManager";
+import { AdminProviderABCEditor } from "@/components/admin/AdminProviderABCEditor";
+import { AdminProviderOwnerEmail } from "@/components/admin/AdminProviderOwnerEmail";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,6 @@ import {
 } from "@/components/ui/select";
 import { adminFetch } from "@/lib/admin-api";
 import { apiBaseUrl } from "@/lib/api";
-import type { CategoryDto } from "@/lib/categories";
 
 type PublicationStatus = "draft" | "published" | "unpublished";
 
@@ -121,19 +122,6 @@ function formFromProvider(provider: AdminProvider): FormState {
   };
 }
 
-function toSlug(value: string) {
-  return value
-    .toLocaleLowerCase("tr-TR")
-    .replaceAll("ı", "i")
-    .replaceAll("ğ", "g")
-    .replaceAll("ü", "u")
-    .replaceAll("ş", "s")
-    .replaceAll("ö", "o")
-    .replaceAll("ç", "c")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 export default function AdminProviderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -141,26 +129,12 @@ export default function AdminProviderDetailPage() {
 
   const [provider, setProvider] = useState<AdminProvider | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
-  const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [cities, setCities] = useState<CityDto[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-
-  const selectedCategory = useMemo(
-    () => categories.find((item) => item.slug === form.categorySlug) ?? null,
-    [categories, form.categorySlug],
-  );
-
-  const selectedAdditionalCategory = useMemo(
-    () =>
-      categories.find(
-        (item) => item.slug === form.additionalCategorySlug,
-      ) ?? null,
-    [categories, form.additionalCategorySlug],
-  );
 
   const selectedCity = useMemo(
     () => cities.find((item) => item.slug === form.citySlug) ?? null,
@@ -172,23 +146,20 @@ export default function AdminProviderDetailPage() {
     setError("");
 
     try {
-      const [providersResponse, categoriesResponse, locationsResponse] =
+      const [providersResponse, locationsResponse] =
         await Promise.all([
           adminFetch(`${apiBaseUrl}/api/admin/providers`, { cache: "no-store" }),
-          adminFetch(`${apiBaseUrl}/api/categories`, { cache: "no-store" }),
           adminFetch(`${apiBaseUrl}/api/locations`, { cache: "no-store" }),
         ]);
 
       if (
         !providersResponse.ok ||
-        !categoriesResponse.ok ||
         !locationsResponse.ok
       ) {
         throw new Error("Veriler alınamadı.");
       }
 
       const providers = (await providersResponse.json()) as AdminProvider[];
-      const categoryData = (await categoriesResponse.json()) as CategoryDto[];
       const locationData = (await locationsResponse.json()) as CityDto[];
 
       const current = providers.find((item) => item.id === id);
@@ -200,13 +171,7 @@ export default function AdminProviderDetailPage() {
       }
 
       setProvider(current);
-      setForm(
-        formFromProvider({
-          ...current,
-          additionalServices: current.additionalServices.slice(0, 1),
-        }),
-      );
-      setCategories(categoryData);
+      setForm(formFromProvider(current));
       setCities(locationData);
     } catch {
       setError("İşletme bilgileri yüklenemedi.");
@@ -266,13 +231,10 @@ export default function AdminProviderDetailPage() {
             businessName: form.businessName.trim(),
             shortDescription: form.shortDescription.trim(),
             description: form.description.trim() || null,
-            categorySlug: form.categorySlug,
-            serviceSlug: form.serviceSlug,
-            additionalCategorySlug:
-              form.additionalServices.length > 0
-                ? form.additionalCategorySlug || null
-                : null,
-            additionalServices: form.additionalServices,
+            categorySlug: provider.categorySlug,
+            serviceSlug: provider.serviceSlug,
+            additionalCategorySlug: provider.additionalCategorySlug,
+            additionalServices: provider.additionalServices,
             citySlug: form.citySlug,
             districtSlug: form.districtSlug,
             publicPhone: form.publicPhone.trim() || null,
@@ -456,6 +418,13 @@ export default function AdminProviderDetailPage() {
           businessName={provider.businessName}
         />
 
+        <AdminProviderABCEditor
+          providerId={provider.id}
+          onSaved={loadData}
+        />
+
+        <AdminProviderOwnerEmail providerId={provider.id} />
+
         <form
           noValidate
           onSubmit={save}
@@ -500,123 +469,6 @@ export default function AdminProviderDetailPage() {
                 rows={6}
                 className="w-full rounded-md border border-input bg-background px-3 py-3 text-sm disabled:opacity-60"
               />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Kategori 1
-              </label>
-              <Select
-                value={form.categorySlug}
-                onValueChange={(value: string) => {
-                  update("categorySlug", value);
-                  update("serviceSlug", "");
-                }}
-                disabled={!editable}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="1. kategoriyi seç" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.slug} value={category.slug}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Hizmet 1
-              </label>
-              <Select
-                value={form.serviceSlug}
-                onValueChange={(value: string) =>
-                  update("serviceSlug", value)
-                }
-                disabled={!editable || !selectedCategory}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="1. hizmeti seç" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(selectedCategory?.services ?? []).map((service) => (
-                    <SelectItem key={service} value={toSlug(service)}>
-                      {service}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Kategori 2
-                <span className="ml-1 font-normal text-muted-foreground">
-                  (isteğe bağlı)
-                </span>
-              </label>
-              <Select
-                value={form.additionalCategorySlug || "none"}
-                onValueChange={(value: string) => {
-                  if (value === "none") {
-                    update("additionalCategorySlug", "");
-                    update("additionalServices", []);
-                    return;
-                  }
-
-                  update("additionalCategorySlug", value);
-                  update("additionalServices", []);
-                }}
-                disabled={!editable}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="2. kategoriyi seç" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">2. hizmet yok</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.slug} value={category.slug}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">
-                Hizmet 2
-                <span className="ml-1 font-normal text-muted-foreground">
-                  (isteğe bağlı)
-                </span>
-              </label>
-              <Select
-                value={form.additionalServices[0] ?? "none"}
-                onValueChange={(value: string) =>
-                  update(
-                    "additionalServices",
-                    value === "none" ? [] : [value],
-                  )
-                }
-                disabled={!editable || !selectedAdditionalCategory}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="2. hizmeti seç" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">2. hizmet yok</SelectItem>
-                  {(selectedAdditionalCategory?.services ?? []).map(
-                    (service) => (
-                      <SelectItem key={service} value={toSlug(service)}>
-                        {service}
-                      </SelectItem>
-                    ),
-                  )}
-                </SelectContent>
-              </Select>
             </div>
 
             <div>

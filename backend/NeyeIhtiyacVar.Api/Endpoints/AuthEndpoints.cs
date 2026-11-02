@@ -1139,7 +1139,8 @@ public static class AuthEndpoints
             // Şifre ve hesap aktiflik kontrolleri korunur.
             var token = tokenService.CreateToken(user);
             return Results.Ok(ToAuthResponse(user, token));
-        });
+        })
+        .RequireRateLimiting("login");
 
         group.MapPost("/change-password", async (
             ChangePasswordRequest request,

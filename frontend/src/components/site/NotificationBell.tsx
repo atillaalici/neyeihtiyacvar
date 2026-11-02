@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { Bell, CheckCheck } from "lucide-react";
 
 import { apiBaseUrl } from "@/lib/api";
@@ -29,6 +30,16 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   async function loadNotifications() {
     const token = getAccessToken();
@@ -56,6 +67,8 @@ export function NotificationBell() {
       const data = (await response.json()) as NotificationResponse;
       setItems(data.items);
       setUnreadCount(data.unreadCount);
+    } catch (error) {
+      console.error("Bildirimler yüklenemedi:", error);
     } finally {
       setLoading(false);
     }
@@ -78,7 +91,8 @@ export function NotificationBell() {
     function handlePointerDown(event: MouseEvent) {
       if (
         rootRef.current &&
-        !rootRef.current.contains(event.target as Node)
+        !rootRef.current.contains(event.target as Node) &&
+        !panelRef.current?.contains(event.target as Node)
       ) {
         setOpen(false);
       }
@@ -155,7 +169,7 @@ export function NotificationBell() {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={`relative ${open ? "z-[100]" : ""}`}>
       <button
         type="button"
         onClick={() => {
@@ -175,7 +189,38 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-[80] w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+        mobile
+          ? createPortal(
+              <div
+                ref={panelRef}
+                className="fixed inset-x-3 top-20 z-[200] mx-auto max-h-[calc(100dvh-6rem)] w-auto max-w-[24rem] overflow-y-auto rounded-2xl border border-border bg-card shadow-xl"
+              >
+                <div className="flex justify-end border-b border-border p-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-md px-3 py-1 text-sm hover:bg-muted"
+                    aria-label="Bildirimleri kapat"
+                  >
+                    Kapat
+                  </button>
+                </div>
+                {renderPanelContent()}
+              </div>,
+              document.body
+            )
+          : (
+        <div className="absolute right-0 top-12 z-[100] w-[min(92vw,24rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+          {renderPanelContent()}
+        </div>
+          )
+      )}
+    </div>
+  );
+
+  function renderPanelContent() {
+    return (
+      <>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
               <div className="font-semibold">Bildirimler</div>
@@ -208,7 +253,11 @@ export function NotificationBell() {
               items.map((item) => (
                 <Link
                   key={item.id}
-                  href={item.link || "#"}
+                  href={
+                    item.eventType === "new_matching_need"
+                      ? "/panel"
+                      : item.link || "#"
+                  }
                   onClick={() => void markRead(item)}
                   className={`block border-b border-border px-4 py-3 transition-colors last:border-b-0 hover:bg-muted/50 ${
                     item.isRead ? "bg-background" : "bg-amber-50/60"
@@ -239,8 +288,7 @@ export function NotificationBell() {
               ))
             )}
           </div>
-        </div>
-      )}
-    </div>
-  );
+      </>
+    );
+  }
 }

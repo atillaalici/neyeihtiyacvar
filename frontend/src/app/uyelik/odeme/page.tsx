@@ -518,15 +518,16 @@ function MembershipPaymentContent() {
         return;
       }
 
-      const meData = (await meResponse.json()) as { user?: AuthUser };
-      if (!meData.user || meData.user.role !== "provider") {
+      const meData = (await meResponse.json()) as AuthUser;
+      const refreshedUser = meData;
+      if (!refreshedUser || refreshedUser.role !== "provider") {
         setPromoError(
           "İşletme kaydı tamamlandı ancak işletme yetkisi doğrulanamadı. Lütfen yeniden giriş yapın.",
         );
         return;
       }
 
-      updateStoredUser(meData.user);
+      updateStoredUser(refreshedUser);
       router.replace("/panel?kayit=tamamlandi&promosyon=1");
     } catch {
       setPromoError(

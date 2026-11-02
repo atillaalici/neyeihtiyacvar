@@ -1565,6 +1565,18 @@ export function BusinessRegistrationForm({
             </span>
           </label>
 
+          <div className="ml-7 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-sm font-bold text-emerald-900">
+              İlk 500 İşletmeye 12 Ay Ücretsiz KOBİ Üyeliği
+            </p>
+            <p className="mt-1 text-xs leading-5 text-emerald-900">
+              İlk 500 işletme kampanyası kapsamında, kontenjan uygunluğu
+              ve kayıt koşullarının sağlanması hâlinde KOBİ paketinin
+              ilk 12 ayı ücretsizdir. Üyelik otomatik yenilenmez.
+              Kampanya hakkı, işletme kaydı tamamlandığında kesinleşir.
+            </p>
+          </div>
+
           <p className="pl-7 text-xs leading-5 text-muted-foreground">
             <Link
               href="/sozlesmeler/kvkk-aydinlatma"

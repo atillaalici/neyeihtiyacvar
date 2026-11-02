@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { MessageCircle } from "lucide-react";
 
 import { apiBaseUrl } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getStoredUser } from "@/lib/auth";
 
 type ConversationItem = {
   id: string;
+  conversationType?: "storefront" | "need";
+  needTitle?: string;
   providerId: string;
   providerSlug: string;
   businessName: string;
@@ -33,9 +36,20 @@ export function MessageBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   const loadUnreadCount = useCallback(async () => {
     const token = getAccessToken();
+
     if (!token) {
       setUnreadCount(0);
       return;
@@ -60,12 +74,13 @@ export function MessageBell() {
 
       setUnreadCount(data.unreadCount ?? 0);
     } catch {
-      // Navbar mesaj sayacı ana kullanımı engellememeli.
+      // Sayaç hatası navbar kullanımını engellememeli.
     }
   }, []);
 
   const loadConversations = useCallback(async () => {
     const token = getAccessToken();
+
     if (!token) {
       setConversations([]);
       return;
@@ -74,22 +89,49 @@ export function MessageBell() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/messages/conversations`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const headers = { Authorization: `Bearer ${token}` };
+
+      const [storefrontResponse, needResponse] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/messages/conversations`, {
+          headers,
           cache: "no-store",
-        },
+        }),
+        fetch(`${apiBaseUrl}/api/need-messages/conversations`, {
+          headers,
+          cache: "no-store",
+        }),
+      ]);
+
+      if (!storefrontResponse.ok || !needResponse.ok) {
+        return;
+      }
+
+      const storefront =
+        (await storefrontResponse.json()) as ConversationItem[];
+
+      const needs =
+        (await needResponse.json()) as ConversationItem[];
+
+      const combined: ConversationItem[] = [
+        ...storefront.map((item) => ({
+          ...item,
+          conversationType: "storefront" as const,
+        })),
+        ...needs.map((item) => ({
+          ...item,
+          conversationType: "need" as const,
+        })),
+      ];
+
+      combined.sort(
+        (a, b) =>
+          new Date(b.lastMessageAtUtc ?? b.createdAtUtc).getTime() -
+          new Date(a.lastMessageAtUtc ?? a.createdAtUtc).getTime(),
       );
 
-      if (!response.ok) return;
-
-      const data = (await response.json()) as ConversationItem[];
-      setConversations(data);
+      setConversations(combined);
     } catch {
-      // Açılır kutu sessizce boş kalabilir.
+      // Mesaj menüsü hatası sayfanın çalışmasını engellememeli.
     } finally {
       setLoading(false);
     }
@@ -137,7 +179,8 @@ export function MessageBell() {
     function handlePointerDown(event: PointerEvent) {
       if (
         containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        !containerRef.current.contains(event.target as Node) &&
+        !panelRef.current?.contains(event.target as Node)
       ) {
         setOpen(false);
       }
@@ -191,7 +234,37 @@ export function MessageBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-[110] mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
+        mobile
+          ? createPortal(
+              <div
+                ref={panelRef}
+                className="fixed inset-x-3 top-20 z-[200] mx-auto max-h-[calc(100dvh-6rem)] w-auto max-w-[22rem] overflow-y-auto rounded-2xl border border-border bg-background shadow-xl"
+              >
+                <div className="flex justify-end border-b border-border p-2">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-md px-3 py-1 text-sm hover:bg-muted"
+                  >
+                    Kapat
+                  </button>
+                </div>
+                {renderPanelContent()}
+              </div>,
+              document.body
+            )
+          : (
+            <div className="absolute right-0 top-full z-[110] mt-2 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-background shadow-xl">
+              {renderPanelContent()}
+            </div>
+          )
+      )}
+    </div>
+  );
+
+  function renderPanelContent() {
+    return (
+      <>
           <div className="border-b border-border px-4 py-3">
             <div className="font-semibold">Mesajlar</div>
             <div className="text-xs text-muted-foreground">
@@ -218,13 +291,19 @@ export function MessageBell() {
               conversations.slice(0, 5).map((conversation) => (
                 <Link
                   key={conversation.id}
-                  href={`/mesajlarim?conversation=${conversation.id}`}
+                  href={`${
+                    getStoredUser()?.id === conversation.customerUserId
+                      ? "/mesajlarim"
+                      : "/panel/mesajlarim"
+                  }?conversation=${conversation.id}`}
                   onClick={() => setOpen(false)}
                   className="flex gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-muted"
                 >
                   <div className="grid size-10 shrink-0 place-items-center rounded-full bg-orange-100 font-bold text-orange-700">
-                    {conversation.businessName
-                      ?.trim()
+                    {(getStoredUser()?.id === conversation.customerUserId
+                      ? conversation.businessName
+                      : conversation.customerName || "Müşteri")
+                      .trim()
                       .charAt(0)
                       .toLocaleUpperCase("tr-TR") || "İ"}
                   </div>
@@ -232,7 +311,9 @@ export function MessageBell() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="truncate text-sm font-semibold">
-                        {conversation.businessName}
+                        {getStoredUser()?.id === conversation.customerUserId
+                          ? conversation.businessName
+                          : conversation.customerName || "Müşteri"}
                       </div>
 
                       {conversation.unreadCount > 0 && (
@@ -263,8 +344,7 @@ export function MessageBell() {
               Tüm mesajları göster
             </Link>
           </div>
-        </div>
-      )}
-    </div>
-  );
+      </>
+    );
+  }
 }

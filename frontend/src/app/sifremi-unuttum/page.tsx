@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,14 @@ export default function ForgotPasswordPage() {
 
   const [step, setStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const transferredEmail = params.get("email");
+    if (transferredEmail) {
+      setEmail(transferredEmail);
+    }
+  }, []);
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordAgain, setNewPasswordAgain] = useState("");

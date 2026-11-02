@@ -1,6 +1,6 @@
 "use client";
 
-import MessagesClient from "@/app/mesajlarim/MessagesClient";
+import MessagesClient from "@/app/mesajlarim/UserMessagesClient";
 import AccountSecurity from "@/components/account/AccountSecurity";
 
 import { Suspense, FormEvent, useEffect, useMemo, useState } from "react";
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { EmergencyDeclarationControl } from "@/components/site/EmergencyDeclarationControl";
+import { OnsiteServiceControl } from "@/components/site/OnsiteServiceControl";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { EditableProviderImage } from "@/components/site/EditableProviderImage";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,13 @@ type ProviderNeed = {
   isDirectRequest?: boolean;
   requesterName?: string | null;
   requesterPhone?: string | null;
+  requesterWhatsapp?: string | null;
+  requesterEmail?: string | null;
+  contactByPhone?: boolean;
+  contactByWhatsapp?: boolean;
+  contactByEmail?: boolean;
+  contactBySystemMessage?: boolean;
+  offerCount: number;
   status?: "open" | "offerreceived" | "completed";
   createdAtUtc: string;
 };
@@ -87,7 +95,22 @@ type ProviderOffer = {
   id: string;
   needRequestId: string;
   needTitle: string;
+  needDescription: string;
+  needCategory: string;
+  needCity: string;
+  needDistrict: string;
+  needCreatedAtUtc: string;
   needStatus?: "open" | "offerreceived" | "completed";
+  requesterName: string | null;
+  requesterMemberSinceUtc: string | null;
+  requesterCompletedNeedCount: number;
+  contactByPhone: boolean;
+  contactByWhatsapp: boolean;
+  contactByEmail: boolean;
+  contactBySystemMessage: boolean;
+  requesterPhone: string | null;
+  requesterWhatsapp: string | null;
+  requesterEmail: string | null;
   message: string;
   price: number | null;
   status: "pending" | "accepted" | "rejected" | "withdrawn";
@@ -243,6 +266,13 @@ function ProviderPanelPageContent({
   const [drafts, setDrafts] = useState<Record<string, OfferDraft>>({});
   const [sendingNeedId, setSendingNeedId] = useState<string | null>(null);
   const [withdrawingOfferId, setWithdrawingOfferId] = useState<string | null>(null);
+  const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
+  const [editingOfferDraft, setEditingOfferDraft] = useState<OfferDraft>({
+    message: "",
+    price: "",
+  });
+  const [savingOfferId, setSavingOfferId] = useState<string | null>(null);
+  const [offerEditError, setOfferEditError] = useState("");
   const [savingNotifications, setSavingNotifications] = useState(false);
 
   const [providerImages, setProviderImages] = useState<ProviderImage[]>([]);
@@ -254,6 +284,54 @@ function ProviderPanelPageContent({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const [selectedNeedId, setSelectedNeedId] = useState<string | null>(null);
+
+  const [openingConversationId, setOpeningConversationId] = useState<string | null>(null);
+  const [conversationError, setConversationError] = useState("");
+
+  async function openNeedConversation(needId: string) {
+    if (!profile || openingConversationId) return;
+
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/giris");
+      return;
+    }
+
+    setOpeningConversationId(needId);
+    setConversationError("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/need-messages/needs/${encodeURIComponent(needId)}/providers/${encodeURIComponent(profile.id)}/conversation`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Konuşma başlatılamadı.");
+      }
+
+      const conversation = (await response.json()) as { id: string };
+      if (!conversation.id) {
+        throw new Error("Konuşma kimliği alınamadı.");
+      }
+
+      router.push(
+        `/panel/mesajlarim?conversation=${encodeURIComponent(conversation.id)}`,
+      );
+    } catch {
+      setConversationError(
+        "Mesajlaşma açılamadı. Lütfen tekrar deneyin.",
+      );
+    } finally {
+      setOpeningConversationId(null);
+    }
+  }
+
 
   const offeredNeedIds = useMemo(
     () => new Set(offers.map((offer) => offer.needRequestId)),
@@ -301,7 +379,7 @@ function ProviderPanelPageContent({
         return;
       }
 
-      if (storedUser.role !== "provider") {
+      if (storedUser.role !== "provider" && storedUser.role !== "admin") {
         router.replace("/hesabim");
         return;
       }
@@ -674,6 +752,21 @@ function ProviderPanelPageContent({
           needTitle:
             needs.find((need) => need.id === needId)?.title ?? "İhtiyaç",
           needStatus: "offerreceived",
+          needDescription: needs.find(n => n.id === needId)?.description ?? "",
+          needCategory: needs.find(n => n.id === needId)?.category ?? "",
+          needCity: needs.find(n => n.id === needId)?.city ?? "",
+          needDistrict: needs.find(n => n.id === needId)?.district ?? "",
+          needCreatedAtUtc: needs.find(n => n.id === needId)?.createdAtUtc ?? data.createdAtUtc,
+          requesterName: needs.find(n => n.id === needId)?.requesterName ?? null,
+          requesterMemberSinceUtc: null,
+          requesterCompletedNeedCount: 0,
+          contactByPhone: needs.find(n => n.id === needId)?.contactByPhone ?? false,
+          contactByWhatsapp: needs.find(n => n.id === needId)?.contactByWhatsapp ?? false,
+          contactByEmail: needs.find(n => n.id === needId)?.contactByEmail ?? false,
+          contactBySystemMessage: needs.find(n => n.id === needId)?.contactBySystemMessage ?? false,
+          requesterPhone: null,
+          requesterWhatsapp: null,
+          requesterEmail: null,
           message: data.message,
           price: data.price,
           status: data.status,
@@ -751,6 +844,92 @@ function ProviderPanelPageContent({
       setError("Sunucuya bağlanılamadı.");
     } finally {
       setSavingNotifications(false);
+    }
+  }
+
+  function startEditingOffer(offer: ProviderOffer) {
+    if (offer.status !== "pending") return;
+
+    setEditingOfferId(offer.id);
+    setEditingOfferDraft({
+      message: offer.message,
+      price: offer.price === null ? "" : String(offer.price),
+    });
+    setOfferEditError("");
+  }
+
+  function cancelEditingOffer() {
+    if (savingOfferId !== null) return;
+    setEditingOfferId(null);
+    setOfferEditError("");
+  }
+
+  async function saveEditedOffer(offerId: string) {
+    if (savingOfferId !== null) return;
+
+    const token = getAccessToken();
+    if (!token) {
+      router.replace("/giris");
+      return;
+    }
+
+    const cleanMessage = editingOfferDraft.message.trim();
+    if (cleanMessage.length < 5 || cleanMessage.length > 2000) {
+      setOfferEditError("Teklif mesajı 5 ile 2000 karakter arasında olmalıdır.");
+      return;
+    }
+
+    const price = editingOfferDraft.price.trim()
+      ? Number(editingOfferDraft.price)
+      : null;
+
+    if (price !== null && (!Number.isFinite(price) || price < 0 || price > 100000000)) {
+      setOfferEditError("Teklif tutarı geçerli değil.");
+      return;
+    }
+
+    setOfferEditError("");
+    setSavingOfferId(offerId);
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/offers/${offerId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: cleanMessage, price }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setOfferEditError(data?.message ?? "Teklif güncellenemedi.");
+        return;
+      }
+
+      setOffers((current) =>
+        current.map((offer) =>
+          offer.id === offerId
+            ? {
+                ...offer,
+                message: data.message,
+                price: data.price,
+                updatedAtUtc: data.updatedAtUtc,
+              }
+            : offer,
+        ),
+      );
+
+      setEditingOfferId(null);
+      setMessage("Teklif başarıyla güncellendi.");
+    } catch {
+      setOfferEditError("Sunucuya bağlanılamadı.");
+    } finally {
+      setSavingOfferId(null);
     }
   }
 
@@ -1124,6 +1303,26 @@ function ProviderPanelPageContent({
         )}
 
         {section === "hizmetler" && (
+          <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
+            <h2 className="font-display text-xl font-semibold">
+              Hizmet Sunum Tercihlerim
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              İşletmenizin hizmet sunum tercihlerini buradan yönetin.
+            </p>
+            <EmergencyDeclarationControl />
+            <OnsiteServiceControl
+              initialValue={profile.onsiteService}
+              onSaved={(value) =>
+                setProfile((current) =>
+                  current ? { ...current, onsiteService: value } : current
+                )
+              }
+            />
+          </div>
+        )}
+
+        {section === "hizmetler" && (
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-soft">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1263,155 +1462,324 @@ function ProviderPanelPageContent({
 
         <div
           className={
-            section === "ayarlar"
+            section === "ayarlar" || section === "talepler" || section === "teklifler"
               ? "mt-6 grid grid-cols-1 gap-6"
               : "mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]"
           }
         >
           <div className="space-y-6">
             {section === "talepler" && (
-            <div id="musteri-talepleri" className="scroll-mt-24 rounded-2xl border border-border bg-card p-6 shadow-soft">
-              <h2 className="font-display text-xl font-semibold">
-                Eşleşen İhtiyaç Talepleri
-              </h2>
+              <div id="musteri-talepleri" className="scroll-mt-24 space-y-5">
+                {(() => {
+                  const selectedNeed = visibleNeeds.find(
+                    (need) => need.id === (selectedNeedId ?? notificationNeedId),
+                  );
 
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Yalnızca giriş yapmış kullanıcıların yeni ve sonuçlanmamış
-                taleplerine teklif verilebilir.
-              </p>
-
-              {visibleNeeds.length === 0 ? (
-                <div className="mt-5 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                  Şu anda işletmenle eşleşen açık ihtiyaç talebi yok.
-                </div>
-              ) : (
-                <div className="mt-5 space-y-4">
-                  {visibleNeeds.map((need) => {
-                    const alreadyOffered = offeredNeedIds.has(need.id);
-                    const draft = getDraft(need.id);
+                  if (selectedNeed) {
+                    const draft = getDraft(selectedNeed.id);
+                    const alreadyOffered = offeredNeedIds.has(selectedNeed.id);
 
                     return (
-                      <article id={`talep-${need.id}`} tabIndex={-1}
-                        key={need.id}
-                        className="rounded-xl border border-border p-4"
-                      >
-                        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
-                          <div>
-                            <h3 className="font-semibold">{need.title}</h3>
+                      <div id={`talep-${selectedNeed.id}`} className="space-y-5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedNeedId(null);
+                            if (notificationNeedId) router.replace("/panel");
+                          }}
+                          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                        >
+                          ← İş Fırsatlarına Dön
+                        </button>
 
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                              {need.description}
-                            </p>
-
-                            {need.isDirectRequest && (
-                              <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
-                                <div className="text-xs font-semibold text-primary">
-                                  Doğrudan işletmenize iletildi
-                                </div>
-
-                                <div className="mt-2 text-sm text-muted-foreground">
-                                  Talep sahibi: {need.requesterName ?? "Kullanıcı"}
-                                </div>
-
-                                {need.requesterPhone && (
-                                  <div className="mt-3 flex flex-wrap gap-3">
-                                    <a
-                                      href={`tel:${need.requesterPhone}`}
-                                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-                                    >
-                                      <Phone className="size-4" aria-hidden="true" />
-                                      Kullanıcıyı Ara
-                                    </a>
-
-                                    <a
-                                      href={`https://wa.me/${need.requesterPhone.replace(/\D/g, "")}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
-                                    >
-                                      WhatsApp
-                                    </a>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {new Date(need.createdAtUtc).toLocaleString("tr-TR")}
-                          </span>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <span className="rounded-full border border-border px-2.5 py-1">
-                            {need.category}
-                          </span>
-
-                          <span className="rounded-full border border-border px-2.5 py-1">
-                            {need.city} / {need.district}
-                          </span>
-                        </div>
-
-                        {alreadyOffered ? (
-                          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                            Bu talebe teklif verdin.
-                          </div>
-                        ) : (
-                          <form
-                            onSubmit={(event) => submitOffer(event, need.id)}
-                            className="mt-4 space-y-3 border-t border-border pt-4"
-                          >
-                            <textarea
-                              value={draft.message}
-                              onChange={(event) =>
-                                updateDraft(
-                                  need.id,
-                                  "message",
-                                  event.target.value,
-                                )
-                              }
-                              rows={3}
-                              maxLength={2000}
-                              placeholder="Teklif mesajını yaz..."
-                              className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                            />
-
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={draft.price}
-                                onChange={(event) =>
-                                  updateDraft(
-                                    need.id,
-                                    "price",
-                                    event.target.value,
-                                  )
-                                }
-                                placeholder="Teklif tutarı (opsiyonel)"
-                                className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/15"
-                              />
-
-                              <Button
-                                type="submit"
-                                disabled={sendingNeedId === need.id}
-                              >
-                                {sendingNeedId === need.id
-                                  ? "Gönderiliyor..."
-                                  : "Teklif Ver"}
-                              </Button>
+                        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-8">
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-600">
+                                İş Fırsatı Detayı
+                              </p>
+                              <h2 className="font-display text-2xl font-bold">
+                                {selectedNeed.title}
+                              </h2>
+                              <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                <MapPin className="size-4" aria-hidden="true" />
+                                {selectedNeed.city} / {selectedNeed.district}
+                              </p>
                             </div>
-                          </form>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                            <span className="rounded-full border border-border bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+                              {new Date(selectedNeed.createdAtUtc).toLocaleString("tr-TR")}
+                            </span>
+                          </div>
 
+                          <div className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-600">
+                            <span aria-hidden="true">◉</span>
+                            {selectedNeed.offerCount === 0
+                              ? "Henüz teklif verilmedi"
+                              : `${selectedNeed.offerCount} teklif alındı`}
+                          </div>
+
+                          <div className="mt-6 border-t border-border pt-6">
+                            <h3 className="font-semibold">İhtiyaç Açıklaması</h3>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+                              {selectedNeed.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-6 text-xs">
+                            <span className="rounded-full bg-muted px-3 py-2">
+                              {selectedNeed.category}
+                            </span>
+                            <span className="rounded-full bg-muted px-3 py-2">
+                              {selectedNeed.city} / {selectedNeed.district}
+                            </span>
+                          </div>
+
+                          <div className="mt-6 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-5">
+                            <h3 className="text-sm font-semibold text-foreground">
+                              Talep Sahibi ve İletişim
+                            </h3>
+
+                            <div className="mt-4 flex items-center gap-3">
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
+                                {(selectedNeed.requesterName ?? "K").charAt(0).toLocaleUpperCase("tr-TR")}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground">
+                                  {selectedNeed.requesterName ?? "Kullanıcı"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {selectedNeed.city} / {selectedNeed.district}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                              {selectedNeed.contactByPhone && (
+                                selectedNeed.requesterPhone ? (
+                                  <a
+                                    href={`tel:${selectedNeed.requesterPhone}`}
+                                    className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
+                                  >
+                                    Telefon Et
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="rounded-lg bg-orange-500/40 px-4 py-2 text-sm font-medium text-white/90"
+                                  >
+                                    Telefon Et
+                                  </button>
+                                )
+                              )}
+
+                              {selectedNeed.contactByWhatsapp && (
+                                selectedNeed.requesterWhatsapp ? (
+                                  <a
+                                    href={`https://wa.me/${selectedNeed.requesterWhatsapp.replace(/\\D/g, "")}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600"
+                                  >
+                                    WhatsApp
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="rounded-lg bg-green-500/40 px-4 py-2 text-sm font-medium text-white/90"
+                                  >
+                                    WhatsApp
+                                  </button>
+                                )
+                              )}
+
+                              {selectedNeed.contactByEmail && (
+                                selectedNeed.requesterEmail ? (
+                                  <a
+                                    href={`mailto:${selectedNeed.requesterEmail}`}
+                                    className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+                                  >
+                                    E-posta
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled
+                                    className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground opacity-50"
+                                  >
+                                    E-posta
+                                  </button>
+                                )
+                              )}
+
+                              {selectedNeed.contactBySystemMessage && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => void openNeedConversation(selectedNeed.id)}
+                                  disabled={openingConversationId !== null}
+                                >
+                                  {openingConversationId === selectedNeed.id
+                                    ? "Açılıyor..."
+                                    : "Mesaj"}
+                                </Button>
+                              )}
+                            </div>
+
+                            {conversationError && (
+                              <p role="alert" className="mt-3 text-xs text-red-600">
+                                {conversationError}
+                              </p>
+                            )}
+
+                            {!selectedNeed.contactByPhone &&
+                              !selectedNeed.contactByWhatsapp &&
+                              !selectedNeed.contactByEmail &&
+                              !selectedNeed.contactBySystemMessage && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  Talep sahibi iletişim yöntemi belirtmemiş.
+                                </p>
+                              )}
+
+                            {!alreadyOffered &&
+                              (selectedNeed.contactByPhone ||
+                                selectedNeed.contactByWhatsapp ||
+                                selectedNeed.contactByEmail) && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  İletişim seçenekleri teklif verdikten sonra kullanılabilir.
+                                </p>
+                              )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft sm:p-8">
+                          <h3 className="font-display text-xl font-semibold">
+                            Teklifinizi Hazırlayın
+                          </h3>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Yapacağınız işi ve teklif koşullarınızı müşteriye açıklayın.
+                          </p>
+
+                          {alreadyOffered ? (
+                            <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+                              Bu talebe teklif verdiniz.
+                            </div>
+                          ) : (
+                            <form
+                              onSubmit={(event) => submitOffer(event, selectedNeed.id)}
+                              className="mt-6 space-y-5"
+                            >
+                              <div>
+                                <label htmlFor="offer-price" className="mb-2 block text-sm font-semibold">
+                                  Teklif Tutarı (TL) — İsteğe bağlı
+                                </label>
+                                <input
+                                  id="offer-price"
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={draft.price}
+                                  onChange={(event) => updateDraft(selectedNeed.id, "price", event.target.value)}
+                                  placeholder="Örn. 1500"
+                                  className="h-11 w-full rounded-lg border border-input bg-background px-4 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="offer-message" className="mb-2 block text-sm font-semibold">
+                                  Teklif Mesajı
+                                </label>
+                                <textarea
+                                  id="offer-message"
+                                  value={draft.message}
+                                  onChange={(event) => updateDraft(selectedNeed.id, "message", event.target.value)}
+                                  rows={5}
+                                  maxLength={2000}
+                                  placeholder="Yapılacak işlemleri, hizmet kapsamını ve teklifinizi açıklayın..."
+                                  className="w-full resize-y rounded-lg border border-input bg-background p-4 text-sm"
+                                />
+                              </div>
+                              <div className="flex justify-end">
+                                <Button type="submit" disabled={sendingNeedId === selectedNeed.id}>
+                                  {sendingNeedId === selectedNeed.id ? "Gönderiliyor..." : "Teklif Ver"}
+                                </Button>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <h2 className="font-display text-2xl font-bold">İş Fırsatları</h2>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            İşletmenizin hizmetleriyle eşleşen açık müşteri talepleri.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700">
+                          {visibleNeeds.length} fırsat
+                        </span>
+                      </div>
+
+                      {visibleNeeds.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
+                          Şu anda işletmenizle eşleşen açık talep bulunmuyor.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {visibleNeeds.map((need) => (
+                            <button
+                              key={need.id}
+                              id={`talep-${need.id}`}
+                              type="button"
+                              onClick={() => setSelectedNeedId(need.id)}
+                              className="block w-full rounded-2xl border border-border bg-card p-5 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 sm:p-6"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <span className="mb-2 inline-block text-xs font-semibold text-orange-600">
+                                    Yeni İş Fırsatı
+                                  </span>
+                                  <h3 className="font-display text-lg font-semibold">{need.title}</h3>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(need.createdAtUtc).toLocaleString("tr-TR")}
+                                </span>
+                              </div>
+                              <p className="mt-3 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                                {need.description}
+                              </p>
+                              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                                <span className="inline-flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <MapPin className="size-4" aria-hidden="true" />
+                                    {need.city} / {need.district}
+                                  </span>
+                                  <span className="font-medium text-slate-600">
+                                    {need.offerCount === 0
+                                      ? "Henüz teklif verilmedi"
+                                      : `${need.offerCount} teklif alındı`}
+                                  </span>
+                                </span>
+                                <span className="inline-flex shrink-0 items-center gap-2 cursor-pointer rounded-lg border border-orange-500 bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors group-hover:border-orange-600 group-hover:bg-orange-600">
+                                  Detayları Gör
+                                  <span aria-hidden="true">↗</span>
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             )}
+
             {section === "istatistikler" && (
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -1493,76 +1861,311 @@ function ProviderPanelPageContent({
 
             )}
             {section === "teklifler" && (
-            <div id="tekliflerim" className="scroll-mt-24 rounded-2xl border border-border bg-card p-6 shadow-soft">
-              <h2 className="font-display text-xl font-semibold">
-                Verdiğim Teklifler
-              </h2>
-
-              {offers.length === 0 ? (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  Henüz teklif vermedin.
-                </p>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  {offers.map((offer) => (
-                    <div
-                      key={offer.id}
-                      className="rounded-xl border border-border p-4"
-                    >
-                      <div className="flex flex-col justify-between gap-2 sm:flex-row">
-                        <div className="font-medium">{offer.needTitle}</div>
-
-                        <span
-                          className={`h-fit rounded-full border px-2.5 py-1 text-xs font-medium ${offerStatusClass(
-                            offer.status,
-                          )}`}
-                        >
-                          {offerStatusLabel(offer.status)}
-                        </span>
-                      </div>
-
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {offer.message}
-                      </p>
-
-                      {offer.price !== null && (
-                        <div className="mt-2 font-semibold">
-                          {offer.price.toLocaleString("tr-TR")} TL
-                        </div>
-                      )}
-
-                      {offer.status === "pending" && (
-                        <div className="mt-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={withdrawingOfferId === offer.id}
-                            onClick={() => void withdrawOffer(offer.id)}
-                            className="border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
-                          >
-                            {withdrawingOfferId === offer.id
-                              ? "Geri Çekiliyor..."
-                              : "Teklifi Geri Çek"}
-                          </Button>
-                        </div>
-                      )}
-
-                      {offer.status === "accepted" && (
-                        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-                          Müşteri teklifinizi kabul etti.
-                        </div>
-                      )}
-
-                      {offer.status === "withdrawn" && (
-                        <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                          Bu teklif geri çekildi.
-                        </div>
-                      )}
-                    </div>
-                  ))}
+              <div id="tekliflerim" className="w-full min-w-0 flex-1 space-y-5">
+                <div className="border-b border-border pb-4">
+                  <h1 className="font-display text-2xl font-bold">
+                    Verdiğim Teklifler
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Gönderdiğiniz teklifleri ve güncel durumlarını buradan takip edebilirsiniz.
+                  </p>
                 </div>
-              )}
-            </div>
+
+                <h2 className="text-sm font-semibold">
+                  Tekliflerim
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    ({offers.length})
+                  </span>
+                </h2>
+
+                {offers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Henüz teklif vermediniz.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {offers.map((offer) => (
+                      <details
+                        key={offer.id}
+                        className="group rounded-xl border border-border bg-card shadow-sm"
+                      >
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              {offer.needTitle}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {offer.price !== null
+                                ? `${offer.price.toLocaleString("tr-TR")} TL`
+                                : "Fiyat belirtilmedi"}
+                            </p>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-3">
+                            <span
+                              className={`rounded-full border px-2.5 py-1 text-xs font-medium ${offerStatusClass(offer.status)}`}
+                            >
+                              {offerStatusLabel(offer.status)}
+                            </span>
+                            <span className="text-xs font-medium text-primary group-open:hidden">
+                              Detayları Gör ↓
+                            </span>
+                            <span className="hidden text-xs font-medium text-primary group-open:inline">
+                              Kapat ↑
+                            </span>
+                          </div>
+                        </summary>
+
+                        <div className="border-t border-border px-4 pb-4 pt-4">
+                          <div className="rounded-2xl border border-border p-5 sm:p-7">
+                            <p className="text-xs font-bold uppercase tracking-widest text-primary">
+                              İş Fırsatı Detayı
+                            </p>
+                            <h3 className="mt-3 font-display text-xl font-bold">
+                              {offer.needTitle}
+                            </h3>
+                            <div className="mt-3 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                              <span>{new Date(offer.needCreatedAtUtc).toLocaleDateString("tr-TR")}</span>
+                              <span>{[offer.needDistrict, offer.needCity].filter(Boolean).join(" / ")}</span>
+                            </div>
+                            <div className="mt-5 border-t border-border pt-5">
+                              <h4 className="font-semibold">İhtiyaç Açıklaması</h4>
+                              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+                                {offer.needDescription || "Açıklama belirtilmedi."}
+                              </p>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {offer.needCategory && (
+                                <span className="rounded-full border px-3 py-1 text-xs">
+                                  {offer.needCategory}
+                                </span>
+                              )}
+                              {(offer.needCity || offer.needDistrict) && (
+                                <span className="rounded-full border px-3 py-1 text-xs">
+                                  {[offer.needDistrict, offer.needCity].filter(Boolean).join(" / ")}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-6 rounded-xl border border-border p-4 sm:p-5">
+                              <h4 className="font-semibold">Talep Sahibi ve İletişim</h4>
+                              <div className="mt-4 flex items-center gap-3">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
+                                  {(offer.requesterName || "K").charAt(0).toLocaleUpperCase("tr-TR")}
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{offer.requesterName || "Kullanıcı"}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {[offer.needDistrict, offer.needCity].filter(Boolean).join(" / ")}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                {offer.requesterMemberSinceUtc && (
+                                  <span>Üyelik: {new Date(offer.requesterMemberSinceUtc).toLocaleDateString("tr-TR")}</span>
+                                )}
+                                <span>Tamamlanan talep: {offer.requesterCompletedNeedCount}</span>
+                              </div>
+                              <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                                {offer.contactByPhone && (
+                                  offer.requesterPhone ? (
+                                    <a
+                                      href={`tel:${offer.requesterPhone}`}
+                                      className="inline-flex items-center rounded-lg bg-orange-300 px-4 py-2 text-sm font-medium text-white hover:bg-orange-400"
+                                    >
+                                      Telefon Et
+                                    </a>
+                                  ) : (
+                                    <button type="button" disabled className="rounded-lg bg-orange-300 px-4 py-2 text-sm font-medium text-white opacity-50">
+                                      Telefon Et
+                                    </button>
+                                  )
+                                )}
+
+                                {offer.contactByWhatsapp && (
+                                  offer.requesterWhatsapp ? (
+                                    <a
+                                      href={`https://wa.me/${offer.requesterWhatsapp.replace(/\\D/g, "")}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center rounded-lg bg-green-300 px-4 py-2 text-sm font-medium text-white hover:bg-green-400"
+                                    >
+                                      WhatsApp
+                                    </a>
+                                  ) : (
+                                    <button type="button" disabled className="rounded-lg bg-green-300 px-4 py-2 text-sm font-medium text-white opacity-50">
+                                      WhatsApp
+                                    </button>
+                                  )
+                                )}
+
+                                {offer.contactByEmail && (
+                                  offer.requesterEmail ? (
+                                    <a
+                                      href={`mailto:${offer.requesterEmail}`}
+                                      className="inline-flex items-center rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
+                                    >
+                                      E-posta
+                                    </a>
+                                  ) : (
+                                    <button type="button" disabled className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm text-muted-foreground opacity-50">
+                                      E-posta
+                                    </button>
+                                  )
+                                )}
+
+                                {offer.contactBySystemMessage && offer.status !== "withdrawn" && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={openingConversationId !== null}
+                                    onClick={() => void openNeedConversation(offer.needRequestId)}
+                                  >
+                                    Mesaj
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 rounded-2xl border border-border p-5 sm:p-7">
+                            <h3 className="text-base font-semibold">Verdiğim Teklif</h3>
+
+                          {editingOfferId === offer.id ? (
+                            <form
+                              className="mt-4 space-y-4"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void saveEditedOffer(offer.id);
+                              }}
+                            >
+                              <div>
+                                <label htmlFor={`edit-price-${offer.id}`} className="mb-2 block text-sm font-semibold">
+                                  Teklif Tutarı (TL) — İsteğe bağlı
+                                </label>
+                                <input
+                                  id={`edit-price-${offer.id}`}
+                                  type="number"
+                                  min={0}
+                                  max={100000000}
+                                  step="0.01"
+                                  value={editingOfferDraft.price}
+                                  onChange={(event) =>
+                                    setEditingOfferDraft((current) => ({
+                                      ...current,
+                                      price: event.target.value,
+                                    }))
+                                  }
+                                  className="h-11 w-full rounded-lg border border-input bg-background px-4 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor={`edit-message-${offer.id}`} className="mb-2 block text-sm font-semibold">
+                                  Teklif Mesajı
+                                </label>
+                                <textarea
+                                  id={`edit-message-${offer.id}`}
+                                  value={editingOfferDraft.message}
+                                  onChange={(event) =>
+                                    setEditingOfferDraft((current) => ({
+                                      ...current,
+                                      message: event.target.value,
+                                    }))
+                                  }
+                                  rows={5}
+                                  maxLength={2000}
+                                  className="w-full resize-y rounded-lg border border-input bg-background p-4 text-sm"
+                                />
+                              </div>
+
+                              {offerEditError && (
+                                <p role="alert" className="text-sm text-red-600">
+                                  {offerEditError}
+                                </p>
+                              )}
+
+                              <div className="flex flex-wrap gap-2">
+                                <Button type="submit" disabled={savingOfferId !== null}>
+                                  {savingOfferId === offer.id
+                                    ? "Kaydediliyor..."
+                                    : "Değişiklikleri Kaydet"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={savingOfferId !== null}
+                                  onClick={cancelEditingOffer}
+                                >
+                                  Vazgeç
+                                </Button>
+                              </div>
+                            </form>
+                          ) : (
+                            <>
+                          <p className="mt-3 text-xs font-medium text-muted-foreground">
+                            Teklif Tutarı
+                          </p>
+                          <p className="mt-1 text-sm font-semibold">
+                            {offer.price !== null
+                              ? `${offer.price.toLocaleString("tr-TR")} TL`
+                              : "Belirtilmedi"}
+                          </p>
+
+                          <p className="mt-4 text-xs font-medium text-muted-foreground">
+                            Teklif Mesajı
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-6">
+                            {offer.message}
+                          </p>
+
+                          <p className="mt-4 text-xs text-muted-foreground">
+                            Teklif tarihi: {new Date(offer.createdAtUtc).toLocaleString("tr-TR")}
+                          </p>
+
+                            </>
+                          )}
+
+                          {offer.status === "pending" && editingOfferId !== offer.id && (
+                            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={savingOfferId !== null || withdrawingOfferId !== null}
+                                onClick={() => startEditingOffer(offer)}
+                              >
+                                Teklifi Düzenle
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={withdrawingOfferId === offer.id}
+                                onClick={() => void withdrawOffer(offer.id)}
+                                className="border-red-600 text-red-600 hover:bg-red-50"
+                              >
+                                {withdrawingOfferId === offer.id
+                                  ? "Geri Çekiliyor..."
+                                  : "Teklifi Geri Çek"}
+                              </Button>
+                            </div>
+                          )}
+
+                          {offer.status === "accepted" && (
+                            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                              Müşteri teklifinizi kabul etti.
+                            </div>
+                          )}
+
+                          {offer.status === "withdrawn" && (
+                            <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                              Bu teklif geri çekildi.
+                            </div>
+                          )}
+                          </div>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -1596,7 +2199,7 @@ function ProviderPanelPageContent({
                   <div className="rounded-xl bg-muted/40 p-4">
                     <div className="text-xs text-muted-foreground">Konum</div>
                     <div className="mt-2 font-medium">
-                      {profile.citySlug} / {profile.districtSlug}
+                      {profile.citySlug?.charAt(0).toLocaleUpperCase("tr-TR")}{profile.citySlug?.slice(1)} / {profile.districtSlug?.charAt(0).toLocaleUpperCase("tr-TR")}{profile.districtSlug?.slice(1)}
                     </div>
                   </div>
 

@@ -439,70 +439,14 @@ public static class ProviderApplicationEndpoints
                 });
             }
 
-            var normalizedAdditionalServices = (request.AdditionalServices ?? Array.Empty<string>())
-                .Select(x => x?.Trim() ?? string.Empty)
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            if (normalizedAdditionalServices.Length > 1)
-            {
-                return Results.BadRequest(new
-                {
-                    message = "En fazla 1 ek hizmet seçebilirsiniz."
-                });
-            }
-
-            if (normalizedAdditionalServices.Any(x =>
-                string.Equals(
-                    x,
-                    request.ServiceSlug.Trim(),
-                    StringComparison.OrdinalIgnoreCase)))
-            {
-                return Results.BadRequest(new
-                {
-                    message = "Ana hizmet ek hizmet olarak tekrar seçilemez."
-                });
-            }
-
-            var additionalCategorySlug = Optional(request.AdditionalCategorySlug);
-
-            if (normalizedAdditionalServices.Length == 0)
-            {
-                additionalCategorySlug = null;
-            }
-            else
-            {
-                if (string.IsNullOrWhiteSpace(additionalCategorySlug))
-                {
-                    return Results.BadRequest(new
-                    {
-                        message = "2. hizmet için kategori seçmelisiniz."
-                    });
-                }
-
-                var additionalCategoryExists = await dbContext.Categories
-                    .AsNoTracking()
-                    .AnyAsync(x =>
-                        x.Slug == additionalCategorySlug &&
-                        x.IsActive);
-
-                if (!additionalCategoryExists)
-                {
-                    return Results.BadRequest(new
-                    {
-                        message = "2. hizmet için geçerli bir kategori seçmelisiniz."
-                    });
-                }
-            }
+            // Eski kategori doğrulamaları bu işlemde uygulanmaz.
+            // A-B-C hizmetleri ayrı endpoint üzerinden yönetilir.
 
             provider.BusinessName = request.BusinessName.Trim();
             provider.ShortDescription = request.ShortDescription.Trim();
             provider.Description = Optional(request.Description);
-            provider.CategorySlug = request.CategorySlug.Trim();
-            provider.ServiceSlug = request.ServiceSlug.Trim();
-            provider.AdditionalCategorySlug = additionalCategorySlug;
-            provider.AdditionalServices = normalizedAdditionalServices;
+            // Kategori ve hizmet kayıtları ayrı ABC editöründen yönetilir.
+            // Genel işletme bilgileri güncellenirken mevcut hizmetler korunur.
             provider.CitySlug = request.CitySlug.Trim();
             provider.DistrictSlug = request.DistrictSlug.Trim();
             provider.PublicPhone = Optional(request.PublicPhone);

@@ -406,8 +406,8 @@ export default function BusinessAccountManager() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Select label="İl" value={citySlug} className={selectClass} onChange={v=>{setCitySlug(v);setDistrictSlug("");}} options={cities.map(x=>({value:x.slug,label:x.name}))}/>
-            <Select label="İlçe" value={districtSlug} className={selectClass} disabled={!selectedCity} onChange={setDistrictSlug} options={(selectedCity?.districts??[]).map(x=>({value:x.slug,label:x.name}))}/>
+            <Select label="İl" value={citySlug} className={selectClass} onChange={v=>{setCitySlug(v);setDistrictSlug("");}} options={cities.map(x=>({value:x.slug,label:x.name.charAt(0).toLocaleUpperCase("tr-TR")+x.name.slice(1)}))}/>
+            <Select label="İlçe" value={districtSlug} className={selectClass} disabled={!selectedCity} onChange={setDistrictSlug} options={(selectedCity?.districts??[]).map(x=>({value:x.slug,label:x.name.charAt(0).toLocaleUpperCase("tr-TR")+x.name.slice(1)}))}/>
           </div>
           <label className="grid gap-1.5"><span className="text-sm font-semibold text-slate-700">Açık Adres</span>
             <textarea value={publicAddress} onChange={e=>setPublicAddress(e.target.value)} rows={3} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"/>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { getStoredUser } from "@/lib/auth";
 import dynamic from "next/dynamic";
 import {
   Building2, ChevronLeft, ChevronRight, Clock3, ExternalLink, Heart,
@@ -14,6 +15,11 @@ import { apiBaseUrl } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { trackPlatformAnalytics } from "@/lib/platform-analytics";
 import { trackProviderInteraction } from "@/lib/provider-interactions";
+
+const EditableMap = dynamic(
+  () => import("@/components/location/BusinessLocationMap"),
+  { ssr: false },
+);
 
 const DetailMap = dynamic(
   () => import("@/components/location/ProviderDetailMap"),
@@ -119,6 +125,8 @@ type ProviderProfileViewProps = {
   galleryOverride?: GalleryPhoto[];
   forceAuthenticated?: boolean;
   embedded?: boolean;
+  allowLocationEdit?: boolean;
+  onLocationSaved?: (latitude: number, longitude: number) => void;
 };
 
 export default function ProviderProfileView({
@@ -126,12 +134,79 @@ export default function ProviderProfileView({
   galleryOverride,
   forceAuthenticated = false,
   embedded = false,
+  allowLocationEdit = false,
+  onLocationSaved,
 }: ProviderProfileViewProps) {
   const params = useParams<{ slug?: string }>();
   const router = useRouter();
   const slug = providerOverride?.slug ?? params.slug ?? "";
 
   const [authVersion, setAuthVersion] = useState(0);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationLatitude, setLocationLatitude] = useState<number | null>(null);
+  const [locationLongitude, setLocationLongitude] = useState<number | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationSuccess, setLocationSuccess] = useState("");
+
+  async function saveOwnLocation() {
+    if (!provider || locationLatitude === null || locationLongitude === null) {
+      setLocationError("Haritadan konum seçin.");
+      return;
+    }
+
+    const token = getAccessToken();
+    const user = getStoredUser();
+    if (!token || !user ||
+        (user.role !== "provider" && user.role !== "admin")) {
+      setLocationError("İşlem için işletme hesabıyla giriş yapın.");
+      return;
+    }
+
+    if (!provider.citySlug || !provider.districtSlug) {
+      setLocationError("İşletmenin il ve ilçe bilgileri eksik.");
+      return;
+    }
+
+    setSavingLocation(true);
+    setLocationError("");
+    setLocationSuccess("");
+
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/provider-panel/me/location`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            citySlug: provider.citySlug,
+            districtSlug: provider.districtSlug,
+            publicAddress: provider.publicAddress ?? null,
+            latitude: locationLatitude,
+            longitude: locationLongitude,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? "Konum kaydedilemedi.");
+      }
+
+      onLocationSaved?.(locationLatitude, locationLongitude);
+      setEditingLocation(false);
+      setLocationSuccess("Konum başarıyla kaydedildi.");
+    } catch (error) {
+      setLocationError(
+        error instanceof Error ? error.message : "Konum kaydedilemedi."
+      );
+    } finally {
+      setSavingLocation(false);
+    }
+  }
 
   useEffect(() => {
     const refresh = () => setAuthVersion((v) => v + 1);
@@ -674,14 +749,42 @@ export default function ProviderProfileView({
           >
             <div className="space-y-5 p-6">
               <div>
-                <h2 className="flex items-center gap-2 text-xl font-black">
-                  <MapPin className="text-emerald-600" />
-                  Konum
-                </h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 text-xl font-black">
+                    <MapPin className="text-emerald-600" />
+                    Konum
+                  </h2>
+                  {allowLocationEdit && !editingLocation && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationLatitude(provider.latitude ?? null);
+                        setLocationLongitude(provider.longitude ?? null);
+                        setLocationError("");
+                        setLocationSuccess("");
+                        setEditingLocation(true);
+                      }}
+                      className="rounded-lg border px-3 py-2 text-sm font-semibold"
+                    >
+                      Konumu Düzenle
+                    </button>
+                  )}
+                </div>
                 <p className="ml-8 text-sm text-slate-500">
                   Kolayca bulun, bize ulaşın
                 </p>
               </div>
+
+              {allowLocationEdit && locationSuccess && (
+                <p role="status" className="text-sm text-emerald-700">
+                  {locationSuccess}
+                </p>
+              )}
+              {allowLocationEdit && locationError && (
+                <p role="alert" className="text-sm text-red-600">
+                  {locationError}
+                </p>
+              )}
 
               <Info
                 icon={Building2}
@@ -784,7 +887,42 @@ export default function ProviderProfileView({
             </div>
 
             <div className="min-h-[430px] bg-slate-100">
-              {hasMap ? (
+              {allowLocationEdit && editingLocation ? (
+                <div className="space-y-3 p-3">
+                  <p className="text-sm text-slate-600">
+                    Haritaya tıklayarak yeni işletme konumunu seçin.
+                  </p>
+                  <div className="h-[390px] overflow-hidden rounded-xl">
+                    <EditableMap
+                      latitude={locationLatitude}
+                      longitude={locationLongitude}
+                      onChange={(point) => {
+                        setLocationLatitude(point.latitude);
+                        setLocationLongitude(point.longitude);
+                        setLocationError("");
+                      }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={savingLocation}
+                      onClick={() => void saveOwnLocation()}
+                      className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white disabled:opacity-50"
+                    >
+                      {savingLocation ? "Kaydediliyor..." : "Konumu Kaydet"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingLocation}
+                      onClick={() => setEditingLocation(false)}
+                      className="rounded-lg border px-4 py-2 font-semibold"
+                    >
+                      İptal
+                    </button>
+                  </div>
+                </div>
+              ) : hasMap ? (
                 <DetailMap
                   latitude={provider.latitude!}
                   longitude={provider.longitude!}

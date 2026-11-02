@@ -65,7 +65,7 @@ export default function MembershipPanelPage() {
         return;
       }
 
-      if (user.role !== "provider") {
+      if (user.role !== "provider" && user.role !== "admin") {
         router.replace("/hesabim");
         return;
       }

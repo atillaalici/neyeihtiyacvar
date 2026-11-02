@@ -12,40 +12,48 @@ public sealed class AdminAccessClaimsTransformation(
         ClaimsPrincipal principal)
     {
         if (principal.Identity?.IsAuthenticated != true)
-        {
             return principal;
-        }
-
-        if (principal.IsInRole(UserRole.Admin.ToString()))
-        {
-            return principal;
-        }
 
         var rawUserId =
             principal.FindFirstValue(ClaimTypes.NameIdentifier) ??
             principal.FindFirstValue("sub");
 
         if (!Guid.TryParse(rawUserId, out var userId))
-        {
             return principal;
-        }
 
-        var hasAdminAccess = await dbContext.Users
+        var user = await dbContext.Users
             .AsNoTracking()
-            .Where(x => x.Id == userId)
-            .Select(x => x.IsAdmin || x.Role == UserRole.Admin)
+            .Where(x =>
+                x.Id == userId &&
+                x.IsActive &&
+                x.DeletedAtUtc == null)
+            .Select(x => new { x.IsAdmin, x.Role })
             .FirstOrDefaultAsync();
 
-        if (!hasAdminAccess)
+        var hasAdminAccess = user is not null &&
+            (user.IsAdmin || user.Role == UserRole.Admin);
+
+        // JWT'den gelen eski Admin rolünü kaldır.
+        // Diğer rollere dokunma.
+        foreach (var identity in principal.Identities)
         {
-            return principal;
+            var oldAdminClaims = identity.Claims
+                .Where(x =>
+                    x.Type == identity.RoleClaimType &&
+                    x.Value == UserRole.Admin.ToString())
+                .ToList();
+
+            foreach (var claim in oldAdminClaims)
+                identity.RemoveClaim(claim);
         }
 
-        if (principal.Identity is ClaimsIdentity identity)
+        // Güncel veritabanı yetkisine göre Admin rolünü ekle.
+        if (hasAdminAccess &&
+            principal.Identity is ClaimsIdentity activeIdentity)
         {
-            identity.AddClaim(
+            activeIdentity.AddClaim(
                 new Claim(
-                    ClaimTypes.Role,
+                    activeIdentity.RoleClaimType,
                     UserRole.Admin.ToString()));
         }
 

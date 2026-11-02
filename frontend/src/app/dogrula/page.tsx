@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Phone, ShieldCheck } from "lucide-react";
 
@@ -33,13 +33,17 @@ function VerifyPageContent() {
       ? "contact-change"
       : undefined;
   const returnUrl = searchParams.get("returnUrl") ?? "/hesabim";
+  const autoSend = searchParams.get("autoSend") === "1";
 
   const [account, setAccount] = useState<AuthUser | null>(null);
   const [code, setCode] = useState("");
   const [working, setWorking] = useState<"verify" | "resend" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [resendSeconds, setResendSeconds] = useState(120);
+  const [resendSeconds, setResendSeconds] = useState(
+    autoSend ? 0 : 120,
+  );
+  const autoSendStarted = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -219,6 +223,63 @@ function VerifyPageContent() {
       setWorking(null);
     }
   }
+
+  useEffect(() => {
+    if (
+      !autoSend ||
+      channel !== "email" ||
+      !userId ||
+      alreadyVerified ||
+      autoSendStarted.current
+    ) {
+      return;
+    }
+
+    // Aynı bileşen yaşam döngüsünde ikinci gönderimi önle.
+    // Eski sessionStorage kaydı sonraki ziyaretleri engellemesin.
+    autoSendStarted.current = true;
+
+    async function sendInitialCode() {
+      setWorking("resend");
+      setError("");
+      setMessage("");
+
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/auth/verification/resend`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              userId,
+              channel: "email",
+              purpose,
+            }),
+          },
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          setError(data?.message ?? "Doğrulama kodu gönderilemedi.");
+          return;
+        }
+
+        setResendSeconds(120);
+        setMessage(
+          data?.message ?? "Doğrulama kodu e-posta adresine gönderildi.",
+        );
+      } catch {
+        setError("Doğrulama kodu gönderilirken bağlantı hatası oluştu.");
+      } finally {
+        setWorking(null);
+      }
+    }
+
+    void sendInitialCode();
+  }, [autoSend, channel, userId, alreadyVerified, purpose]);
 
   if (!userId) {
     return (

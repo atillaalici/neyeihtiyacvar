@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { HomeClient } from "./home-client";
+import { First500CampaignPopup } from "@/components/site/First500CampaignPopup";
 
 export const metadata: Metadata = {
   title: "İhtiyacını Yaz, Doğru Hizmeti Bul",
@@ -34,5 +35,10 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <HomeClient />;
+  return (
+    <>
+      <HomeClient />
+      <First500CampaignPopup />
+    </>
+  );
 }

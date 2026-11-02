@@ -3,29 +3,148 @@ import Link from "next/link";
 import { ArrowRight, Search } from "lucide-react";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { HeroSearch } from "@/components/site/HeroSearch";
+import { serverApiBaseUrl } from "@/lib/seo";
 
 const categories = [
-  { title: "Usta & Tamir", image: "/vitrin/usta-tamir.png", href: "/kategoriler/usta-tamir" },
-  { title: "Ev & Yaşam", image: "/vitrin/ev-yasam.png", href: "/kategoriler/ev-yasam" },
-  { title: "Nakliye & Hafriyat", image: "/vitrin/nakliye-hafriyat-v2.png", href: "/kategoriler/nakliye-ve-hafriyat" },
-  { title: "Teknoloji & Yazılım", image: "/vitrin/teknoloji.png", href: "/kategoriler/teknoloji-yazilim" },
-  { title: "Otomotiv", image: "/vitrin/otomotiv.png", href: "/kategoriler/otomotiv" },
-  { title: "Eğitim", image: "/vitrin/egitim.png", href: "/kategoriler/egitim" },
-  { title: "Organizasyon", image: "/vitrin/organizasyon.png", href: "/kategoriler/organizasyon" },
-  { title: "Sağlık & Bakım", image: "/vitrin/saglik-bakim.png", href: "/kategoriler/saglik-bakim" },
-  { title: "Güzellik & Kişisel Bakım", image: "/vitrin/guzellik-kisisel-bakim.png", href: "/kategoriler/guzellik-kisisel-bakim" },
-  { title: "Yeme & İçme", image: "/vitrin/yeme-icme.png", href: "/kategoriler/yeme-icme" },
-  { title: "Alışveriş & Mağazalar", image: "/vitrin/alisveris-magazalar.png", href: "/kategoriler/alisveris-magazalar" },
-  { title: "Emlak", image: "/vitrin/emlak.png", href: "/kategoriler/emlak" },
-  { title: "İnşaat & Yapı", image: "/vitrin/insaat-yapi.png", href: "/kategoriler/insaat-yapi" },
-  { title: "Tarım & Hayvancılık", image: "/vitrin/tarim-hayvancilik.png", href: "/kategoriler/tarim-hayvancilik" },
-  { title: "Turizm & Konaklama", image: "/vitrin/turizm-konaklama.png", href: "/kategoriler/turizm-konaklama" },
-  { title: "Profesyonel Hizmetler", image: "/vitrin/profesyonel-hizmetler.png", href: "/kategoriler/profesyonel-hizmetler" },
-  { title: "Spor & Fitness", image: "/vitrin/spor-fitness.png", href: "/kategoriler/spor-fitness" },
-  { title: "Diğer Hizmetler", image: "/vitrin/diger.png", href: "/kategoriler/digerleri" },
+  {
+    "title": "Alışveriş, Mağazalar ve Perakende",
+    "image": "/kategori-gorselleri/alisveris-magazalar-ve-perakende.png",
+    "href": "/kategoriler/alisveris-magazalar-ve-perakende"
+  },
+  {
+    "title": "Bahçe, Peyzaj ve Dış Mekân",
+    "image": "/kategori-gorselleri/bahce-peyzaj-ve-dis-mekan.png",
+    "href": "/kategoriler/bahce-peyzaj-ve-dis-mekan"
+  },
+  {
+    "title": "Eğitim, Kurs ve Özel Ders",
+    "image": "/kategori-gorselleri/egitim-kurs-ve-ozel-ders.png",
+    "href": "/kategoriler/egitim-kurs-ve-ozel-ders"
+  },
+  {
+    "title": "Elektrik, Enerji ve Aydınlatma",
+    "image": "/kategori-gorselleri/elektrik-enerji-ve-aydinlatma.png",
+    "href": "/kategoriler/elektrik-enerji-ve-aydinlatma"
+  },
+  {
+    "title": "Emlak, Gayrimenkul ve Konaklama",
+    "image": "/kategori-gorselleri/emlak-gayrimenkul-ve-konaklama.png",
+    "href": "/kategoriler/emlak-gayrimenkul-ve-konaklama"
+  },
+  {
+    "title": "Güzellik, Kişisel Bakım ve Spor",
+    "image": "/kategori-gorselleri/guzellik-kisisel-bakim-ve-spor.png",
+    "href": "/kategoriler/guzellik-kisisel-bakim-ve-spor"
+  },
+  {
+    "title": "Mobilya, Marangozluk ve Dekorasyon",
+    "image": "/kategori-gorselleri/mobilya-marangozluk-ve-dekorasyon.png",
+    "href": "/kategoriler/mobilya-marangozluk-ve-dekorasyon"
+  },
+  {
+    "title": "Nakliyat, Lojistik ve Kurye",
+    "image": "/kategori-gorselleri/nakliyat-lojistik-ve-kurye.png",
+    "href": "/kategoriler/nakliyat-lojistik-ve-kurye"
+  },
+  {
+    "title": "Organizasyon, Etkinlik ve Eğlence",
+    "image": "/kategori-gorselleri/organizasyon-etkinlik-ve-eglence.png",
+    "href": "/kategoriler/organizasyon-etkinlik-ve-eglence"
+  },
+  {
+    "title": "Otomotiv ve Araç Hizmetleri",
+    "image": "/kategori-gorselleri/otomotiv-ve-arac-hizmetleri.png",
+    "href": "/kategoriler/otomotiv-ve-arac-hizmetleri"
+  },
+  {
+    "title": "Profesyonel ve Kurumsal Hizmetler",
+    "image": "/kategori-gorselleri/profesyonel-ve-kurumsal-hizmetler.png",
+    "href": "/kategoriler/profesyonel-ve-kurumsal-hizmetler"
+  },
+  {
+    "title": "Sağlık, Bakım ve Danışmanlık",
+    "image": "/kategori-gorselleri/saglik-bakim-ve-danismanlik.png",
+    "href": "/kategoriler/saglik-bakim-ve-danismanlik"
+  },
+  {
+    "title": "Sanayi, Üretim ve Makine Hizmetleri",
+    "image": "/kategori-gorselleri/sanayi-uretim-ve-makine-hizmetleri.png",
+    "href": "/kategoriler/sanayi-uretim-ve-makine-hizmetleri"
+  },
+  {
+    "title": "Tadilat, İnşaat ve Yapı",
+    "image": "/kategori-gorselleri/tadilat-insaat-ve-yapi.png",
+    "href": "/kategoriler/tadilat-insaat-ve-yapi"
+  },
+  {
+    "title": "Tarım, Hayvancılık ve Evcil Hayvanlar",
+    "image": "/kategori-gorselleri/tarim-hayvancilik-ve-evcil-hayvanlar.png",
+    "href": "/kategoriler/tarim-hayvancilik-ve-evcil-hayvanlar"
+  },
+  {
+    "title": "Teknik Servis, Bakım ve Onarım",
+    "image": "/kategori-gorselleri/teknik-servis-bakim-ve-onarim.png",
+    "href": "/kategoriler/teknik-servis-bakim-ve-onarim"
+  },
+  {
+    "title": "Teknoloji, Yazılım ve Dijital Hizmetler",
+    "image": "/kategori-gorselleri/teknoloji-yazilim-ve-dijital-hizmetler.png",
+    "href": "/kategoriler/teknoloji-yazilim-ve-dijital-hizmetler"
+  },
+  {
+    "title": "Temizlik, Hijyen ve İlaçlama",
+    "image": "/kategori-gorselleri/temizlik-hijyen-ve-ilaclama.png",
+    "href": "/kategoriler/temizlik-hijyen-ve-ilaclama"
+  },
+  {
+    "title": "Tesisat, Isıtma, Soğutma ve İklimlendirme",
+    "image": "/kategori-gorselleri/tesisat-isitma-sogutma-ve-iklimlendirme.png",
+    "href": "/kategoriler/tesisat-isitma-sogutma-ve-iklimlendirme"
+  },
+  {
+    "title": "Yeme, İçme ve Gıda",
+    "image": "/kategori-gorselleri/yeme-icme-ve-gida.png",
+    "href": "/kategoriler/yeme-icme-ve-gida"
+  }
 ];
 
-export default function CategoriesPage() {
+type CategoryCount = {
+  slug: string;
+  providerCount: number;
+};
+
+export default async function CategoriesPage() {
+  let categoryCounts: Record<string, number> = {};
+
+  try {
+    const response = await fetch(
+      `${serverApiBaseUrl}/api/categories/tree`,
+      { cache: "no-store" },
+    );
+
+    if (response.ok) {
+      const data = (await response.json()) as CategoryCount[];
+
+      categoryCounts = Object.fromEntries(
+        data.map((item) => [item.slug, item.providerCount ?? 0]),
+      );
+    }
+  } catch {
+    // API erisilemezse alfabetik siralama kullanilir.
+  }
+
+  const sortedCategories = [...categories].sort((a, b) => {
+    const slugA = a.href.split("/").pop() ?? "";
+    const slugB = b.href.split("/").pop() ?? "";
+
+    return (
+      (categoryCounts[slugB] ?? 0) -
+        (categoryCounts[slugA] ?? 0) ||
+      a.title.localeCompare(b.title, "tr")
+    );
+  });
+
   return (
     <SiteLayout>
       <main className="section-shell py-10 sm:py-14 lg:py-16">
@@ -35,29 +154,15 @@ export default function CategoriesPage() {
           </span>
 
           <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-            Sık Aranan Hizmetler
+            Kategoriler
           </h1>
 
           <p className="mt-3 max-w-2xl text-muted-foreground">
-            En Çok ihtiyaÇ duyulan hizmetleri hızlıca keŞfet. AradıĞın hizmet burada yoksa ihtiyacını kendi cÜmlenle yaz.
+            Farklı alanlardaki hizmetleri incele, ihtiyacına en uygun olanı seç.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/kesfet"
-              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-orange-600"
-            >
-              <Search className="h-4 w-4" />
-              Keşfet
-            </Link>
-
-            <Link
-              href="/ihtiyac-olustur"
-              className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-sm font-bold text-orange-700 transition hover:bg-orange-50"
-            >
-              İhtiyacını Yaz
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div className="relative z-20 mt-6 max-w-[760px]">
+            <HeroSearch searchOnly />
           </div>
         </section>
 
@@ -65,11 +170,8 @@ export default function CategoriesPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                En Çok Arananlar
+                Tüm Hizmetler
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-                Ana sayfadaki vitrin gÖrÜnÜmÜyle aynı dÜzen.
-              </p>
             </div>
 
             <Link
@@ -81,7 +183,7 @@ export default function CategoriesPage() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
-            {categories.map((category) => (
+            {sortedCategories.map((category) => (
               <Link
                 key={category.title}
                 href={category.href}

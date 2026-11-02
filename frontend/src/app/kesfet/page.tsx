@@ -238,7 +238,8 @@ function ExplorePageContent() {
   const service =
     searchParams.get("hizmet")?.trim() ?? "";
 
-  const smartMode = q.length > 0;
+  const workId = searchParams.get("workId")?.trim() ?? "";
+  const smartMode = q.length > 0 && !workId;
 
   const visibleIntentSuggestions = useMemo(() => {
     const normalized = normalizeSearchText(queryInput);
@@ -267,6 +268,7 @@ function ExplorePageContent() {
       "ilce",
       "kategori",
       "hizmet",
+      "workId",
       "lat",
       "lon",
     ] as const) {

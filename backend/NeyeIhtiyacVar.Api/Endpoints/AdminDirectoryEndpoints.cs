@@ -415,6 +415,357 @@ public static class AdminDirectoryEndpoints
             });
         });
 
+
+
+        // Admin: İşletme sahibinin e-posta adresini yönet.
+        group.MapGet("/providers/{id:guid}/owner-email", async (
+            Guid id,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (!provider.OwnerUserId.HasValue)
+                return Results.NotFound(new { message = "İşletme sahibi hesabı bulunamadı." });
+
+            var user = await dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == provider.OwnerUserId.Value);
+
+            if (user is null)
+                return Results.NotFound(new { message = "Kullanıcı bulunamadı." });
+
+            return Results.Ok(new
+            {
+                userId = user.Id,
+                email = user.Email,
+                emailVerified = user.EmailVerifiedAtUtc != null
+            });
+        });
+
+        group.MapPut("/providers/{id:guid}/owner-email", async (
+            Guid id,
+            AdminUpdateProviderOwnerEmailRequest request,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (!provider.OwnerUserId.HasValue)
+                return Results.NotFound(new { message = "İşletme sahibi hesabı bulunamadı." });
+
+            var user = await dbContext.Users
+                .FirstOrDefaultAsync(x => x.Id == provider.OwnerUserId.Value);
+
+            if (user is null)
+                return Results.NotFound(new { message = "Kullanıcı bulunamadı." });
+
+            var email = request.Email?.Trim().ToLowerInvariant() ?? "";
+
+            if (email.Length > 254 ||
+                email.Length < 5 ||
+                !System.Net.Mail.MailAddress.TryCreate(email, out var parsed) ||
+                !string.Equals(parsed.Address, email, StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new
+                {
+                    message = "Geçerli bir e-posta adresi girin."
+                });
+
+            var normalized = email.ToUpperInvariant();
+
+            var duplicate = await dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id != user.Id &&
+                    x.NormalizedEmail == normalized);
+
+            if (duplicate)
+                return Results.Conflict(new
+                {
+                    message = "Bu e-posta adresi başka bir kullanıcıya ait."
+                });
+
+            if (user.NormalizedEmail != normalized)
+            {
+                user.Email = email;
+                user.NormalizedEmail = normalized;
+                user.EmailVerifiedAtUtc = null;
+                user.UpdatedAtUtc = DateTime.UtcNow;
+
+                await dbContext.SaveChangesAsync();
+            }
+
+            return Results.Ok(new
+            {
+                userId = user.Id,
+                email = user.Email,
+                emailVerified = user.EmailVerifiedAtUtc != null,
+                message = "E-posta adresi güncellendi. Yeni adres doğrulanmalıdır."
+            });
+        });
+
+        // Admin: İşletmenin kayıtlı A-B-C hizmetlerini görüntüle.
+        group.MapGet("/providers/{id:guid}/abc-services", async (
+            Guid id,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+                return Results.NotFound(new
+                {
+                    message = "İşletme bulunamadı."
+                });
+
+            var assignments = await dbContext.ProviderCategoryLibraryWorks
+                .AsNoTracking()
+                .Where(x => x.ProviderId == id)
+                .Join(dbContext.CategoryLibraryWorks.AsNoTracking(),
+                    assignment => assignment.CategoryLibraryWorkId,
+                    work => work.Id,
+                    (assignment, work) => new
+                    {
+                        assignment.SlotIndex,
+                        assignment.CategoryLibraryWorkId,
+                        work.CategoryServiceId
+                    })
+                .ToListAsync();
+
+            var slots = assignments
+                .GroupBy(x => x.SlotIndex)
+                .OrderBy(x => x.Key)
+                .Select(g => new
+                {
+                    slotIndex = g.Key,
+                    categoryServiceId = g.First().CategoryServiceId,
+                    categoryLibraryWorkIds = g
+                        .Select(x => x.CategoryLibraryWorkId)
+                        .ToArray()
+                })
+                .ToArray();
+
+            var now = DateTime.UtcNow;
+
+            var membership = await dbContext.ProviderMemberships
+                .AsNoTracking()
+                .Where(x => x.ProviderId == id &&
+                            x.IsActive &&
+                            x.StartsAtUtc <= now &&
+                            (x.ExpiresAtUtc == null ||
+                             x.ExpiresAtUtc > now))
+                .OrderByDescending(x => x.StartsAtUtc)
+                .FirstOrDefaultAsync();
+
+            var serviceLimit = membership?.ServiceLimitSnapshot ?? 0;
+
+            int? workLimit = serviceLimit switch
+            {
+                2 => 3,
+                5 => 5,
+                12 => null,
+                _ => 3
+            };
+
+            return Results.Ok(new
+            {
+                slots,
+                categoryServiceIds = assignments
+                    .Select(x => x.CategoryServiceId)
+                    .Distinct()
+                    .ToArray(),
+                categoryLibraryWorkIds = assignments
+                    .Select(x => x.CategoryLibraryWorkId)
+                    .ToArray(),
+                serviceLimit,
+                workLimit,
+                version = provider.Version,
+                membershipActive = membership is not null
+            });
+        });
+
+
+        // Admin: İşletmenin A-B-C hizmet kartlarını güncelle.
+        group.MapPut("/providers/{id:guid}/abc-services", async (
+            Guid id,
+            AdminUpdateAbcServicesRequest request,
+            AppDbContext dbContext) =>
+        {
+            var provider = await dbContext.Providers
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (provider is null)
+                return Results.NotFound(new { message = "İşletme bulunamadı." });
+
+            if (provider.Version != request.ExpectedVersion)
+                return Results.Conflict(new
+                {
+                    message = "İşletme bilgileri değişmiş. Sayfayı yenileyin."
+                });
+
+            var now = DateTime.UtcNow;
+
+            var membership = await dbContext.ProviderMemberships
+                .AsNoTracking()
+                .Where(x => x.ProviderId == id &&
+                            x.IsActive &&
+                            x.StartsAtUtc <= now &&
+                            (x.ExpiresAtUtc == null || x.ExpiresAtUtc > now))
+                .OrderByDescending(x => x.StartsAtUtc)
+                .FirstOrDefaultAsync();
+
+            if (membership is null)
+                return Results.BadRequest(new
+                {
+                    message = "Aktif üyelik bulunamadı."
+                });
+
+            var serviceLimit = membership.ServiceLimitSnapshot;
+
+            int? workLimit = serviceLimit switch
+            {
+                2 => 3,
+                5 => 5,
+                12 => null,
+                _ => 3
+            };
+
+            var slots = request.Slots;
+
+            if (slots is null ||
+                slots.Length == 0 ||
+                slots.Length > serviceLimit ||
+                slots.Any(x =>
+                    x.SlotIndex < 0 ||
+                    x.SlotIndex >= serviceLimit ||
+                    x.CategoryLibraryWorkIds is null ||
+                    x.CategoryLibraryWorkIds.Length == 0) ||
+                slots.Select(x => x.SlotIndex).Distinct().Count() != slots.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz hizmet kartı veya paket sınırı."
+                });
+
+            var allWorkIds = slots
+                .SelectMany(x => x.CategoryLibraryWorkIds!)
+                .ToArray();
+
+            if (allWorkIds.Distinct().Count() != allWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Aynı iş birden fazla kartta seçilemez."
+                });
+
+            if (workLimit.HasValue &&
+                slots.Any(x => x.CategoryLibraryWorkIds!.Length > workLimit.Value))
+                return Results.BadRequest(new
+                {
+                    message = "Hizmet kartındaki iş sayısı paket sınırını aşıyor."
+                });
+
+            var groupIds = slots
+                .Select(x => x.CategoryServiceId)
+                .Distinct()
+                .ToArray();
+
+            var validGroupCount = await dbContext.CategoryServices
+                .AsNoTracking()
+                .CountAsync(x => groupIds.Contains(x.Id) &&
+                                 x.IsActive &&
+                                 x.Category.IsActive);
+
+            if (validGroupCount != groupIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz veya pasif hizmet grubu."
+                });
+
+            var works = await dbContext.CategoryLibraryWorks
+                .AsNoTracking()
+                .Where(x => allWorkIds.Contains(x.Id) &&
+                            x.IsActive &&
+                            x.CategoryService.IsActive &&
+                            x.CategoryService.Category.IsActive)
+                .Select(x => new { x.Id, x.CategoryServiceId })
+                .ToListAsync();
+
+            if (works.Count != allWorkIds.Length)
+                return Results.BadRequest(new
+                {
+                    message = "Geçersiz veya pasif iş seçimi."
+                });
+
+            var workGroups = works.ToDictionary(
+                x => x.Id,
+                x => x.CategoryServiceId);
+
+            if (slots.Any(slot => slot.CategoryLibraryWorkIds!
+                .Any(workId => workGroups[workId] != slot.CategoryServiceId)))
+                return Results.BadRequest(new
+                {
+                    message = "İş ve hizmet grubu eşleşmiyor."
+                });
+
+            var existing = await dbContext.ProviderCategoryLibraryWorks
+                .Where(x => x.ProviderId == id)
+                .ToListAsync();
+
+            var desired = slots
+                .SelectMany(slot => slot.CategoryLibraryWorkIds!
+                    .Select(workId => new
+                    {
+                        WorkId = workId,
+                        slot.SlotIndex
+                    }))
+                .ToDictionary(x => x.WorkId, x => x.SlotIndex);
+
+            dbContext.ProviderCategoryLibraryWorks.RemoveRange(
+                existing.Where(x =>
+                    !desired.ContainsKey(x.CategoryLibraryWorkId)));
+
+            foreach (var assignment in existing)
+            {
+                if (desired.TryGetValue(
+                    assignment.CategoryLibraryWorkId,
+                    out var slotIndex))
+                    assignment.SlotIndex = slotIndex;
+            }
+
+            var currentIds = existing
+                .Select(x => x.CategoryLibraryWorkId)
+                .ToHashSet();
+
+            dbContext.ProviderCategoryLibraryWorks.AddRange(
+                desired
+                    .Where(x => !currentIds.Contains(x.Key))
+                    .Select(x => new ProviderCategoryLibraryWork
+                    {
+                        ProviderId = id,
+                        CategoryLibraryWorkId = x.Key,
+                        SlotIndex = x.Value,
+                        CreatedAtUtc = now
+                    }));
+
+            provider.Version++;
+            provider.UpdatedAtUtc = now;
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                message = "Hizmetler kaydedildi.",
+                version = provider.Version
+            });
+        });
+
         group.MapGet("/providers/{id:guid}", async (
             Guid id,
             AppDbContext dbContext) =>
@@ -976,3 +1327,17 @@ public sealed record AdminContactRequestStatusRequest(string? Status);
 
 
 public sealed record AdminContactReplyRequest(string? Message);
+
+
+public sealed record AdminAbcServiceSlotRequest(
+    int SlotIndex,
+    Guid CategoryServiceId,
+    Guid[] CategoryLibraryWorkIds);
+
+public sealed record AdminUpdateAbcServicesRequest(
+    int ExpectedVersion,
+    AdminAbcServiceSlotRequest[] Slots);
+
+
+
+public sealed record AdminUpdateProviderOwnerEmailRequest(string Email);

@@ -45,6 +45,18 @@ public static class CatalogEndpoints
                     id = category.Id,
                     name = category.Name,
                     slug = category.Slug,
+                    providerCount = db.ProviderCategoryLibraryWorks
+                        .Where(link =>
+                            link.Provider.IsActive &&
+                            link.Provider.PublicationStatus ==
+                                NeyeIhtiyacVar.Api.Domain.PublicationStatus.Published &&
+                            link.CategoryLibraryWork.IsActive &&
+                            link.CategoryLibraryWork.CategoryService.IsActive &&
+                            link.CategoryLibraryWork.CategoryService.CategoryId ==
+                                category.Id)
+                        .Select(link => link.ProviderId)
+                        .Distinct()
+                        .Count(),
                     services = category.Services
                         .Where(service => service.IsActive)
                         .OrderBy(service => service.SortOrder)

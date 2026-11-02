@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +15,30 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>();
+builder.Services.AddHostedService<EmailOutboxWorker>();
 builder.Services.AddHttpClient<ISmsSender, VerimorSmsSender>();
 
 builder.Services.AddOpenApi();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
+
+
 
 var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -111,6 +133,38 @@ builder.Services
                 Encoding.UTF8.GetBytes(jwtOptions.Key)),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var rawUserId =
+                    context.Principal?.FindFirst(
+                        System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                    context.Principal?.FindFirst("sub")?.Value;
+
+                if (!Guid.TryParse(rawUserId, out var userId))
+                {
+                    context.Fail("Gecersiz kullanici kimligi.");
+                    return;
+                }
+
+                var db = context.HttpContext.RequestServices
+                    .GetRequiredService<AppDbContext>();
+
+                var isValidUser = await db.Users
+                    .AsNoTracking()
+                    .AnyAsync(x =>
+                        x.Id == userId &&
+                        x.IsActive &&
+                        x.DeletedAtUtc == null);
+
+                if (!isValidUser)
+                {
+                    context.Fail("Kullanici hesabi aktif degil.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -132,6 +186,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("Frontend");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 
@@ -161,10 +217,8 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await SeedData.InitializeAsync(dbContext);
-    if (!app.Environment.IsDevelopment())
-    {
-        await ExpandedCatalogSeeder.EnsureAsync(dbContext);
-    }
+    // Eski kategori kataloğunun otomatik yüklenmesi devre dışı.
+    // A/B/C kategori kayıtları yönetim panelinden yönetilir.
 }
 
 app.MapGet("/", () => Results.Ok(new
@@ -200,9 +254,11 @@ app.MapPromotionEndpoints();
 app.MapProviderImageEndpoints();
 app.MapUserProfileImageEndpoints();
 app.MapOfferEndpoints();
+app.MapNeedJobEndpoints();
 app.MapReviewEndpoints();
 app.MapProviderInteractionEndpoints();
 app.MapMessagingEndpoints();
+app.MapNeedMessagingEndpoints();
 app.MapNotificationEndpoints();
 app.MapContactEndpoints();
 app.MapAdminAuditLogEndpoints();
@@ -215,6 +271,7 @@ if (app.Environment.IsDevelopment())
     app.MapAdminProviderWorkflowEndpoints();
     app.MapDevelopmentProviderOwnerEndpoints();
     app.MapAdminNeedEndpoints();
+    app.MapPublicStatsEndpoints();
     app.MapAdminDashboardEndpoints();
     app.MapAdminUserEndpoints();
 app.MapAdminRoleManagementEndpoints();
@@ -230,3 +287,4 @@ else
 
 app.MapAdminAnalyticsEndpoints();
 app.Run();
+public partial class Program { }

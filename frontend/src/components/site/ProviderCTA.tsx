@@ -2,193 +2,72 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Crown, Sparkles, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { apiBaseUrl } from "@/lib/api";
 
-type Plan = {
-  id: string;
-  code: string;
-  annualPrice: number;
-  monthlyEquivalent: number;
-  serviceLimit: number;
-  isRecommended: boolean;
+type CampaignAvailability = {
+  available: boolean;
+  remaining: number;
 };
-
-const defaults: Plan[] = [
-  { id: "kobi", code: "kobi", annualPrice: 1200, monthlyEquivalent: 100, serviceLimit: 2, isRecommended: false },
-  { id: "avantaj", code: "avantaj", annualPrice: 2400, monthlyEquivalent: 200, serviceLimit: 5, isRecommended: true },
-  { id: "profesyonel", code: "profesyonel", annualPrice: 5000, monthlyEquivalent: 416.67, serviceLimit: 12, isRecommended: false },
-];
-
-const names: Record<string, string> = {
-  kobi: "KOBİ Paket",
-  avantaj: "Avantaj Paket",
-  profesyonel: "Profesyonel Paket",
-};
-
-const regularPrices: Record<string, number> = {
-  kobi: 2400,
-  avantaj: 5000,
-  profesyonel: 12000,
-};
-
-const formatMoney = (n: number) => n.toLocaleString("tr-TR", {
-  maximumFractionDigits: 0,
-});
 
 export function ProviderCTA() {
-  const [plans, setPlans] = useState<Plan[]>(defaults);
+  const [campaignVisible, setCampaignVisible] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetch(`${apiBaseUrl}/api/membership-plans`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Paketler yüklenemedi");
-        return res.json();
-      })
-      .then((data: Plan[]) => {
-        if (active && Array.isArray(data) && data.length) {
-          setPlans(data);
-        }
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, []);
 
-  const ordered = ["kobi", "avantaj", "profesyonel"]
-    .map((code) => plans.find((p) => p.code === code))
-    .filter((p): p is Plan => Boolean(p));
+    async function loadCampaign() {
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/api/promotions/first500/availability`,
+          { cache: "no-store" },
+        );
+
+        if (!response.ok) return;
+
+        const data =
+          (await response.json()) as CampaignAvailability;
+
+        if (active) {
+          setCampaignVisible(
+            data.available === true && data.remaining > 0,
+          );
+        }
+      } catch {
+        // Kampanya durumu doğrulanamazsa reklam gösterilmez.
+      }
+    }
+
+    void loadCampaign();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section className="home-cta section-shell py-6 sm:py-8 lg:py-10">
       <div className="rounded-2xl border border-primary/25 bg-accent px-4 py-10 sm:px-8">
-        <div className="text-center">
-          <h2 className="font-display text-3xl font-bold sm:text-4xl">
-            İşini büyütmek ister misin?
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-            İşletmeni dijital dünyada tanıt, hizmetlerini sergile
-            ve bölgende seni arayan müşterilere ulaş.
-          </p>
-        </div>
-
-        <div className="mx-auto mt-10 grid max-w-6xl grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-5">
-          {ordered.map((plan) => {
-            const professional = plan.code === "profesyonel";
-            const recommended = plan.code === "avantaj";
-            const kobi = plan.code === "kobi";
-
-            return (
-              <article
-                key={plan.code}
-                className={[
-                  "relative flex h-full min-w-0 flex-col self-stretch rounded-[18px] border bg-card p-2.5 shadow-sm transition-all duration-300 sm:rounded-[22px] sm:p-4 xl:p-5",
-
-                  professional
-                    ? "col-span-2 w-full md:col-span-1"
-                    : "",
-                  recommended
-                    ? "border-orange-400 ring-2 ring-orange-200/70"
-                    : "border-border",
-                ].join(" ")}
-              >
-                {recommended && (
-                  <span className="absolute right-2 top-2 rounded-full bg-orange-500 px-2 py-1 text-[9px] font-bold text-white sm:text-xs">
-                    ÖNERİLEN
-                  </span>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <div className={[
-                    "grid size-11 shrink-0 place-items-center rounded-xl sm:size-14",
-                    recommended
-                      ? "bg-orange-100 text-orange-600"
-                      : professional
-                        ? "bg-violet-100 text-violet-700"
-                        : "bg-sky-100 text-sky-700",
-                  ].join(" ")}>
-                    {recommended ? <Crown /> : professional ? <Sparkles /> : <Building2 />}
-                  </div>
-                  <h3 className="font-display text-base font-extrabold sm:text-xl">
-                    {names[plan.code]}
-                  </h3>
-                </div>
-
-                <div className={[
-                  "mt-5 rounded-xl border p-3",
-                  recommended
-                    ? "border-orange-200 bg-orange-50/60"
-                    : professional
-                      ? "border-violet-200 bg-violet-50/60"
-                      : "border-sky-200 bg-sky-50/60",
-                ].join(" ")}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                      Birinci Yıla Özel
-                    </span>
-                    <span className="text-sm font-bold text-slate-600 line-through sm:text-lg">
-                      {formatMoney(regularPrices[plan.code])} TL
-                    </span>
-                  </div>
-                  <div className={[
-                    "mt-2 text-2xl font-black sm:text-3xl",
-                    recommended ? "text-orange-600" : professional ? "text-violet-700" : "text-sky-700",
-                  ].join(" ")}>
-                    {formatMoney(plan.annualPrice)} TL
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    KDV dahil / yıl
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Aylık yaklaşık {formatMoney(plan.monthlyEquivalent)} TL
-                  </p>
-                </div>
-
-                <div className="mt-3 rounded-xl bg-muted/50 p-3">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Hizmet kapasitesi
-                  </p>
-                  <p className="mt-1 text-lg font-bold">
-                    {plan.serviceLimit} kategori
-                  </p>
-                </div>
-
-                <div className="mt-4 flex-1 space-y-3">
-                  {[
-                    "Dijital vitrin",
-                    "İşletme paneline tam erişim",
-                    "12 aylık platform üyeliği",
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-start gap-2 text-xs sm:text-sm">
-                      <Check className="size-4 shrink-0 text-emerald-600" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <Link
-                  href={`/kayit?hesap=isletme&paket=${plan.code}`}
-                  className={[
-                    "mt-6 flex h-11 items-center justify-center rounded-xl px-2 text-center text-xs font-bold transition sm:text-sm",
-                    recommended
-                      ? "bg-orange-500 text-white hover:bg-orange-600"
-                      : kobi
-                        ? "border border-emerald-300 bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                        : "bg-violet-600 text-white hover:bg-violet-700",
-                  ].join(" ")}
-                >
-                  Kayıt Ol / Satın Al
-                </Link>
-              </article>
-            );
-          })}
-        </div>
-
-        <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-6 text-muted-foreground">
-          Tüm paketler satın alma tarihinden itibaren 12 ay geçerlidir.
-          Otomatik yenileme ve otomatik kart tahsilatı yapılmaz.
-          Süre sonunda işletmeler üyeliklerini yeniden satın alarak yenileyebilir.
-        </p>
+        {campaignVisible && (
+          <Link
+            href="/kayit?hesap=isletme&paket=kobi"
+            aria-label="İlk 500 işletmeye ücretsiz KOBİ üyeliği kampanyasına katıl"
+            className="block overflow-hidden rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-500"
+          >
+            <picture>
+              <source
+                media="(max-width: 639px)"
+                srcSet="/kampanya/kampanya-ilk500-mobil-v2.webp"
+              />
+              <img
+                src="/kampanya/kampanya-ilk500-masaustu-v2.webp"
+                alt="İlk 500 işletmeye özel ücretsiz KOBİ üyeliği kampanyası"
+                className="block h-auto w-full"
+                loading="lazy"
+              />
+            </picture>
+          </Link>
+        )}
 
         <div className="mx-auto mt-10 max-w-5xl rounded-xl border border-primary/25 bg-card p-6 sm:p-8">
 

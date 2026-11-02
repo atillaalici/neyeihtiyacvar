@@ -351,14 +351,20 @@ function RegisterPageContent() {
 
       const registerData = data as RegisterResponse;
 
-      // Normal kullanıcı kaydında e-posta doğrulaması giriş şartı değildir.
-      // Kayıt sonrası kullanıcı güvenli giriş ekranına yönlendirilir.
       const params = new URLSearchParams({
-        returnUrl,
+        channel: "email",
+        userId: registerData.userId,
         email: registerData.email,
+        returnUrl,
       });
 
-      router.push(`/giris?${params.toString()}`);
+      if (registerData.verificationRequired) {
+        router.push(`/dogrula?${params.toString()}`);
+      } else {
+        router.push(
+          `/giris?returnUrl=${encodeURIComponent(returnUrl)}&email=${encodeURIComponent(registerData.email)}`
+        );
+      }
     } catch {
       setError(
         "Sunucuya bağlanılamadı. İnternet bağlantısını ve backend servisinin çalıştığını kontrol et.",
@@ -368,193 +374,6 @@ function RegisterPageContent() {
     }
   }
 
-  const accountChoice = searchParams.get("hesap");
-  const hasAccountChoice =
-    accountChoice === "kullanici" ||
-    accountChoice === "isletme";
-
-  if (!hasAccountChoice) {
-    const userRegistrationUrl =
-      incomingReturnUrl && incomingReturnUrl !== "/"
-        ? `/kayit?hesap=kullanici&returnUrl=${encodeURIComponent(incomingReturnUrl)}`
-        : "/kayit?hesap=kullanici";
-
-    return (
-      <SiteLayout>
-        <section className="section-shell py-10 sm:py-14">
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-8 text-center">
-              <p className="text-sm font-semibold text-primary">
-                Neye İhtiyacın Var?
-              </p>
-
-              <h1 className="mt-2 font-display text-4xl font-bold sm:text-5xl">
-                Hesap oluştur
-              </h1>
-
-              <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-                Kullanıcı olarak ihtiyacını paylaş veya işletme olarak
-                müşterilerine daha kolay ulaş.
-              </p>
-            </div>
-
-            <div className="grid gap-5 lg:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => router.push(userRegistrationUrl)}
-                className="group min-h-[25rem] rounded-[30px] border border-orange-200 bg-gradient-to-br from-orange-50 via-background to-orange-50/40 p-7 text-left shadow-soft transition hover:-translate-y-1 hover:border-orange-400 hover:shadow-lg sm:p-8"
-              >
-                <div className="flex h-full flex-col">
-                  <div className="flex items-start gap-4">
-                    <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-orange-100 text-orange-600">
-                      <UsersRound className="size-7" />
-                    </div>
-
-                    <div>
-                      <h2 className="font-display text-2xl font-bold text-foreground">
-                        Kullanıcı olarak kayıt ol
-                      </h2>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        İhtiyacını paylaş, işletmelerden teklif al ve sana en
-                        uygun hizmet vereni kolayca bul.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
-                    <div className="flex items-center gap-3 text-emerald-700">
-                      <CheckCircle2 className="size-6 shrink-0" />
-                      <div>
-                        <div className="text-2xl font-extrabold">
-                          %100 Ücretsiz
-                        </div>
-                        <div className="mt-0.5 text-sm font-medium">
-                          Kullanıcı kaydı tamamen ücretsizdir.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-3 text-sm text-foreground">
-                    {[
-                      "İhtiyaçlarını kolayca paylaş",
-                      "İşletmelerden teklif al",
-                      "Doğru hizmet verene hızlı ulaş",
-                      "Kullanıcı hesabını ücretsiz kullan",
-                    ].map((item) => (
-                      <div
-                        key={item}
-                        className="flex items-center gap-3"
-                      >
-                        <span className="grid size-6 place-items-center rounded-full bg-orange-100 text-orange-600">
-                          ✓
-                        </span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-auto pt-7">
-                    <div className="flex h-12 items-center justify-center rounded-2xl bg-primary px-5 text-base font-bold text-primary-foreground transition group-hover:opacity-90">
-                      Kullanıcı olarak devam et
-                    </div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => router.push("/uyelik")}
-                className="group min-h-[25rem] rounded-[30px] border border-sky-200 bg-gradient-to-br from-sky-50 via-background to-sky-50/50 p-7 text-left shadow-soft transition hover:-translate-y-1 hover:border-sky-400 hover:shadow-lg sm:p-8"
-              >
-                <div className="flex h-full flex-col">
-                  <div className="flex items-start gap-4">
-                    <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-sky-100 text-sky-700">
-                      <Building2 className="size-7" />
-                    </div>
-
-                    <div>
-                      <h2 className="font-display text-2xl font-bold text-foreground">
-                        İşletme olarak kayıt ol
-                      </h2>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        İşletmeni tanıt, hizmetlerini göster ve daha fazla
-                        müşteriye ulaş.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-3 text-sm text-foreground">
-                    {[
-                      "Daha fazla müşteriye ulaş",
-                      "İşletme profilini oluştur",
-                      "Hizmetlerini tanıt",
-                      "Güvenilir ve profesyonel görün",
-                    ].map((item) => (
-                      <div
-                        key={item}
-                        className="flex items-center gap-3"
-                      >
-                        <span className="grid size-6 place-items-center rounded-full bg-sky-100 text-sky-700">
-                          ✓
-                        </span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-auto pt-7">
-                    <div className="flex h-12 items-center justify-center rounded-2xl bg-sky-600 px-5 text-base font-bold text-white transition group-hover:bg-sky-700">
-                      İşletme olarak devam et
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            <div className="mt-8 grid gap-3 text-center text-xs text-muted-foreground sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-card px-4 py-3">
-                <div className="font-semibold text-foreground">
-                  Güvenli Kayıt
-                </div>
-                <div className="mt-1">
-                  Bilgilerin güvende
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-card px-4 py-3">
-                <div className="font-semibold text-foreground">
-                  Hızlı ve Kolay
-                </div>
-                <div className="mt-1">
-                  Sadece birkaç adım
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-card px-4 py-3">
-                <div className="font-semibold text-foreground">
-                  Her Zaman Yanınızda
-                </div>
-                <div className="mt-1">
-                  İhtiyaçların için buradayız
-                </div>
-              </div>
-            </div>
-
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Zaten hesabın var mı?{" "}
-              <Link
-                href="/giris"
-                className="font-semibold text-primary hover:underline"
-              >
-                Giriş yap
-              </Link>
-            </p>
-          </div>
-        </section>
-      </SiteLayout>
-    );
-  }
   if (accountType === "business") {
     return (
       <SiteLayout>

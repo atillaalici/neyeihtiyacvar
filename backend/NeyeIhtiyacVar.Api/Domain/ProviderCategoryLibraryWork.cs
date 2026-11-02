@@ -8,5 +8,7 @@ public sealed class ProviderCategoryLibraryWork
     public Guid CategoryLibraryWorkId { get; set; }
     public CategoryLibraryWork CategoryLibraryWork { get; set; } = null!;
 
+    public int SlotIndex { get; set; }
+
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }

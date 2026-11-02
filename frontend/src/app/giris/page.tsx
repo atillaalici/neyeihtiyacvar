@@ -172,7 +172,7 @@ function LoginPageContent() {
               </label>
 
               <Link
-                href="/sifremi-unuttum"
+                href={`/sifremi-unuttum?email=${encodeURIComponent(email.trim())}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 Şifremi Unuttum
