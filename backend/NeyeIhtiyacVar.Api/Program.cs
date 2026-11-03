@@ -265,13 +265,13 @@ app.MapAdminAuditLogEndpoints();
 app.MapAdminModerationEndpoints();
 app.MapAdminDirectoryEndpoints();
 app.MapAdminNotificationCountEndpoints();
+app.MapPublicStatsEndpoints();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapAdminProviderWorkflowEndpoints();
     app.MapDevelopmentProviderOwnerEndpoints();
     app.MapAdminNeedEndpoints();
-    app.MapPublicStatsEndpoints();
     app.MapAdminDashboardEndpoints();
     app.MapAdminUserEndpoints();
 app.MapAdminRoleManagementEndpoints();
