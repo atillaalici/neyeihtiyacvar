@@ -178,7 +178,7 @@ export default async function CategoriesPage() {
               href="/hizmetler"
               className="text-xs font-semibold text-orange-700 transition hover:text-orange-800 sm:text-sm"
             >
-              TÜm hizmetleri keŞfet →
+              Tüm hizmetleri keşfet →
             </Link>
           </div>
 
