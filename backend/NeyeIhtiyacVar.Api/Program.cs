@@ -234,6 +234,7 @@ app.MapCatalogEndpoints();
 app.MapLocationEndpoints();
 app.MapProviderEndpoints();
 app.MapFeaturedProviderEndpoints();
+app.MapBusinessShowcaseEndpoints();
 app.MapEmergencyServiceEndpoints();
 app.MapRecommendationEndpoints();
 app.MapSmartSearchEndpoints();

@@ -46,6 +46,10 @@ public sealed class Provider
 
     public int? ExperienceYears { get; set; }
 
+    public DateTime? ShowcaseStartedAtUtc { get; set; }
+
+    public DateTime? ShowcaseExpiresAtUtc { get; set; }
+
     public bool EmergencyService { get; set; }
 
     public bool OnsiteService { get; set; }

@@ -22,10 +22,11 @@ export function HomeClient() {
       <div className="home-page">
         <HeroSearch />
 
+        <EmergencyServicesSlider />
+
         <SeasonalNeedsSlider />
 
         <ShowcaseSection />
-        <EmergencyServicesSlider />
         <PopularServicesSection />
 
         <HowItWorks />

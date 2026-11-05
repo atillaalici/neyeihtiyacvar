@@ -34,6 +34,8 @@ type AdminProvider = {
   publicationStatus: PublicationStatus;
   isActive: boolean;
   publishedAtUtc: string | null;
+  showcaseStartedAtUtc: string | null;
+  showcaseExpiresAtUtc: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
   version: number;
@@ -53,6 +55,7 @@ export default function AdminProvidersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showcaseBusyId, setShowcaseBusyId] = useState<string | null>(null);
 
   const pageSize = 10;
 
@@ -127,6 +130,40 @@ export default function AdminProvidersPage() {
 
     return () => window.clearTimeout(timer);
   }, [query, sort, status]);
+
+  async function updateShowcase(provider: AdminProvider, days: 7 | 15 | 30 | null) {
+    if (!days && !window.confirm(`${provider.businessName} vitrinden çıkarılsın mı?`)) {
+      return;
+    }
+
+    setShowcaseBusyId(provider.id);
+    setError("");
+
+    try {
+      const response = await adminFetch(
+        `${apiBaseUrl}/api/admin/providers/${provider.id}/showcase`,
+        days
+          ? {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ days }),
+            }
+          : { method: "DELETE" },
+      );
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        setError(data?.message ?? "Vitrin işlemi gerçekleştirilemedi.");
+        return;
+      }
+
+      await loadProviders();
+    } catch {
+      setError("Vitrin işlemi sırasında sunucuya bağlanılamadı.");
+    } finally {
+      setShowcaseBusyId(null);
+    }
+  }
 
   async function publishProvider(provider: AdminProvider) {
     if (
@@ -367,7 +404,39 @@ export default function AdminProvidersPage() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-col gap-3 xl:items-end">
+                    <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                      {([7, 15, 30] as const).map((days) => (
+                        <Button
+                          key={days}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={showcaseBusyId !== null || provider.publicationStatus !== "published"}
+                          onClick={() => void updateShowcase(provider, days)}
+                        >
+                          {days} Gün
+                        </Button>
+                      ))}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={showcaseBusyId !== null || !provider.showcaseExpiresAtUtc}
+                        onClick={() => void updateShowcase(provider, null)}
+                      >
+                        Vitrinden Çıkar
+                      </Button>
+                    </div>
+                    {provider.showcaseExpiresAtUtc && (
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(provider.showcaseExpiresAtUtc).getTime() > Date.now()
+                          ? "Vitrin bitişi: "
+                          : "Vitrin süresi doldu: "}
+                        {new Date(provider.showcaseExpiresAtUtc).toLocaleString("tr-TR")}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
                     <Link
                       href={`/admin/isletmeler/${provider.id}`}
                       className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
@@ -410,6 +479,7 @@ export default function AdminProvidersPage() {
                     >
                       Sil
                     </Button>
+                    </div>
                   </div>
                 </div>
               </article>

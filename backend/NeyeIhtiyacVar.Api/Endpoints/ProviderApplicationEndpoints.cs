@@ -401,6 +401,8 @@ public static class ProviderApplicationEndpoints
                     x.PublicAddress,
                     x.WorkingHours,
                     x.ExperienceYears,
+                    x.ShowcaseStartedAtUtc,
+                    x.ShowcaseExpiresAtUtc,
                     x.EmergencyService,
                     x.OnsiteService,
                     publicationStatus = x.PublicationStatus.ToString().ToLowerInvariant(),
